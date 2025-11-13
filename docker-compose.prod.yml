@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: akaydepo_db_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-akaydepo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      POSTGRES_DB: ${DB_NAME:-akaydepo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - akaydepo_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-akaydepo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: akaydepo_redis_prod
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - akaydepo_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: akaydepo_api_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-akaydepo}:${DB_PASSWORD}@db:5432/${DB_NAME:-akaydepo}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: production
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - akaydepo_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
+
+  # React Frontend
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost/api}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost/ws}
+    container_name: akaydepo_web_prod
+    restart: always
+    networks:
+      - akaydepo_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: akaydepo_nginx_prod
+    restart: always
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - akaydepo_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  akaydepo_network:
+    driver: bridge

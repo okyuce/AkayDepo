@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Backend API (FastAPI)
+  api:
+    build: ./backend
+    container_name: akaydepo_api
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    environment:
+      - DATABASE_URL=postgresql://depo:depo123@db:5432/akaydepo
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ENVIRONMENT=development
+    depends_on:
+      - db
+      - redis
+    networks:
+      - akaydepo_network
+    restart: unless-stopped
+
+  # Frontend (React + Vite)
+  web:
+    build: ./frontend
+    container_name: akaydepo_web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8001
+    depends_on:
+      - api
+    networks:
+      - akaydepo_network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: akaydepo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=akaydepo
+      - POSTGRES_USER=depo
+      - POSTGRES_PASSWORD=depo123
+    networks:
+      - akaydepo_network
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: akaydepo_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - akaydepo_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  akaydepo_network:
+    driver: bridge

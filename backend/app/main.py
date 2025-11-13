@@ -1,0 +1,41 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+
+app = FastAPI(
+    title="AkayDepo API",
+    description="Depo Transfer Yönetim Sistemi",
+    version="0.1.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+async def root():
+    return {
+        "message": "AkayDepo API",
+        "version": "0.1.0",
+        "environment": settings.ENVIRONMENT
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# API routers
+from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations
+
+app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
+app.include_router(cycles.router, prefix="/v1/cycles", tags=["cycles"])
+app.include_router(planning.router, prefix="/v1/cycles", tags=["planning"])
+app.include_router(loadsheets.router, prefix="/v1/loadsheets", tags=["loadsheets"])
+app.include_router(counters.router, prefix="/v1/counters", tags=["counters"])
+app.include_router(stations.router, prefix="/v1/stations", tags=["stations"])
+app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
