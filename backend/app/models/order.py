@@ -38,6 +38,9 @@ class Order(SQLModel, table=True):
     revision_group_id: UUID  # Aynı siparişin versiyonları
     revision_no: int  # 1, 2, 3
     source_sheet: str  # Recipe2 / Recip1
+    import_batch: int = Field(default=1)  # 1, 2, 3... (hangi Excel import'u)
+    is_revision: bool = Field(default=False)  # Bu sipariş revizyon mu?
+    previous_order_id: Optional[UUID] = None  # Revizyon ise önceki sipariş
     imported_at: datetime = Field(default_factory=datetime.utcnow)
 
 class OrderLine(SQLModel, table=True):

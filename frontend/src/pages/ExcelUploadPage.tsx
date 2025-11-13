@@ -337,30 +337,7 @@ export default function ExcelUploadPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Planlama Sonucu</h2>
-              
-              {!isPlanLocked ? (
-                <button
-                  onClick={async () => {
-                    if (window.confirm('Planı kilitledikten sonra değiştiremezsiniz. Fişler oluşturulacak. Emin misiniz?')) {
-                      try {
-                        // Fişleri oluştur (loadsheet generation backend'de zaten yapılıyor)
-                        setIsPlanLocked(true);
-                        localStorage.setItem('plan_locked_' + cycleId, 'true');
-                        alert('✅ Plan kilitlendi! Fişler oluşturuldu. Artık değiştirilemez.');
-                      } catch (err) {
-                        alert('Hata: Plan kilitlenemedi.');
-                      }
-                    }
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-semibold"
-                >
-                  Planı Onayla ve Kilitle
-                </button>
-              ) : (
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-                  🔒 Plan Kilitli
-                </span>
-              )}
+              {/* Kilitleme butonu kaldırıldı - revizyon sistemi için */}
             </div>
 
             <div className="space-y-4">

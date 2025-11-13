@@ -46,6 +46,16 @@ export default function Navbar() {
                 >
                   İstasyon Dağılımı
                 </Link>
+                <Link
+                  to="/loadsheets"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                    location.pathname === '/loadsheets' 
+                      ? 'bg-blue-700 text-white' 
+                      : 'text-blue-100 hover:bg-blue-500'
+                  }`}
+                >
+                  Yükleme Fişleri
+                </Link>
               </nav>
             )}
           </div>

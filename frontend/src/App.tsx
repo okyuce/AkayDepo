@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import ExcelUploadPage from './pages/ExcelUploadPage';
 import TabletPage from './pages/TabletPage';
 import StationDistributionPage from './pages/StationDistributionPage';
+import LoadsheetListPage from './pages/LoadsheetListPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -43,6 +44,14 @@ function App() {
           element={
             <PrivateRoute>
               <StationDistributionPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/loadsheets"
+          element={
+            <PrivateRoute>
+              <LoadsheetListPage />
             </PrivateRoute>
           }
         />

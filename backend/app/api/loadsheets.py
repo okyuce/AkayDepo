@@ -64,10 +64,13 @@ async def get_station_loadsheets(
         for assignment in assignments:
             territory = session.get(Territory, assignment.territory_id)
             
-            # Bu territory'nin fişleri
-            stmt = select(Loadsheet).where(
-                Loadsheet.assignment_id == assignment.id
-            ).order_by(Loadsheet.package_number)
+            # Bu territory'nin fişleri - route_order ile sırala
+            stmt = (
+                select(Loadsheet)
+                .join(Dealer, Loadsheet.dealer_id == Dealer.id)
+                .where(Loadsheet.assignment_id == assignment.id)
+                .order_by(Dealer.route_order)
+            )
             loadsheets = session.exec(stmt).all()
             
             # Fiş detayları
@@ -90,6 +93,9 @@ async def get_station_loadsheets(
                     "route_order": dealer.route_order if dealer else 0,
                     "total_carton": round(ls_total_carton, 1),
                     "status": ls.status,
+                    "batch_number": ls.batch_number,
+                    "loadsheet_type": ls.loadsheet_type,
+                    "completed_at": ls.completed_at.isoformat() if ls.completed_at else None,
                     "is_revision": ls.is_revision,
                     "parent_loadsheet_id": str(ls.parent_loadsheet_id) if ls.parent_loadsheet_id else None,
                     "loaded_at": ls.loaded_at.isoformat() if ls.loaded_at else None
@@ -221,6 +227,7 @@ async def complete_loadsheet(
     # Durumu güncelle
     loadsheet.status = "loaded"
     loadsheet.loaded_at = datetime.utcnow()
+    loadsheet.completed_at = datetime.utcnow()
     session.add(loadsheet)
     session.commit()
     
