@@ -78,12 +78,7 @@ export default function StationDistributionPage() {
           name: s.station_name
         }));
         setStations(stationList);
-        
-        // İlk istasyonu otomatik seç
-        if (stationList.length > 0) {
-          setSelectedStationId(stationList[0].id);
-          await loadStationDistribution(stationList[0].id);
-        }
+        // İlk istasyonu otomatik seçme - kullanıcı manuel seçsin
       }
     } catch (err) {
       console.error('İstasyonlar yüklenemedi:', err);
@@ -107,7 +102,9 @@ export default function StationDistributionPage() {
 
   const handleStationChange = (stationId: string) => {
     setSelectedStationId(stationId);
-    loadStationDistribution(stationId);
+    if (stationId) {
+      loadStationDistribution(stationId);
+    }
   };
 
   return (
@@ -143,6 +140,7 @@ export default function StationDistributionPage() {
                       onChange={(e) => handleStationChange(e.target.value)}
                       className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="">İstasyon Seçiniz...</option>
                       {stations.map((station) => (
                         <option key={station.id} value={station.id}>
                           {station.name}
@@ -161,9 +159,15 @@ export default function StationDistributionPage() {
               </div>
 
               {/* Dağılım Tablosu - Excel Format (Ürün x Territory Matrix) */}
-              {isLoading ? (
+              {!selectedStationId ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <p className="text-center text-blue-800">
+                    Lütfen yukarıdaki listeden bir istasyon seçin.
+                  </p>
+                </div>
+              ) : isLoading ? (
                 <div className="bg-white rounded-lg shadow-md p-6">
-                  <p className="text-center text-gray-500">Yükleniyor...</p>
+                  <p className="text-center text-gray-500">Yüklüyor...</p>
                 </div>
               ) : distributionData ? (
                 <div className="bg-white rounded-lg shadow-md overflow-hidden">
