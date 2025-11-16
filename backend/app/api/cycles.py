@@ -109,17 +109,26 @@ async def cancel_pending(
     cycle_id: UUID,
     session: Session = Depends(get_session)
 ):
-    """Döngüdeki tüm pending fişleri iptal et"""
+    """
+    Döngüdeki tüm pending fişleri iptal et ve döngüyü tamamla
+    Bu endpoint 'Yeni Döngü Başlat' butonu için kullanılır.
+    """
     cycle = session.get(Cycle, cycle_id)
     if not cycle:
         raise HTTPException(404, "Döngü bulunamadı")
     
     manager = CycleManager(session)
+    
+    # Pending fişleri iptal et
     cancelled_count = manager.cancel_pending_loadsheets(cycle_id)
+    
+    # Döngüyü tamamla (completed status)
+    manager.complete_cycle(cycle_id)
     
     return {
         "cycle_id": str(cycle_id),
         "cancelled_count": cancelled_count,
+        "cycle_completed": True,
         "can_start_next_cycle": True
     }
 
