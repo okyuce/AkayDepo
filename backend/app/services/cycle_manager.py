@@ -25,7 +25,7 @@ class CycleManager:
         excel_content: bytes
     ) -> Cycle:
         """
-        Yeni döngü oluştur ve Excel verisini import et
+        Yeni döngü oluştur veya mevcut döngüye append et
         
         Args:
             run_time: "14:00", "16:00", "17:00"
@@ -33,40 +33,47 @@ class CycleManager:
             excel_content: Excel dosyası bytes
             
         Returns:
-            Cycle: Oluşturulan döngü
+            Cycle: Oluşturulan veya mevcut döngü
         """
-        # Önceki döngü tamamlanmış mı kontrol et
-        can_start, warnings = self.can_start_new_cycle(plan_date)
-        if not can_start:
-            raise Exception(f"Yeni döngü başlatılamaz: {', '.join(warnings)}")
-        
-        # Cycle no hesapla
-        cycle_no = self._get_next_cycle_no(plan_date)
-        
-        # Cycle oluştur
-        cycle = Cycle(
-            cycle_no=cycle_no,
-            run_time=run_time,
-            plan_date=plan_date,
-            status="active"
+        # Aynı gün için aktif döngü var mı kontrol et
+        stmt = select(Cycle).where(
+            Cycle.plan_date == plan_date,
+            Cycle.status == "active"
         )
-        self.session.add(cycle)
-        self.session.commit()
-        self.session.refresh(cycle)
+        existing_cycle = self.session.exec(stmt).first()
+        
+        if existing_cycle:
+            # APPEND MODE: Mevcut döngüye ekle
+            cycle = existing_cycle
+            batch_number = self._get_next_batch_number(cycle.id)
+        else:
+            # YENİ DÖNGÜ: Farklı gün için yeni cycle oluştur
+            cycle_no = self._get_next_cycle_no(plan_date)
+            
+            cycle = Cycle(
+                cycle_no=cycle_no,
+                run_time=run_time,
+                plan_date=plan_date,
+                status="active"
+            )
+            self.session.add(cycle)
+            self.session.commit()
+            self.session.refresh(cycle)
+            batch_number = 1
         
         # Excel'i parse et ve import et
         parser = ExcelParser(excel_content, sheet_name='Recipe2')
         df = parser.validate_and_parse()
         
-        # Verileri import et
+        # Verileri import et (batch numarası ile)
         self._import_territories(df)
         self._import_dealers(df)
         self._import_products(df)
-        self._import_orders(df, cycle.id)
+        self._import_orders(df, cycle.id, batch_number)
         
-        # Revizyon tespiti (eğer önceki döngü varsa)
-        if cycle_no > 1:
-            self._detect_revisions(cycle.id, plan_date)
+        # Revizyon tespiti (eğer batch > 1 ise)
+        if batch_number > 1:
+            self._detect_revisions(cycle.id, batch_number)
         
         return cycle
     
@@ -148,6 +155,17 @@ class CycleManager:
         
         return max(c.cycle_no for c in cycles) + 1
     
+    def _get_next_batch_number(self, cycle_id: UUID) -> int:
+        """Döngüdeki bir sonraki batch numarasını hesapla"""
+        stmt = select(Order).where(Order.cycle_id == cycle_id)
+        orders = self.session.exec(stmt).all()
+        
+        if not orders:
+            return 1
+        
+        max_batch = max(o.import_batch for o in orders)
+        return max_batch + 1
+    
     def _import_territories(self, df: pd.DataFrame):
         """Territory'leri import et (upsert)"""
         unique_territories = df['Territory'].unique()
@@ -215,7 +233,7 @@ class CycleManager:
         
         self.session.commit()
     
-    def _import_orders(self, df: pd.DataFrame, cycle_id: UUID):
+    def _import_orders(self, df: pd.DataFrame, cycle_id: UUID, batch_number: int = 1):
         """Siparişleri ve satırları import et"""
         # Siparişleri grupla
         for order_code, order_group in df.groupby('SiparişKodu'):
@@ -231,6 +249,18 @@ class CycleManager:
             if not territory or not dealer:
                 continue
             
+            # Aynı order_code ile önceki batch'te sipariş var mı?
+            is_revision = False
+            previous_order = None
+            if batch_number > 1:
+                stmt = select(Order).where(
+                    Order.cycle_id == cycle_id,
+                    Order.external_order_code == order_code,
+                    Order.import_batch < batch_number
+                ).order_by(Order.import_batch.desc())
+                previous_order = self.session.exec(stmt).first()
+                is_revision = previous_order is not None
+            
             # Order oluştur
             order = Order(
                 cycle_id=cycle_id,
@@ -240,6 +270,9 @@ class CycleManager:
                 delivery_date=first_row['TeslimatTarihi'].date(),
                 territory_id=territory.id,
                 dealer_id=dealer.id,
+                import_batch=batch_number,
+                is_revision=is_revision,
+                previous_order_id=previous_order.id if previous_order else None,
                 revision_group_id=uuid4(),  # İlk versiyon için yeni ID
                 revision_no=1,
                 source_sheet='Recipe2'
@@ -265,10 +298,31 @@ class CycleManager:
         
         self.session.commit()
     
-    def _detect_revisions(self, current_cycle_id: UUID, plan_date: date):
+    def _detect_revisions(self, cycle_id: UUID, batch_number: int):
         """
-        Revizyon tespiti - önceki döngü ile karşılaştır
-        Bu FAZ 2'de placeholder, FAZ 3'te implement edilecek
+        Revizyon tespiti - önceki batch ile karşılaştır ve loadsheet tipi belirle
+        
+        Args:
+            cycle_id: Döngü ID
+            batch_number: Şu anki batch numarası
         """
-        # TODO: Implement revision detection
-        pass
+        # Bu batch'teki tüm revizyon orderları al
+        stmt = select(Order).where(
+            Order.cycle_id == cycle_id,
+            Order.import_batch == batch_number,
+            Order.is_revision == True
+        )
+        revision_orders = self.session.exec(stmt).all()
+        
+        for order in revision_orders:
+            if not order.previous_order_id:
+                continue
+            
+            # Önceki order'ı al
+            previous_order = self.session.get(Order, order.previous_order_id)
+            if not previous_order:
+                continue
+            
+            # Ürün bazlı fark hesapla (placeholder - loadsheet oluşturulurken kullanılacak)
+            # TODO: Detaylı diff hesaplama loadsheet generator'da yapılacak
+            pass
