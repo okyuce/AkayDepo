@@ -18,7 +18,7 @@ class LoadsheetGenerator:
     
     def generate_loadsheets_for_cycle(self, cycle_id: UUID) -> int:
         """
-        Bir döngü için tüm fişleri oluştur
+        Bir döngü için tüm fişleri oluştur (multi-batch desteği ile)
         
         Args:
             cycle_id: Döngü ID
@@ -37,137 +37,169 @@ class LoadsheetGenerator:
         
         # Her assignment için fişler oluştur
         for assignment in assignments:
-            # Territory'nin bayilerini al
-            dealers = self._get_dealers_for_territory(cycle_id, assignment.territory_id)
+            # Bu territory için tüm dealer'ları ve batch'leri al
+            dealer_batches = self._get_dealer_batches_for_territory(cycle_id, assignment.territory_id)
             
             # Territory bilgisi
             territory = self.session.get(Territory, assignment.territory_id)
             
-            # Her bayi için fiş oluştur
-            for idx, dealer in enumerate(dealers, 1):
-                # Paket numarası üret: T07-B01
+            # Her dealer+batch kombinasyonu için fiş oluştur
+            dealer_index = {}
+            for dealer_id, batch_number, order in dealer_batches:
+                # Dealer index - ilk görüşte set et
+                if dealer_id not in dealer_index:
+                    dealer_index[dealer_id] = len(dealer_index) + 1
+                idx = dealer_index[dealer_id]
+                
+                # Paket numarası: T07-B01 (dealer index'e göre)
                 package_number = f"{territory.display_number}-B{idx:02d}"
                 
-                # Order'ı bul
-                stmt = select(Order).where(
-                    Order.cycle_id == cycle_id,
-                    Order.dealer_id == dealer.id
-                )
-                order = self.session.exec(stmt).first()
-                
-                if not order:
-                    continue
-                
                 # Loadsheet oluştur
-                loadsheet = Loadsheet(
+                loadsheet_count += self._create_loadsheet_for_order(
                     cycle_id=cycle_id,
-                    assignment_id=assignment.id,
-                    dealer_id=dealer.id,
-                    sheet_no=f"{cycle_id}-{package_number}",
+                    assignment=assignment,
+                    dealer_id=dealer_id,
+                    order=order,
                     package_number=package_number,
-                    status="pending",
-                    is_revision=False
+                    batch_number=batch_number
                 )
-                self.session.add(loadsheet)
-                self.session.flush()  # ID için
-                
-                # Order lines'ları loadsheet lines'a kopyala
-                stmt = select(OrderLine).where(OrderLine.order_id == order.id)
-                order_lines = self.session.exec(stmt).all()
-                
-                for line in order_lines:
-                    loadsheet_line = LoadsheetLine(
-                        loadsheet_id=loadsheet.id,
-                        product_id=line.product_id,
-                        qty_carton=line.qty_carton,
-                        qty_pack=line.qty_pack
-                    )
-                    self.session.add(loadsheet_line)
-                
-                loadsheet_count += 1
         
         self.session.commit()
         return loadsheet_count
     
-    def _get_dealers_for_territory(self, cycle_id: UUID, territory_id: UUID) -> List[Dealer]:
+    def _get_dealer_batches_for_territory(self, cycle_id: UUID, territory_id: UUID) -> List[tuple]:
         """
-        Bir territory'nin bayilerini al (route_order'a göre sıralı)
+        Bir territory için tüm dealer+batch kombinasyonlarını al
         
         Returns:
-            List[Dealer]: Sıralı bayi listesi
+            List[(dealer_id, batch_number, order)]: (dealer, batch, order) tuple'ları
         """
-        # Bu territory için order'ları al
-        stmt = select(Order).where(
+        # Bu territory için tüm order'ları al (batch ve dealer'a göre sıralı)
+        stmt = select(Order).join(Dealer).where(
             Order.cycle_id == cycle_id,
             Order.territory_id == territory_id
-        )
+        ).order_by(Dealer.route_order, Order.import_batch)
+        
         orders = self.session.exec(stmt).all()
         
-        # Unique dealer ID'leri
-        dealer_ids = list(set(order.dealer_id for order in orders))
+        # (dealer_id, batch_number, order) tuple listesi
+        result = []
+        for order in orders:
+            result.append((order.dealer_id, order.import_batch, order))
         
-        # Dealer'ları al ve route_order'a göre sırala
-        dealers = []
-        for dealer_id in dealer_ids:
-            dealer = self.session.get(Dealer, dealer_id)
-            if dealer:
-                dealers.append(dealer)
-        
-        # Route order'a göre sırala
-        dealers.sort(key=lambda d: d.route_order)
-        
-        return dealers
+        return result
     
-    def generate_revision_loadsheet(
+    def _create_loadsheet_for_order(
         self,
-        parent_loadsheet_id: UUID,
-        changes: Dict[UUID, int]  # {product_id: qty_change_carton}
-    ) -> Loadsheet:
+        cycle_id: UUID,
+        assignment: StationAssignment,
+        dealer_id: UUID,
+        order: Order,
+        package_number: str,
+        batch_number: int
+    ) -> int:
         """
-        Revizyon fişi oluştur
+        Bir order için loadsheet oluştur (revizyon tespiti ile)
         
-        Args:
-            parent_loadsheet_id: Orjinal fiş ID
-            changes: Ürün değişiklikleri
-            
         Returns:
-            Loadsheet: Revizyon fişi
+            int: Oluşturulan fiş sayısı (1)
         """
-        # Parent loadsheet al
-        parent = self.session.get(Loadsheet, parent_loadsheet_id)
-        if not parent:
-            raise Exception("Orjinal fiş bulunamadı")
+        # Revizyon mu kontrol et
+        is_revision = order.is_revision
+        loadsheet_type = "normal"
+        revision_diff = None
         
-        # Revizyon fişi oluştur
-        revision_package_number = f"{parent.package_number}-R"
+        if is_revision and order.previous_order_id:
+            # Önceki order ile karşılaştır ve diff hesapla
+            revision_diff, loadsheet_type = self._calculate_revision_diff(order.id, order.previous_order_id)
         
-        revision = Loadsheet(
-            cycle_id=parent.cycle_id,
-            assignment_id=parent.assignment_id,
-            dealer_id=parent.dealer_id,
-            sheet_no=f"{parent.sheet_no}-R",
-            package_number=revision_package_number,
+        # Loadsheet oluştur
+        loadsheet = Loadsheet(
+            cycle_id=cycle_id,
+            assignment_id=assignment.id,
+            dealer_id=dealer_id,
+            sheet_no=f"{cycle_id}-{package_number}-B{batch_number}",
+            package_number=package_number,
+            batch_number=batch_number,
             status="pending",
-            is_revision=True,
-            parent_loadsheet_id=parent.id
+            loadsheet_type=loadsheet_type,
+            revision_diff=revision_diff
         )
-        self.session.add(revision)
-        self.session.flush()
+        self.session.add(loadsheet)
+        self.session.flush()  # ID için
         
-        # Değişiklikleri loadsheet lines'a ekle
-        for product_id, qty_change in changes.items():
-            if qty_change == 0:
-                continue
-            
-            line = LoadsheetLine(
-                loadsheet_id=revision.id,
-                product_id=product_id,
-                qty_carton=qty_change,  # Pozitif veya negatif
-                qty_pack=0
+        # Order lines'ı loadsheet lines'a kopyala
+        stmt = select(OrderLine).where(OrderLine.order_id == order.id)
+        order_lines = self.session.exec(stmt).all()
+        
+        for line in order_lines:
+            loadsheet_line = LoadsheetLine(
+                loadsheet_id=loadsheet.id,
+                product_id=line.product_id,
+                qty_carton=line.qty_carton,
+                qty_pack=line.qty_pack
             )
-            self.session.add(line)
+            self.session.add(loadsheet_line)
         
-        self.session.commit()
-        self.session.refresh(revision)
+        return 1
+    
+    def _calculate_revision_diff(self, current_order_id: UUID, previous_order_id: UUID) -> tuple:
+        """
+        İki order arasındaki farkları hesapla
         
-        return revision
+        Returns:
+            (revision_diff_json, loadsheet_type): (JSON farklar, "revision_increase" veya "revision_decrease")
+        """
+        import json
+        
+        # Şu anki order lines
+        stmt = select(OrderLine).where(OrderLine.order_id == current_order_id)
+        current_lines = self.session.exec(stmt).all()
+        
+        # Önceki order lines
+        stmt = select(OrderLine).where(OrderLine.order_id == previous_order_id)
+        previous_lines = self.session.exec(stmt).all()
+        
+        # Ürün bazlı map oluştur
+        current_map = {line.product_id: line for line in current_lines}
+        previous_map = {line.product_id: line for line in previous_lines}
+        
+        # Farkları hesapla
+        diffs = []
+        total_diff_carton = 0
+        
+        # Tüm ürünleri kontrol et (hem yeni hem eski)
+        all_product_ids = set(current_map.keys()) | set(previous_map.keys())
+        
+        for product_id in all_product_ids:
+            current_qty = current_map.get(product_id)
+            previous_qty = previous_map.get(product_id)
+            
+            current_carton = current_qty.qty_carton if current_qty else 0
+            previous_carton = previous_qty.qty_carton if previous_qty else 0
+            
+            diff_carton = current_carton - previous_carton
+            
+            if diff_carton != 0:
+                product = self.session.get(Product, product_id)
+                diffs.append({
+                    "product_id": str(product_id),
+                    "product_code": product.code if product else "",
+                    "product_name": product.name if product else "",
+                    "previous_qty": previous_carton,
+                    "current_qty": current_carton,
+                    "diff": diff_carton
+                })
+                total_diff_carton += diff_carton
+        
+        # Loadsheet tipi belirle
+        if total_diff_carton > 0:
+            loadsheet_type = "revision_increase"
+        elif total_diff_carton < 0:
+            loadsheet_type = "revision_decrease"
+        else:
+            loadsheet_type = "normal"  # Fark yok
+        
+        revision_diff_json = json.dumps(diffs) if diffs else None
+        
+        return revision_diff_json, loadsheet_type
