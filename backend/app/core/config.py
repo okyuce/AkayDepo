@@ -1,8 +1,15 @@
-from pydantic_settings import BaseSettings
-from typing import List
-from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Union
+from pydantic import field_validator, Field
+import json
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        json_loads=json.loads
+    )
+    
     # Database
     DATABASE_URL: str = "postgresql://depo:depo123@db:5432/akaydepo"
     
@@ -17,18 +24,21 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:8000", "http://localhost:3000"]
+    # CORS - Accept either string or list
+    CORS_ORIGINS: Union[str, List[str]] = Field(default="http://localhost:8000,http://localhost:3000")
     
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(',')]
+            # Try JSON parse first
+            if v.startswith('['):
+                try:
+                    return json.loads(v)
+                except:
+                    pass
+            # Otherwise split by comma
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
         return v
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 settings = Settings()

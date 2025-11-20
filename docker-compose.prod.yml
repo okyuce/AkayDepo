@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:14-alpine
-    container_name: akaydepo_db_prod
+    container_name: akaydepo_postgres_prod
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-akaydepo}
@@ -74,7 +74,7 @@ services:
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: akaydepo_nginx_prod
+    container_name: akaydepo_nginx_8005
     restart: always
     ports:
       - "${HTTP_PORT:-80}:80"

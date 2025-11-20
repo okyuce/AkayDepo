@@ -16,8 +16,8 @@ type MessageHandler = (message: WebSocketMessage) => void;
 export function useWebSocket(path: string, onMessage?: MessageHandler) {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<number>();
+  const heartbeatIntervalRef = useRef<number>();
 
   useEffect(() => {
     let isMounted = true;

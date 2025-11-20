@@ -41,6 +41,24 @@ async def import_cycle(
         # Tarihi parse et
         plan_date_obj = date.fromisoformat(plan_date)
         
+        # Aktif döngüde aynı dosya adı var mı kontrol et
+        from app.models import CycleImport
+        stmt = select(Cycle).where(
+            Cycle.plan_date == plan_date_obj,
+            Cycle.status == "active"
+        ).order_by(Cycle.imported_at.desc())
+        active_cycle = session.exec(stmt).first()
+        
+        if active_cycle:
+            # Bu döngüde aynı dosya adı var mı?
+            stmt = select(CycleImport).where(
+                CycleImport.cycle_id == active_cycle.id,
+                CycleImport.filename == file.filename
+            )
+            existing_import = session.exec(stmt).first()
+            if existing_import:
+                raise HTTPException(400, "Bu dosya zaten yüklendi")
+        
         # Cycle Manager ile import et
         manager = CycleManager(session)
         cycle, batch_number = manager.create_cycle(run_time, plan_date_obj, content)
@@ -146,27 +164,83 @@ async def cancel_pending(
     session: Session = Depends(get_session)
 ):
     """
-    Döngüdeki tüm pending fişleri iptal et ve döngüyü tamamla
+    Yeni döngü başlat - TÜM verileri sil (territories, dealers, products, orders, loadsheets, stations, cycles)
     Bu endpoint 'Yeni Döngü Başlat' butonu için kullanılır.
     """
-    cycle = session.get(Cycle, cycle_id)
-    if not cycle:
-        raise HTTPException(404, "Döngü bulunamadı")
+    from app.models import (
+        Territory, Dealer, Product, Order, OrderLine, 
+        Loadsheet, LoadsheetLine, Station, StationAssignment,
+        LoadCounter, RevisionDiff, CycleImport
+    )
     
-    manager = CycleManager(session)
+    try:
+        # TÜM verileri sil (foreign key cascade ile ilişkili veriler de silinir)
+        # Sıralama önemli: önce bağımlı tablolar, sonra parent tablolar
+        
+        # 1. LoadsheetLine (Loadsheet'e bağlı)
+        session.exec(select(LoadsheetLine)).all()
+        for item in session.exec(select(LoadsheetLine)).all():
+            session.delete(item)
+        
+        # 2. Loadsheet (Station, Dealer, Cycle'a bağlı)
+        for item in session.exec(select(Loadsheet)).all():
+            session.delete(item)
+        
+        # 3. StationAssignment (Station, Territory, Cycle'a bağlı)
+        for item in session.exec(select(StationAssignment)).all():
+            session.delete(item)
+        
+        # 4. Station
+        for item in session.exec(select(Station)).all():
+            session.delete(item)
+        
+        # 5. OrderLine (Order'a bağlı)
+        for item in session.exec(select(OrderLine)).all():
+            session.delete(item)
+        
+        # 6. Order (Cycle, Dealer, Territory'ye bağlı)
+        for item in session.exec(select(Order)).all():
+            session.delete(item)
+        
+        # 7. LoadCounter (Station, Cycle'a bağlı)
+        for item in session.exec(select(LoadCounter)).all():
+            session.delete(item)
+        
+        # 8. RevisionDiff (Cycle'a bağlı)
+        for item in session.exec(select(RevisionDiff)).all():
+            session.delete(item)
+        
+        # 9. CycleImport (Cycle'a bağlı)
+        for item in session.exec(select(CycleImport)).all():
+            session.delete(item)
+        
+        # 10. Cycle
+        for item in session.exec(select(Cycle)).all():
+            session.delete(item)
+        
+        # 11. Dealer (Territory'ye bağlı)
+        for item in session.exec(select(Dealer)).all():
+            session.delete(item)
+        
+        # 12. Territory (parent tablo)
+        for item in session.exec(select(Territory)).all():
+            session.delete(item)
+        
+        # 13. Product (parent tablo)
+        for item in session.exec(select(Product)).all():
+            session.delete(item)
+        
+        session.commit()
+        
+        return {
+            "success": True,
+            "message": "Tüm veriler silindi. Yeni döngü başlatmaya hazır.",
+            "can_start_next_cycle": True
+        }
     
-    # Pending fişleri iptal et
-    cancelled_count = manager.cancel_pending_loadsheets(cycle_id)
-    
-    # Döngüyü tamamla (completed status)
-    manager.complete_cycle(cycle_id)
-    
-    return {
-        "cycle_id": str(cycle_id),
-        "cancelled_count": cancelled_count,
-        "cycle_completed": True,
-        "can_start_next_cycle": True
-    }
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(500, f"Veri silme hatası: {str(e)}")
 
 
 @router.get("/active")

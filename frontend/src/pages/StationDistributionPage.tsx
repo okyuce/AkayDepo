@@ -35,13 +35,6 @@ interface ProductRow {
   total_carton_equivalent: number;
 }
 
-interface DistributionData {
-  station_id: string;
-  station_name: string;
-  territories: Territory[];
-  products: ProductRow[];
-  grand_total: number;
-}
 
 export default function StationDistributionPage() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -207,14 +200,14 @@ export default function StationDistributionPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white">
-                        {distributionData.products.map((product, idx) => (
+                        {distributionData.products.map((product: ProductRow, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm text-gray-900 border border-gray-300">
                               {product.product_code}
                             </td>
-                            {distributionData.territories.map((territory) => {
+                            {distributionData.territories.map((territory: Territory) => {
                               const territoryData = product.territories.find(
-                                (t) => t.territory_id === territory.id
+                                (t: TerritoryQuantity) => t.territory_id === territory.id
                               );
                               const value = territoryData?.total_carton || 0;
                               return (
@@ -234,11 +227,11 @@ export default function StationDistributionPage() {
                           <td className="px-4 py-3 text-sm font-bold text-gray-900 border border-gray-400">
                             toplam
                           </td>
-                          {distributionData.territories.map((territory) => {
+                          {distributionData.territories.map((territory: Territory) => {
                             // Her territory'nin toplam kartonunu hesapla
-                            const territoryTotal = distributionData.products.reduce((sum, product) => {
+                            const territoryTotal = distributionData.products.reduce((sum: number, product: ProductRow) => {
                               const territoryData = product.territories.find(
-                                (t) => t.territory_id === territory.id
+                                (t: TerritoryQuantity) => t.territory_id === territory.id
                               );
                               return sum + (territoryData?.total_carton || 0);
                             }, 0);

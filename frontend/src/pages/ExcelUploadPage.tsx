@@ -16,6 +16,8 @@ export default function ExcelUploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPlanLocked, setIsPlanLocked] = useState(false);
   const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string}[]>([]);
+  const [isPlanButtonDisabled, setIsPlanButtonDisabled] = useState(false); // Planlama butonu disable durumu
+  const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
 
   // Sayfa yüklenince son cycle ve planı kontrol et
   useEffect(() => {
@@ -69,6 +71,12 @@ export default function ExcelUploadPage() {
               if (lockStatus === 'true') {
                 setIsPlanLocked(true);
               }
+              
+              // Plan butonu disable durumunu kontrol et
+              const planButtonStatus = localStorage.getItem('plan_button_disabled_' + cycle.id);
+              if (planButtonStatus === 'true') {
+                setIsPlanButtonDisabled(true);
+              }
             }
           } catch (err) {
             console.error('Plan yüklenemedi:', err);
@@ -105,7 +113,13 @@ export default function ExcelUploadPage() {
       localStorage.setItem('latest_cycle_id', result.cycle_id);
       // Yükleme geçmişini yenile
       try { const list = await apiService.getCycleImports(result.cycle_id); setImports(list); } catch {}
-      alert('Excel başarıyla yüklendi! Şimdi planlama oluşturun.');
+      
+      // Yeni Excel yüklendi - planlama butonunu tekrar aktif et
+      setIsPlanButtonDisabled(false);
+      localStorage.removeItem('plan_button_disabled_' + result.cycle_id);
+      
+      setToast({ message: 'Excel başarıyla yüklendi! Şimdi planlama oluşturun.', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       console.error('Upload error:', err);
       let errorMsg = 'Yükleme başarısız';
@@ -118,6 +132,9 @@ export default function ExcelUploadPage() {
         }
       }
       
+      // Toast mesajı göster
+      setToast({ message: errorMsg, type: 'error' });
+      setTimeout(() => setToast(null), 3000);
       setError(errorMsg);
     } finally {
       setIsUploading(false);
@@ -154,11 +171,13 @@ export default function ExcelUploadPage() {
       setSelectedFile(null);
       setIsPlanLocked(false);
       setImports([]);
+      setIsPlanButtonDisabled(false); // Plan butonunu tekrar aktif et
       
       // LocalStorage temizle
       localStorage.removeItem('latest_cycle_id');
       if (cycleId) {
         localStorage.removeItem('plan_locked_' + cycleId);
+        localStorage.removeItem('plan_button_disabled_' + cycleId);
       }
       
       alert('Yeni döngü başlatmaya hazır! Excel dosyası yükleyebilirsiniz.');
@@ -208,7 +227,13 @@ export default function ExcelUploadPage() {
       };
       
       setPlanResult(formattedPlan);
-      alert('Planlama başarıyla oluşturuldu!');
+      
+      // Plan oluşturuldu - butonu disable et (yeni Excel yüklenene kadar)
+      setIsPlanButtonDisabled(true);
+      localStorage.setItem('plan_button_disabled_' + cycleId, 'true');
+      
+      setToast({ message: 'Planlama başarıyla oluşturuldu!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       console.error('Planning error:', err);
       let errorMsg = 'Planlama oluşturma başarısız';
@@ -230,6 +255,16 @@ export default function ExcelUploadPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
+      
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
+          toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white font-medium animate-fade-in`}>
+          {toast.message}
+        </div>
+      )}
+      
       <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
@@ -349,11 +384,17 @@ export default function ExcelUploadPage() {
 
             <button
               onClick={handleCreatePlan}
-              disabled={!cycleId || isPlanning}
+              disabled={!cycleId || isPlanning || isPlanButtonDisabled}
               className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
             >
               {isPlanning ? 'Oluşturuluyor...' : isPlanLocked ? 'Planlamayı Güncelle' : planResult ? 'Yeni Plan Oluştur' : 'Planlama Oluştur'}
             </button>
+            
+            {isPlanButtonDisabled && (
+              <p className="text-sm text-gray-600 mt-2">
+                ℹ️ Plan oluşturuldu. Yeni Excel yükledikten sonra planlamayı tekrar çalıştırabilirsiniz.
+              </p>
+            )}
             
             {isPlanLocked && (
               <p className="text-sm text-gray-600 mt-2">
