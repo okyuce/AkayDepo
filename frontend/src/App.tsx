@@ -12,6 +12,21 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user } = useAuthStore();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  // Tablet kullanıcıları Yükleme Fişleri'ne yönlendir
+  if (user?.role === 'tablet') {
+    return <Navigate to="/loadsheets" />;
+  }
+  
+  return <>{children}</>;
+}
+
 function App() {
   const { checkAuth } = useAuthStore();
 
@@ -26,25 +41,25 @@ function App() {
         <Route
           path="/"
           element={
-            <PrivateRoute>
+            <AdminRoute>
               <ExcelUploadPage />
-            </PrivateRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/tablet/:stationId"
           element={
-            <PrivateRoute>
+            <AdminRoute>
               <TabletPage />
-            </PrivateRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/distribution"
           element={
-            <PrivateRoute>
+            <AdminRoute>
               <StationDistributionPage />
-            </PrivateRoute>
+            </AdminRoute>
           }
         />
         <Route

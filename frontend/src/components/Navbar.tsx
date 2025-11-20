@@ -26,26 +26,33 @@ export default function Navbar() {
             
             {user && (
               <nav className="flex space-x-4">
-                <Link
-                  to="/"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                    location.pathname === '/' 
-                      ? 'bg-blue-700 text-white' 
-                      : 'text-blue-100 hover:bg-blue-500'
-                  }`}
-                >
-                  Planlama
-                </Link>
-                <Link
-                  to="/distribution"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                    location.pathname === '/distribution' 
-                      ? 'bg-blue-700 text-white' 
-                      : 'text-blue-100 hover:bg-blue-500'
-                  }`}
-                >
-                  İstasyon Dağılımı
-                </Link>
+                {/* Admin kullanıcılar için tüm sayfalar */}
+                {user.role === 'admin' && (
+                  <>
+                    <Link
+                      to="/"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                        location.pathname === '/' 
+                          ? 'bg-blue-700 text-white' 
+                          : 'text-blue-100 hover:bg-blue-500'
+                      }`}
+                    >
+                      Planlama
+                    </Link>
+                    <Link
+                      to="/distribution"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                        location.pathname === '/distribution' 
+                          ? 'bg-blue-700 text-white' 
+                          : 'text-blue-100 hover:bg-blue-500'
+                      }`}
+                    >
+                      İstasyon Dağılımı
+                    </Link>
+                  </>
+                )}
+                
+                {/* Tüm kullanıcılar için Yükleme Fişleri */}
                 <Link
                   to="/loadsheets"
                   className={`px-3 py-2 rounded-md text-sm font-medium transition ${

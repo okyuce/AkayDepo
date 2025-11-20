@@ -16,8 +16,14 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      await login(username, password);
-      navigate('/');
+      const user = await login(username, password);
+      
+      // Tablet kullanıcıları doğrudan Yükleme Fişleri sayfasına yönlendir
+      if (user?.role === 'tablet') {
+        navigate('/loadsheets');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       // Error handled in store
     }

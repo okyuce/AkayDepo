@@ -17,7 +17,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
   checkAuth: () => Promise<void>;
 }
@@ -46,6 +46,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      
+      return user;
     } catch (error: any) {
       set({
         error: error.response?.data?.detail || 'Giriş başarısız',
