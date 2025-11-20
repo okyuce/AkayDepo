@@ -43,12 +43,26 @@ async def import_cycle(
         
         # Cycle Manager ile import et
         manager = CycleManager(session)
-        cycle = manager.create_cycle(run_time, plan_date_obj, content)
+        cycle, batch_number = manager.create_cycle(run_time, plan_date_obj, content)
         
         # İstatistikleri hesapla
         parser = ExcelParser(content)
         parser.validate_and_parse()
         stats = parser.get_statistics()
+
+        # Import geçmişini kaydet
+        import hashlib
+        from app.models import CycleImport
+        file_hash = hashlib.sha256(content).hexdigest()
+        ci = CycleImport(
+            cycle_id=cycle.id,
+            batch_number=batch_number,
+            filename=file.filename or "excel.xlsx",
+            file_size=len(content),
+            file_hash=file_hash,
+        )
+        session.add(ci)
+        session.commit()
         
         return {
             "cycle_id": str(cycle.id),
@@ -56,6 +70,7 @@ async def import_cycle(
             "run_time": cycle.run_time,
             "plan_date": str(cycle.plan_date),
             "status": cycle.status,
+            "batch_number": batch_number,
             **stats
         }
         
@@ -64,6 +79,27 @@ async def import_cycle(
     except Exception as e:
         raise HTTPException(500, f"Import hatası: {str(e)}")
 
+
+@router.get("/{cycle_id}/imports")
+async def list_cycle_imports(
+    cycle_id: UUID,
+    session: Session = Depends(get_session)
+):
+    """Bir döngüdeki Excel import geçmişini sırayla getirir"""
+    from app.models import CycleImport
+    from sqlmodel import select
+    stmt = select(CycleImport).where(CycleImport.cycle_id == cycle_id).order_by(CycleImport.batch_number)
+    items = session.exec(stmt).all()
+    return [
+        {
+            "id": str(x.id),
+            "batch_number": x.batch_number,
+            "filename": x.filename,
+            "file_size": x.file_size,
+            "uploaded_at": x.uploaded_at.isoformat()
+        }
+        for x in items
+    ]
 
 @router.get("/{cycle_id}/status")
 async def get_cycle_status(
@@ -168,6 +204,7 @@ async def get_active_cycle(
             "run_time": cycle.run_time,
             "plan_date": str(cycle.plan_date),
             "status": cycle.status,
+            "fixed_station_count": getattr(cycle, 'fixed_station_count', None),
             "has_plan": has_plan,
             "total_loadsheets": total,
             "completed_loadsheets": completed,

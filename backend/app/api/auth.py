@@ -7,14 +7,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from typing import Optional
-import jwt
+import jwt  # PyJWT
 import os
 
 router = APIRouter()
 security = HTTPBearer()
 
-# JWT config
-SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
+# JWT config (destek: JWT_SECRET veya SECRET_KEY)
+SECRET_KEY = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 saat
 
@@ -63,7 +63,7 @@ def verify_token(token: str) -> dict:
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token süresi dolmuş")
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(401, "Geçersiz token")
 
 

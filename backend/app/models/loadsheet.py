@@ -38,7 +38,7 @@ class Loadsheet(SQLModel, table=True):
     batch_number: int = Field(default=1)  # 1, 2, 3... (hangi fiş seti)
     status: str = Field(default="pending")  # pending, loaded, cancelled, error
     loadsheet_type: str = Field(default="normal")  # normal, revision_increase, revision_decrease
-    revision_diff: Optional[int] = None  # Revizyon farkı (+5, -3)
+    revision_diff: Optional[str] = None  # Revizyon farkı JSON (product diff listesi)
     is_revision: bool = Field(default=False)
     parent_loadsheet_id: Optional[UUID] = None  # Revizyon ise orjinal fişin ID'si
     printed_at: Optional[datetime] = None

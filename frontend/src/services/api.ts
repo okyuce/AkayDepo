@@ -67,6 +67,11 @@ class ApiService {
     return response.data;
   }
 
+  async getCycleImports(cycleId: string) {
+    const response = await this.client.get(`/v1/cycles/${cycleId}/imports`);
+    return response.data as { id: string; batch_number: number; filename: string; file_size: number; uploaded_at: string }[];
+  }
+
   async importCycle(file: File) {
     const formData = new FormData();
     formData.append('file', file);

@@ -38,6 +38,18 @@ class StationPlanner:
         if not cycle:
             raise Exception("Döngü bulunamadı")
         
+        # İstasyon sayısını kilitle / kullan
+        fixed_count = getattr(cycle, 'fixed_station_count', None)
+        if fixed_count is None:
+            station_count = force_station_count if force_station_count else worker_count
+            # Eğer model attribute'u yoksa (eski kod), direkt station_count kullan; varsa alanı set et
+            if hasattr(cycle, 'fixed_station_count'):
+                cycle.fixed_station_count = station_count
+                self.session.add(cycle)
+                self.session.commit()
+        else:
+            station_count = fixed_count
+
         # Territory'leri ve yüklerini hesapla
         territory_loads = self._calculate_territory_loads(cycle_id)
         
@@ -46,7 +58,7 @@ class StationPlanner:
         
         # Dengesizlik kontrolü
         total_carton = sum(territory_loads.values())
-        avg_carton = total_carton / worker_count
+        avg_carton = total_carton / station_count
         threshold = avg_carton * 1.5
         
         warnings = []
@@ -69,38 +81,116 @@ class StationPlanner:
         # İstasyon sayısını belirle
         station_count = force_station_count if force_station_count else worker_count
         
-        # Greedy algoritma ile dağıt
-        if method == "greedy":
-            assignments = self._greedy_distribution(territory_loads, station_count)
+        from sqlmodel import select
+        from app.models import StationAssignment, Territory, Order
+
+        existing_assignments = self.session.exec(
+            select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
+        ).all()
+
+        if not existing_assignments:
+            # İlk planlama - yeni dağıtım
+            if method == "greedy":
+                assignments = self._greedy_distribution(territory_loads, station_count)
+            else:
+                raise NotImplementedError("ILP henüz implement edilmedi")
+            self._save_assignments_incremental(cycle_id, cycle.plan_date, assignments, station_count)
         else:
-            raise NotImplementedError("ILP henüz implement edilmedi")
-        
-        # Veritabanına kaydet
-        self._save_assignments(cycle_id, cycle.plan_date, assignments)
-        
-        # Response hazırla
-        stations_data = []
-        for station_idx, territories in enumerate(assignments, 1):
-            station_total = sum(territory_loads[t] for t in territories)
+            # İnkremental planlama - sadece yeni territory'leri dağıt
+            latest_batch = self.session.exec(
+                select(Order.import_batch).where(Order.cycle_id==cycle_id).order_by(Order.import_batch.desc())
+            ).first()
+            if latest_batch is None:
+                raise Exception("Geçerli batch bulunamadı")
             
-            # Territory detayları
+            # Yeni batch'teki territory'leri bul
+            new_territory_codes = self._get_territories_for_batch(cycle_id, latest_batch)
+            
+            # Zaten atanmış territory'leri filtrele
+            assigned_territory_ids = {a.territory_id for a in existing_assignments}
+            assigned_codes = set()
+            for tid in assigned_territory_ids:
+                t = self.session.get(Territory, tid)
+                if t:
+                    assigned_codes.add(t.code)
+            
+            # Atanmamış territory'leri bul
+            to_assign_codes = [code for code in new_territory_codes if code not in assigned_codes]
+            
+            if to_assign_codes:
+                # Mevcut istasyon yüklerini hesapla
+                station_loads = self._calculate_current_station_loads(cycle_id, station_count)
+                
+                # Yeni territory'ler için yükleri hesapla
+                territory_batch_loads = self._calculate_territory_loads_for_batch(cycle_id, latest_batch, to_assign_codes)
+                
+                # İnkremental dağıtım - mevcut yüklere göre en az yüklü istasyonlara dağıt
+                incremental_assignments = self._greedy_distribution_with_initial(station_loads, territory_batch_loads, station_count)
+                
+                # Sadece yeni territory'leri kaydet
+                self._save_assignments_incremental(cycle_id, cycle.plan_date, incremental_assignments, station_count)
+        
+        # Tüm assignment'ların target_total_carton değerlerini güncelle (güncel yüklerle)
+        all_assignments = self.session.exec(
+            select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
+        ).all()
+        
+        for assignment in all_assignments:
+            territory = self.session.get(Territory, assignment.territory_id)
+            if territory:
+                # Güncel yükü hesapla ve güncelle
+                current_load = territory_loads.get(territory.code, 0)
+                assignment.target_total_carton = int(current_load)
+        
+        self.session.commit()
+        
+        # Response hazırla - tüm mevcut assignment'lardan
+        stations_data = []
+        all_assignments = self.session.exec(
+            select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
+        ).all()
+        
+        # İstasyon bazında grupla
+        from collections import defaultdict
+        by_station = defaultdict(list)
+        for sa in all_assignments:
+            by_station[sa.station_id].append(sa)
+        
+        # Her istasyon için detay hazırla
+        for station_idx in range(1, station_count + 1):
+            station_name = f"İstasyon-{station_idx}"
+            stmt = select(Station).where(Station.name == station_name)
+            station = self.session.exec(stmt).first()
+            
+            if not station:
+                continue
+                
+            station_assignments = by_station.get(station.id, [])
+            
             territory_details = []
-            for territory_code in territories:
-                stmt = select(Territory).where(Territory.code == territory_code)
-                territory = self.session.exec(stmt).first()
+            station_total = 0.0
+            
+            for sa in station_assignments:
+                territory = self.session.get(Territory, sa.territory_id)
+                if not territory:
+                    continue
+                
+                # Territory yükü
+                territory_carton = territory_loads.get(territory.code, 0)
+                station_total += territory_carton
                 
                 # Bayi sayısı
-                dealer_count = self._get_dealer_count_for_territory(cycle_id, territory_code)
+                dealer_count = self._get_dealer_count_for_territory(cycle_id, territory.code)
                 
                 territory_details.append({
-                    "territory_code": territory_code,
-                    "display_number": territory.display_number if territory else "T00",
-                    "carton": round(territory_loads[territory_code], 1),
+                    "territory_code": territory.code,
+                    "display_number": territory.display_number,
+                    "carton": round(territory_carton, 1),
                     "dealer_count": dealer_count
                 })
             
             stations_data.append({
-                "station_name": f"İstasyon-{station_idx}",
+                "station_name": station_name,
                 "total_carton": round(station_total, 1),
                 "territories": territory_details
             })
@@ -187,79 +277,43 @@ class StationPlanner:
         # Sadece territory listelerini döndür
         return [station["territories"] for station in stations]
     
-    def _save_assignments(
+    def _save_assignments_incremental(
         self,
         cycle_id: UUID,
         plan_date: date,
-        assignments: List[List[str]]
+        assignments: List[List[str]],
+        station_count: int
     ):
-        """İstasyon atamalarını veritabanına kaydet"""
-        # Önce bu cycle için mevcut atamaları sil - Raw SQL ile cascade delete
-        from sqlalchemy import text
+        """Atamaları silmeden, yalnızca yeni territory'ler için kayıt ekle."""
+        from sqlmodel import select
         
-        # 1. Loadsheet_lines'ı sil
-        self.session.execute(
-            text("""
-                DELETE FROM loadsheet_lines 
-                WHERE loadsheet_id IN (
-                    SELECT id FROM loadsheets 
-                    WHERE assignment_id IN (
-                        SELECT id FROM station_assignments 
-                        WHERE cycle_id = :cycle_id
-                    )
-                )
-            """),
-            {"cycle_id": str(cycle_id)}
-        )
-        
-        # 2. Loadsheets'ı sil
-        self.session.execute(
-            text("""
-                DELETE FROM loadsheets 
-                WHERE assignment_id IN (
-                    SELECT id FROM station_assignments 
-                    WHERE cycle_id = :cycle_id
-                )
-            """),
-            {"cycle_id": str(cycle_id)}
-        )
-        
-        # 3. Station assignments'ı sil
-        self.session.execute(
-            text("DELETE FROM station_assignments WHERE cycle_id = :cycle_id"),
-            {"cycle_id": str(cycle_id)}
-        )
-        
-        self.session.commit()
-        
-        # İstasyonları al veya oluştur
-        for idx, territories in enumerate(assignments, 1):
-            # İstasyon adı
+        # İstasyonları al veya oluştur (kilitli istasyon sayısı kadar)
+        for idx in range(1, station_count + 1):
             station_name = f"İstasyon-{idx}"
-            
-            # İstasyon var mı kontrol et
             stmt = select(Station).where(Station.name == station_name)
             station = self.session.exec(stmt).first()
-            
             if not station:
                 station = Station(name=station_name, active=True)
                 self.session.add(station)
                 self.session.flush()
-            
-            # Her territory için assignment oluştur
+        
+        # Mevcut assignment'ları set olarak al (territory_id bazlı)
+        existing = set()
+        from app.models import StationAssignment, Territory
+        for sa in self.session.exec(select(StationAssignment).where(StationAssignment.cycle_id==cycle_id)).all():
+            existing.add(sa.territory_id)
+        
+        # Assignment ekle
+        for idx, territories in enumerate(assignments, 1):
+            # İstasyon id'yi getir
+            station_name = f"İstasyon-{idx}"
+            station = self.session.exec(select(Station).where(Station.name==station_name)).first()
             for rank, territory_code in enumerate(territories, 1):
-                # Territory ID bul
-                stmt = select(Territory).where(Territory.code == territory_code)
-                territory = self.session.exec(stmt).first()
-                
-                if not territory:
+                territory = self.session.exec(select(Territory).where(Territory.code==territory_code)).first()
+                if not territory or territory.id in existing:
                     continue
-                
-                # Territory'nin toplam kartonunu hesapla
-                territory_loads = self._calculate_territory_loads(cycle_id)
-                total_carton = territory_loads.get(territory_code, 0)
-                
-                # Assignment oluştur
+                # Territory toplam karton (tüm cycle) — sadece gösterim amaçlı
+                total_carton = self._calculate_territory_loads(cycle_id).get(territory_code, 0)
                 assignment = StationAssignment(
                     cycle_id=cycle_id,
                     plan_date=plan_date,
@@ -267,10 +321,9 @@ class StationPlanner:
                     territory_id=territory.id,
                     load_rank=rank,
                     target_total_carton=int(total_carton),
-                    target_total_pack=0  # Şimdilik 0, gerekirse hesaplanır
+                    target_total_pack=0
                 )
                 self.session.add(assignment)
-        
         self.session.commit()
     
     def _get_dealer_count_for_territory(self, cycle_id: UUID, territory_code: str) -> int:
@@ -290,3 +343,127 @@ class StationPlanner:
         
         unique_dealers = set(order.dealer_id for order in orders)
         return len(unique_dealers)
+
+    def _get_territories_for_batch(self, cycle_id: UUID, batch: int) -> List[str]:
+        """Belirli batch'te yer alan territory code listesi"""
+        from sqlmodel import select
+        from app.models import Order, Territory
+        territory_ids = set()
+        orders = self.session.exec(select(Order).where(Order.cycle_id==cycle_id, Order.import_batch==batch)).all()
+        for o in orders:
+            territory_ids.add(o.territory_id)
+        codes = []
+        for tid in territory_ids:
+            t = self.session.get(Territory, tid)
+            if t:
+                codes.append(t.code)
+        return codes
+
+    def _calculate_territory_loads_for_batch(self, cycle_id: UUID, batch: int, only_codes: Optional[List[str]] = None) -> Dict[str, float]:
+        """Belirli batch için territory yüklerini (karton) hesapla."""
+        from sqlmodel import select
+        from app.models import Order, OrderLine, Territory
+        orders = self.session.exec(select(Order).where(Order.cycle_id==cycle_id, Order.import_batch==batch)).all()
+        by_tid = {}
+        for o in orders:
+            if only_codes:
+                t = self.session.get(Territory, o.territory_id)
+                if not t or t.code not in only_codes:
+                    continue
+            by_tid.setdefault(o.territory_id, []).append(o.id)
+        loads: Dict[str, float] = {}
+        for tid, order_ids in by_tid.items():
+            lines = self.session.exec(select(OrderLine).where(OrderLine.order_id.in_(order_ids))).all()
+            total_carton = 0.0
+            for l in lines:
+                total_carton += l.qty_carton + (l.qty_pack/10)
+            t = self.session.get(Territory, tid)
+            if t:
+                loads[t.code] = total_carton
+        return loads
+
+    def _calculate_current_station_loads(self, cycle_id: UUID, station_count: int) -> List[float]:
+        """Mevcut istasyonların TÜM batch'ler için toplam yüklerini döndür."""
+        from sqlmodel import select
+        from app.models import Station, StationAssignment, Territory, Order, OrderLine
+        
+        totals = [0.0 for _ in range(station_count)]
+        
+        for idx in range(1, station_count + 1):
+            station_name = f"İstasyon-{idx}"
+            station = self.session.exec(select(Station).where(Station.name==station_name)).first()
+            if not station:
+                continue
+            
+            # Bu istasyonun tüm territory'leri
+            sas = self.session.exec(
+                select(StationAssignment).where(
+                    StationAssignment.cycle_id==cycle_id, 
+                    StationAssignment.station_id==station.id
+                )
+            ).all()
+            territory_ids = [sa.territory_id for sa in sas]
+            
+            if not territory_ids:
+                continue
+            
+            # Tüm batch'lerdeki siparişleri topla
+            for tid in territory_ids:
+                orders = self.session.exec(
+                    select(Order).where(
+                        Order.cycle_id==cycle_id, 
+                        Order.territory_id==tid
+                    )
+                ).all()
+                
+                for order in orders:
+                    lines = self.session.exec(
+                        select(OrderLine).where(OrderLine.order_id==order.id)
+                    ).all()
+                    
+                    for line in lines:
+                        totals[idx-1] += line.qty_carton + (line.qty_pack / 10)
+        
+        return totals
+    
+    def _greedy_distribution_with_initial(
+        self,
+        initial_station_loads: List[float],
+        territory_loads: Dict[str, float],
+        station_count: int
+    ) -> List[List[str]]:
+        """
+        Mevcut istasyon yüklerine göre yeni territory'leri dağıt.
+        
+        Args:
+            initial_station_loads: Her istasyonun mevcut yükü [station_1_load, station_2_load, ...]
+            territory_loads: Yeni territory'lerin yükleri {territory_code: carton}
+            station_count: İstasyon sayısı
+            
+        Returns:
+            [[territory_code, ...], ...] (istasyon başına YENİ territory listesi)
+        """
+        # Territory'leri azalan sırada sırala
+        sorted_territories = sorted(
+            territory_loads.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        
+        # İstasyon kovaları - mevcut yüklerle başla
+        stations = [
+            {"territories": [], "total": initial_station_loads[i] if i < len(initial_station_loads) else 0.0}
+            for i in range(station_count)
+        ]
+        
+        # Her territory'yi en az yüklü istasyona ata
+        for territory_code, carton in sorted_territories:
+            # En az yüklü istasyonu bul
+            min_station = min(stations, key=lambda s: s["total"])
+            
+            # Territory'yi ata
+            min_station["territories"].append(territory_code)
+            min_station["total"] += carton
+        
+        # Sadece yeni territory listelerini döndür
+        return [station["territories"] for station in stations]

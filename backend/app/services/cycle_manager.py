@@ -23,7 +23,7 @@ class CycleManager:
         run_time: str, 
         plan_date: date,
         excel_content: bytes
-    ) -> Cycle:
+    ) -> tuple[Cycle, int]:
         """
         Yeni döngü oluştur veya mevcut döngüye append et
         
@@ -75,7 +75,7 @@ class CycleManager:
         if batch_number > 1:
             self._detect_revisions(cycle.id, batch_number)
         
-        return cycle
+        return cycle, batch_number
     
     def can_start_new_cycle(self, plan_date: date) -> tuple[bool, List[str]]:
         """
@@ -249,13 +249,16 @@ class CycleManager:
             if not territory or not dealer:
                 continue
             
-            # Aynı order_code ile önceki batch'te sipariş var mı?
+            # Aynı bayi + territory + delivery_date ile önceki batch'te sipariş var mı?
+            # (Order code batch'e göre değişebilir, ama bayi/tarih kombinasyonu unique)
             is_revision = False
             previous_order = None
             if batch_number > 1:
                 stmt = select(Order).where(
                     Order.cycle_id == cycle_id,
-                    Order.external_order_code == order_code,
+                    Order.dealer_id == dealer.id,
+                    Order.territory_id == territory.id,
+                    Order.delivery_date == first_row['TeslimatTarihi'].date(),
                     Order.import_batch < batch_number
                 ).order_by(Order.import_batch.desc())
                 previous_order = self.session.exec(stmt).first()

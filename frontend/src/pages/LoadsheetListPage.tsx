@@ -146,12 +146,13 @@ export default function LoadsheetListPage() {
       
       let cardColor: 'gray' | 'green' | 'orange' = 'gray';
       
+      // Kart rengi tamamlanma durumuna göre
       if (completedCount === totalCount) {
         cardColor = 'green';  // Hepsi tamamlandı
       } else if (completedCount > 0 && completedCount < totalCount) {
-        cardColor = 'orange'; // Bazıları tamamlandı, ek fiş var
+        cardColor = 'orange'; // Bazıları tamamlandı, bazıları bekliyor
       } else {
-        cardColor = 'gray';   // Hiç tamamlanmadı
+        cardColor = 'gray';   // Hiçbiri tamamlanmadı
       }
       
       groups.push({
@@ -332,7 +333,11 @@ export default function LoadsheetListPage() {
                                   {group.dealer_code}
                                 </p>
                                 <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-xs bg-white px-2 py-1 rounded">
+                                  <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                    group.loadsheets.length > 1 
+                                      ? 'bg-orange-500 text-white' 
+                                      : 'bg-white text-gray-800'
+                                  }`}>
                                     {group.loadsheets.length} Fiş
                                   </span>
                                   {group.cardColor === 'green' && (
@@ -361,9 +366,11 @@ export default function LoadsheetListPage() {
                                 <div key={loadsheet.id} className="border-2 border-gray-200 rounded">
                                   {/* Fiş Başlık */}
                                   <div className="bg-gray-50 p-3 flex justify-between items-center">
-                                    <div>
-                                      <span className="font-bold text-lg">FIŞ-{loadsheet.batch_number}</span>
-                                      <span className="text-sm text-gray-600 ml-3">{loadsheet.package_number}</span>
+<div className="flex items-center gap-2">
+                                      <span className={loadsheet.batch_number >= 2 ? 'font-bold text-lg bg-orange-100 text-orange-800 px-2 py-0.5 rounded' : 'font-bold text-lg'}>
+                                        FIŞ-{loadsheet.batch_number}
+                                      </span>
+                                      <span className="text-sm text-gray-600 ml-1">{loadsheet.package_number}</span>
                                     </div>
                                     {!loadsheet.completed_at ? (
                                       <button

@@ -43,9 +43,12 @@ async def create_plan(
             method=request.method
         )
         
-        # Fişleri oluştur
+        # Fişleri oluştur (yalnızca son batch)
+        from app.models import Order
+        from sqlmodel import select
+        latest_batch = session.exec(select(Order.import_batch).where(Order.cycle_id==cycle_id).order_by(Order.import_batch.desc())).first()
         generator = LoadsheetGenerator(session)
-        loadsheet_count = generator.generate_loadsheets_for_cycle(cycle_id)
+        loadsheet_count = generator.generate_loadsheets_for_cycle(cycle_id, only_batch=latest_batch)
         
         plan["loadsheet_count"] = loadsheet_count
         

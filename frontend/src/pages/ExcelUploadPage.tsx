@@ -14,18 +14,22 @@ export default function ExcelUploadPage() {
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [planResult, setPlanResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isPlanLocked, setIsPlanLocked] = useState(false);
+  const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string}[]>([]);
 
   // Sayfa yüklenince son cycle ve planı kontrol et
   useEffect(() => {
     loadLatestCycle();
   }, []);
 
+  // cycleId değiştiğinde import geçmişini çek
+  useEffect(() => {
+    if (!cycleId) { setImports([]); return; }
+    apiService.getCycleImports(cycleId).then(setImports).catch(() => {});
+  }, [cycleId]);
+
   const loadLatestCycle = async () => {
     try {
-      setIsLoading(true);
-      
       // Bugünkü aktif cycle'i getir
       const activeData = await apiService.getActivecycle();
       
@@ -33,6 +37,12 @@ export default function ExcelUploadPage() {
         const cycle = activeData.cycle;
         setCycleId(cycle.id);
         localStorage.setItem('latest_cycle_id', cycle.id);
+
+        // İstasyon sayısı kilitliyse input'u kilitle
+        if (typeof cycle.fixed_station_count === 'number' && cycle.fixed_station_count > 0) {
+          setNumStations(cycle.fixed_station_count);
+          setIsPlanLocked(true);
+        }
         
         // Plan var mı kontrol et
         if (cycle.has_plan) {
@@ -68,7 +78,7 @@ export default function ExcelUploadPage() {
     } catch (err) {
       console.error('Aktif cycle yüklenemedi:', err);
     } finally {
-      setIsLoading(false);
+      // no-op
     }
   };
 
@@ -93,6 +103,8 @@ export default function ExcelUploadPage() {
       const result = await apiService.importCycle(selectedFile);
       setCycleId(result.cycle_id);
       localStorage.setItem('latest_cycle_id', result.cycle_id);
+      // Yükleme geçmişini yenile
+      try { const list = await apiService.getCycleImports(result.cycle_id); setImports(list); } catch {}
       alert('Excel başarıyla yüklendi! Şimdi planlama oluşturun.');
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -141,6 +153,7 @@ export default function ExcelUploadPage() {
       setPlanResult(null);
       setSelectedFile(null);
       setIsPlanLocked(false);
+      setImports([]);
       
       // LocalStorage temizle
       localStorage.removeItem('latest_cycle_id');
@@ -166,7 +179,12 @@ export default function ExcelUploadPage() {
 
     try {
       const result = await apiService.createPlan(cycleId, numStations);
-      console.log('Plan result:', result);
+      
+      // İlk plan sonrası kilitle - sadece henüz kilitli değilse
+      if (!isPlanLocked) {
+        setIsPlanLocked(true);
+        localStorage.setItem('plan_locked_' + cycleId, 'true');
+      }
       
       // Backend'den gelen formatı frontend formatına dönüştür
       const formattedPlan = {
@@ -241,46 +259,68 @@ export default function ExcelUploadPage() {
           </div>
         )}
 
-        {/* Excel Upload */}
+        {/* Excel Upload + Yükleme Geçmişi */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">1. Excel Dosyası Yükle</h2>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Excel Dosyası Seç (PMI ISMS)
-              </label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-md file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100"
-              />
-              {selectedFile && (
-                <p className="mt-2 text-sm text-gray-600">
-                  Seçili: {selectedFile.name}
-                </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Upload Form */}
+            <div className="md:col-span-2 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Excel Dosyası Seç (PMI ISMS)
+                </label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100"
+                />
+                {selectedFile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Seçili: {selectedFile.name}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={handleUpload}
+                disabled={!selectedFile || isUploading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {isUploading ? 'Yükleniyor...' : 'Excel Yükle'}
+              </button>
+
+              {cycleId && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                  ✓ Döngü oluşturuldu: {cycleId}
+                </div>
               )}
             </div>
 
-            <button
-              onClick={handleUpload}
-              disabled={!selectedFile || isUploading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {isUploading ? 'Yükleniyor...' : 'Excel Yükle'}
-            </button>
-
-            {cycleId && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-                ✓ Döngü oluşturuldu: {cycleId}
+            {/* Import History */}
+            <div>
+              <h3 className="font-semibold mb-2">Yükleme Geçmişi</h3>
+              <div className="max-h-56 overflow-y-auto border rounded">
+                {imports.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">Henüz yükleme yok</div>
+                ) : (
+                  <ul className="divide-y">
+                    {imports.map((it) => (
+                      <li key={it.id} className="p-3 text-sm">
+                        <p className="font-medium truncate" title={it.filename}>{it.filename}</p>
+                        <p className="text-gray-500 text-xs">Batch {it.batch_number} • {new Date(it.uploaded_at).toLocaleTimeString()}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -299,27 +339,31 @@ export default function ExcelUploadPage() {
                 max="10"
                 value={numStations}
                 onChange={(e) => setNumStations(parseInt(e.target.value))}
-                className="w-32 px-3 py-2 border border-gray-300 rounded-md"
+                disabled={isPlanLocked}
+                className={`w-32 px-3 py-2 border rounded-md ${isPlanLocked ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`}
               />
+              {isPlanLocked && (
+                <p className="text-xs text-gray-500 mt-1">🔒 İstasyon sayısı ilk plandan sonra kilitlendi. Yeni Excel yükleyip Planlama'yı tekrar çalıştırabilirsiniz.</p>
+              )}
             </div>
 
             <button
               onClick={handleCreatePlan}
-              disabled={!cycleId || isPlanning || isPlanLocked}
+              disabled={!cycleId || isPlanning}
               className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
             >
-              {isPlanning ? 'Oluşturuluyor...' : isPlanLocked ? 'Plan Kilitli' : planResult ? 'Yeni Plan Oluştur' : 'Planlama Oluştur'}
+              {isPlanning ? 'Oluşturuluyor...' : isPlanLocked ? 'Planlamayı Güncelle' : planResult ? 'Yeni Plan Oluştur' : 'Planlama Oluştur'}
             </button>
             
             {isPlanLocked && (
               <p className="text-sm text-gray-600 mt-2">
-                🔒 Plan kilitli. Yeni plan oluşturmak için "Yeni Döngü Başlat" butonuna basın.
+                🔒 İstasyon sayısı kilitli. Yeni Excel yükledikten sonra bu butonla planlamayı tekrar çalıştırabilirsiniz.
               </p>
             )}
             
             {!isPlanLocked && planResult && (
               <p className="text-sm text-blue-600 mt-2">
-                ℹ️ İstasyon sayısını değiştirip "Yeni Plan Oluştur" butonuna basarak farklı plan oluşturabilirsiniz.
+                ℹ️ İstasyon sayısını belirledikten sonra tekrar değiştirilebilir. İlk planlamadan sonra kilitlenecektir.
               </p>
             )}
           </div>
