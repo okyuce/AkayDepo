@@ -2,6 +2,7 @@
  * Navbar Component
  * Üst menü - kullanıcı bilgisi ve logout
  */
+import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
@@ -9,11 +10,16 @@ export default function Navbar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const linkClasses = (active: boolean) =>
+    'px-3 py-2 rounded-md text-sm font-medium transition ' +
+    (active ? 'bg-blue-700 text-white' : 'text-blue-100 hover:bg-blue-500');
 
   return (
     <nav className="bg-blue-600 text-white shadow-lg">
@@ -31,35 +37,60 @@ export default function Navbar() {
                   <>
                     <Link
                       to="/"
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                        location.pathname === '/' 
-                          ? 'bg-blue-700 text-white' 
-                          : 'text-blue-100 hover:bg-blue-500'
-                      }`}
+                      className={linkClasses(location.pathname === '/')}
                     >
                       Planlama
                     </Link>
                     <Link
                       to="/distribution"
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                        location.pathname === '/distribution' 
-                          ? 'bg-blue-700 text-white' 
-                          : 'text-blue-100 hover:bg-blue-500'
-                      }`}
+                      className={linkClasses(location.pathname === '/distribution')}
                     >
                       İstasyon Dağılımı
                     </Link>
+                    
+                    {/* Tanımlar Dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
+                        className={
+                          'px-3 py-2 rounded-md text-sm font-medium transition flex items-center ' +
+                          (location.pathname.startsWith('/territories')
+                            ? 'bg-blue-700 text-white'
+                            : 'text-blue-100 hover:bg-blue-500')
+                        }
+                      >
+                        Tanımlar
+                        <svg className="ml-1 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      {isDefinitionsOpen && (
+                        <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                          <Link
+                            to="/territories"
+                            onClick={() => setIsDefinitionsOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          >
+                            Territory Tanımları
+                          </Link>
+                          <Link
+                            to="/territory-assignment"
+                            onClick={() => setIsDefinitionsOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          >
+                            Territory Atama
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
                 
                 {/* Tüm kullanıcılar için Yükleme Fişleri */}
                 <Link
                   to="/loadsheets"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                    location.pathname === '/loadsheets' 
-                      ? 'bg-blue-700 text-white' 
-                      : 'text-blue-100 hover:bg-blue-500'
-                  }`}
+                  className={linkClasses(location.pathname === '/loadsheets')}
                 >
                   Yükleme Fişleri
                 </Link>

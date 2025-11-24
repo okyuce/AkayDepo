@@ -17,8 +17,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add display_order column to products table
-    op.add_column('products', sa.Column('display_order', sa.Integer(), nullable=False, server_default='999'))
+    # Add display_order column to products table if it doesn't exist
+    conn = op.get_bind()
+    result = conn.execute(sa.text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name='products' AND column_name='display_order'"
+    ))
+    if not result.fetchone():
+        op.add_column('products', sa.Column('display_order', sa.Integer(), nullable=False, server_default='999'))
 
 
 def downgrade() -> None:

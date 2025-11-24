@@ -165,6 +165,83 @@ class ApiService {
     const response = await this.client.get(`/v1/stations/${stationId}/distribution/${cycleId}`);
     return response.data;
   }
+
+  async listStations() {
+    const response = await this.client.get('/v1/stations/');
+    return response.data as { id: string; name: string; active: boolean }[];
+  }
+
+  async updateStation(stationId: string, data: { active?: boolean; name?: string }) {
+    const response = await this.client.put(`/v1/stations/${stationId}`, data);
+    return response.data as { id: string; name: string; active: boolean };
+  }
+
+  async createStation(name: string) {
+    const response = await this.client.post('/v1/stations/', { name });
+    return response.data as { id: string; name: string; active: boolean };
+  }
+
+  async deleteStation(stationId: string) {
+    const response = await this.client.delete(`/v1/stations/${stationId}`);
+    return response.data;
+  }
+
+  // Assignments (manual mapping)
+  async getAssignmentsConfig() {
+    const response = await this.client.get('/v1/assignments/config');
+    return response.data as {
+      auto_planning_enabled: boolean;
+      stations: { id: string; name: string; active: boolean }[];
+      assignments: { station_id: string; territory_code: string }[];
+    };
+  }
+
+  async saveAssignmentsConfig(payload: {
+    auto_planning_enabled: boolean;
+    assignments: { station_id: string; territory_code: string }[];
+  }) {
+    const response = await this.client.post('/v1/assignments/config', payload);
+    return response.data;
+  }
+
+  async resetAssignments() {
+    const response = await this.client.post('/v1/assignments/reset', {});
+    return response.data;
+  }
+
+  // Territory Info
+  async getTerritories(includeInactive: boolean = false) {
+    const params = { include_inactive: includeInactive };
+    const response = await this.client.get('/v1/territory-info/', { params });
+    return response.data;
+  }
+
+  async getTerritory(id: string) {
+    const response = await this.client.get(`/v1/territory-info/${id}`);
+    return response.data;
+  }
+
+  async createTerritory(data: { code: string; name: string; display_number: string; color?: string }) {
+    const response = await this.client.post('/v1/territory-info/', data);
+    return response.data;
+  }
+
+  async updateTerritory(id: string, data: { name?: string; display_number?: string; is_active?: boolean; color?: string }) {
+    const response = await this.client.put(`/v1/territory-info/${id}`, data);
+    return response.data;
+  }
+
+  async deleteTerritory(id: string) {
+    const response = await this.client.delete(`/v1/territory-info/${id}`);
+    return response.data;
+  }
+
+  async reorderTerritories(territoryIds: string[]) {
+    const response = await this.client.post('/v1/territory-info/reorder', {
+      territory_ids: territoryIds,
+    });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

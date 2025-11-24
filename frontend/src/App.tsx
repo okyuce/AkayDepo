@@ -6,6 +6,8 @@ import ExcelUploadPage from './pages/ExcelUploadPage';
 import TabletPage from './pages/TabletPage';
 import StationDistributionPage from './pages/StationDistributionPage';
 import LoadsheetListPage from './pages/LoadsheetListPage';
+import TerritoryListPage from './pages/TerritoryListPage';
+import TerritoryAssignmentPage from './pages/TerritoryAssignmentPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -68,6 +70,22 @@ function App() {
             <PrivateRoute>
               <LoadsheetListPage />
             </PrivateRoute>
+          }
+        />
+        <Route
+          path="/territories"
+          element={
+            <AdminRoute>
+              <TerritoryListPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/territory-assignment"
+          element={
+            <AdminRoute>
+              <TerritoryAssignmentPage />
+            </AdminRoute>
           }
         />
       </Routes>

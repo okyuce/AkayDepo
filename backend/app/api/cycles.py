@@ -164,8 +164,8 @@ async def cancel_pending(
     session: Session = Depends(get_session)
 ):
     """
-    Yeni döngü başlat - TÜM verileri sil (territories, dealers, products, orders, loadsheets, stations, cycles)
-    Bu endpoint 'Yeni Döngü Başlat' butonu için kullanılır.
+    Yeni döngü başlat - Döngüye özgü verileri sil (territories, dealers, products, orders, loadsheets, cycles)
+    NOT: Station'lar ve StationTerritoryMap manuel atamalar korunur!
     """
     from app.models import (
         Territory, Dealer, Product, Order, OrderLine, 
@@ -190,9 +190,8 @@ async def cancel_pending(
         for item in session.exec(select(StationAssignment)).all():
             session.delete(item)
         
-        # 4. Station
-        for item in session.exec(select(Station)).all():
-            session.delete(item)
+        # 4. Station'ları SİLME - manuel atamalar için korunmalı!
+        # StationTerritoryMap de korunur (CASCADE nedeniyle otomatik silinmez)
         
         # 5. OrderLine (Order'a bağlı)
         for item in session.exec(select(OrderLine)).all():

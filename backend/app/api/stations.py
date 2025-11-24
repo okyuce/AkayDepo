@@ -15,6 +15,53 @@ from app.models import (
 
 router = APIRouter()
 
+@router.get("/")
+async def list_stations(session: Session = Depends(get_session)):
+    stations = session.exec(select(Station)).all()
+    return [{"id": str(s.id), "name": s.name, "active": s.active} for s in stations]
+
+@router.post("/")
+async def create_station(payload: Dict, session: Session = Depends(get_session)):
+    """Yeni istasyon oluştur"""
+    name = payload.get("name")
+    if not name:
+        raise HTTPException(400, "İstasyon adı gerekli")
+    
+    # Aynı isimde istasyon var mı kontrol et
+    existing = session.exec(select(Station).where(Station.name == name)).first()
+    if existing:
+        raise HTTPException(400, "Bu isimde bir istasyon zaten var")
+    
+    station = Station(name=name, active=True)
+    session.add(station)
+    session.commit()
+    session.refresh(station)
+    return {"id": str(station.id), "name": station.name, "active": station.active}
+
+@router.delete("/{station_id}")
+async def delete_station(station_id: UUID, session: Session = Depends(get_session)):
+    """İstasyon sil"""
+    station = session.get(Station, station_id)
+    if not station:
+        raise HTTPException(404, "İstasyon bulunamadı")
+    session.delete(station)
+    session.commit()
+    return {"success": True}
+
+@router.put("/{station_id}")
+async def update_station(station_id: UUID, payload: Dict, session: Session = Depends(get_session)):
+    station = session.get(Station, station_id)
+    if not station:
+        raise HTTPException(404, "İstasyon bulunamadı")
+    if "active" in payload:
+        station.active = payload["active"]
+    if "name" in payload:
+        station.name = payload["name"]
+    session.add(station)
+    session.commit()
+    session.refresh(station)
+    return {"id": str(station.id), "name": station.name, "active": station.active}
+
 
 @router.get("/{station_id}/distribution/{cycle_id}")
 async def get_station_distribution(

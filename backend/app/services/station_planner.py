@@ -84,51 +84,101 @@ class StationPlanner:
         from sqlmodel import select
         from app.models import StationAssignment, Territory, Order
 
+# Manuel planlama açık mı?
+        from app.models import PlanningConfig, StationTerritoryMap, TerritoryInfo
+        cfg = self.session.exec(select(PlanningConfig)).first()
+        manual_mode = bool(cfg and not cfg.auto_planning_enabled)
+
         existing_assignments = self.session.exec(
             select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
         ).all()
 
-        if not existing_assignments:
-            # İlk planlama - yeni dağıtım
-            if method == "greedy":
-                assignments = self._greedy_distribution(territory_loads, station_count)
-            else:
-                raise NotImplementedError("ILP henüz implement edilmedi")
-            self._save_assignments_incremental(cycle_id, cycle.plan_date, assignments, station_count)
-        else:
-            # İnkremental planlama - sadece yeni territory'leri dağıt
-            latest_batch = self.session.exec(
-                select(Order.import_batch).where(Order.cycle_id==cycle_id).order_by(Order.import_batch.desc())
-            ).first()
-            if latest_batch is None:
-                raise Exception("Geçerli batch bulunamadı")
+        if manual_mode:
+            # Manual mapping uygula: aktif istasyonlar için mapping'i oku ve SADECE YENİ territory'leri ata
+            # Mevcut assignment'ları KORUYORUZ (loadsheet foreign key nedeniyle)
             
-            # Yeni batch'teki territory'leri bul
-            new_territory_codes = self._get_territories_for_batch(cycle_id, latest_batch)
-            
-            # Zaten atanmış territory'leri filtrele
+            mappings = self.session.exec(select(StationTerritoryMap)).all()
+            # Aktif istasyon seti
+            active_station_ids = {s.id for s in self.session.exec(select(Station).where(Station.active == True)).all()}
+
+            by_station: Dict[UUID, List[str]] = {}
+            for m in mappings:
+                if m.station_id in active_station_ids:
+                    by_station.setdefault(m.station_id, []).append(m.territory_code)
+
+            # Zaten atanmış territory'leri bul
             assigned_territory_ids = {a.territory_id for a in existing_assignments}
             assigned_codes = set()
             for tid in assigned_territory_ids:
                 t = self.session.get(Territory, tid)
                 if t:
                     assigned_codes.add(t.code)
-            
-            # Atanmamış territory'leri bul
-            to_assign_codes = [code for code in new_territory_codes if code not in assigned_codes]
-            
-            if to_assign_codes:
-                # Mevcut istasyon yüklerini hesapla
-                station_loads = self._calculate_current_station_loads(cycle_id, station_count)
+
+            # Her istasyon için SADECE YENİ territory'leri ekle
+            from app.models import Territory as TerritoryModel
+            for station_id, codes in by_station.items():
+                station = self.session.get(Station, station_id)
+                for rank, code in enumerate(codes, start=1):
+                    # Zaten atanmışsa skip
+                    if code in assigned_codes:
+                        continue
+                    
+                    territory = self.session.exec(select(TerritoryModel).where(TerritoryModel.code == code)).first()
+                    if not territory:
+                        continue
+                    total_carton = int(self._calculate_territory_loads(cycle_id).get(code, 0))
+                    self.session.add(StationAssignment(
+                        cycle_id=cycle_id,
+                        plan_date=cycle.plan_date,
+                        station_id=station.id,
+                        territory_id=territory.id,
+                        load_rank=rank,
+                        target_total_carton=total_carton,
+                        target_total_pack=0,
+                    ))
+            self.session.commit()
+        else:
+            if not existing_assignments:
+                # İlk planlama - yeni dağıtım (greedy)
+                if method == "greedy":
+                    assignments = self._greedy_distribution(territory_loads, station_count)
+                else:
+                    raise NotImplementedError("ILP henüz implement edilmedi")
+                self._save_assignments_incremental(cycle_id, cycle.plan_date, assignments, station_count)
+            else:
+                # İnkremental planlama - sadece yeni territory'leri dağıt
+                latest_batch = self.session.exec(
+                    select(Order.import_batch).where(Order.cycle_id==cycle_id).order_by(Order.import_batch.desc())
+                ).first()
+                if latest_batch is None:
+                    raise Exception("Geçerli batch bulunamadı")
                 
-                # Yeni territory'ler için yükleri hesapla
-                territory_batch_loads = self._calculate_territory_loads_for_batch(cycle_id, latest_batch, to_assign_codes)
+                # Yeni batch'teki territory'leri bul
+                new_territory_codes = self._get_territories_for_batch(cycle_id, latest_batch)
                 
-                # İnkremental dağıtım - mevcut yüklere göre en az yüklü istasyonlara dağıt
-                incremental_assignments = self._greedy_distribution_with_initial(station_loads, territory_batch_loads, station_count)
+                # Zaten atanmış territory'leri filtrele
+                assigned_territory_ids = {a.territory_id for a in existing_assignments}
+                assigned_codes = set()
+                for tid in assigned_territory_ids:
+                    t = self.session.get(Territory, tid)
+                    if t:
+                        assigned_codes.add(t.code)
                 
-                # Sadece yeni territory'leri kaydet
-                self._save_assignments_incremental(cycle_id, cycle.plan_date, incremental_assignments, station_count)
+                # Atanmamış territory'leri bul
+                to_assign_codes = [code for code in new_territory_codes if code not in assigned_codes]
+                
+                if to_assign_codes:
+                    # Mevcut istasyon yüklerini hesapla
+                    station_loads = self._calculate_current_station_loads(cycle_id, station_count)
+                    
+                    # Yeni territory'ler için yükleri hesapla
+                    territory_batch_loads = self._calculate_territory_loads_for_batch(cycle_id, latest_batch, to_assign_codes)
+                    
+                    # İnkremental dağıtım - mevcut yüklere göre en az yüklü istasyonlara dağıt
+                    incremental_assignments = self._greedy_distribution_with_initial(station_loads, territory_batch_loads, station_count)
+                    
+                    # Sadece yeni territory'leri kaydet
+                    self._save_assignments_incremental(cycle_id, cycle.plan_date, incremental_assignments, station_count)
         
         # Tüm assignment'ların target_total_carton değerlerini güncelle (güncel yüklerle)
         all_assignments = self.session.exec(
