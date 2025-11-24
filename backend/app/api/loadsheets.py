@@ -157,8 +157,13 @@ async def get_loadsheet_detail(
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
     territory = session.get(Territory, assignment.territory_id) if assignment else None
     
-    # Lines
-    stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet_id)
+    # Lines - Excel sırasına göre sırala
+    stmt = (
+        select(LoadsheetLine)
+        .join(Product, LoadsheetLine.product_id == Product.id)
+        .where(LoadsheetLine.loadsheet_id == loadsheet_id)
+        .order_by(Product.display_order, Product.code)
+    )
     lines = session.exec(stmt).all()
     
     lines_data = []

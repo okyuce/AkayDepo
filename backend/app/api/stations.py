@@ -66,13 +66,14 @@ async def get_station_distribution(
                 territory_map[str(territory.id)] = territory
         
         # Cycle'daki tüm ürünleri al (sadece bu cycle'da kullanılan ürünler)
+        # Excel'deki sıraya göre sırala
         stmt = (
             select(Product)
             .join(OrderLine, OrderLine.product_id == Product.id)
             .join(Order, Order.id == OrderLine.order_id)
             .where(Order.cycle_id == cycle_id)
             .distinct()
-            .order_by(Product.code)
+            .order_by(Product.display_order, Product.code)
         )
         all_products = session.exec(stmt).all()
         
@@ -124,11 +125,16 @@ async def get_station_distribution(
                 product_distribution[product_code]["total_carton"] += line.qty_carton
                 product_distribution[product_code]["total_pack"] += line.qty_pack
         
-        # Response hazırla
+        # Response hazırla - Excel sırasını koru (all_products zaten display_order'a göre sıralı)
         products_list = []
         grand_total_carton = 0
         
-        for product_code, data in sorted(product_distribution.items()):
+        # all_products sırasını kullan (display_order'a göre sıralı)
+        for product in all_products:
+            product_code = product.code
+            data = product_distribution.get(product_code)
+            if not data:
+                continue
             # Her territory için miktar
             territory_quantities = []
             for territory in territories:

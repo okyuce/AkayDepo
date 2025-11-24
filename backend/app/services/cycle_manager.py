@@ -216,20 +216,29 @@ class CycleManager:
         self.session.commit()
     
     def _import_products(self, df: pd.DataFrame):
-        """Ürünleri import et (upsert)"""
-        unique_products = df[['ÜrünKodu', 'ÜrünAdı']].drop_duplicates('ÜrünKodu')
+        """Ürünleri import et (upsert) - Excel sırasını koru"""
+        # Ürünleri ilk görüldüğü Excel satırına göre sırala
+        # _excel_row_index her satırın Excel'deki orijinal konumunu tutar
+        unique_products = df[['ÜrünKodu', 'ÜrünAdı', '_excel_row_index']].drop_duplicates('ÜrünKodu', keep='first')
+        # Excel sırasına göre sırala
+        unique_products = unique_products.sort_values('_excel_row_index')
         
-        for _, row in unique_products.iterrows():
-            stmt = select(Product).where(Product.code == row['ÜrünKodu'])
+        for idx, (_, row_data) in enumerate(unique_products.iterrows()):
+            stmt = select(Product).where(Product.code == row_data['ÜrünKodu'])
             existing = self.session.exec(stmt).first()
             
             if not existing:
                 product = Product(
-                    code=row['ÜrünKodu'],
-                    name=row['ÜrünAdı'],
-                    pack_per_carton=10  # Sabit kural
+                    code=row_data['ÜrünKodu'],
+                    name=row_data['ÜrünAdı'],
+                    pack_per_carton=10,  # Sabit kural
+                    display_order=idx + 1  # Excel'deki görünme sırası
                 )
                 self.session.add(product)
+            else:
+                # Mevcut ürün varsa display_order'ı güncelle
+                existing.display_order = idx + 1
+                self.session.add(existing)
         
         self.session.commit()
     

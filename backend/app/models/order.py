@@ -22,6 +22,7 @@ class Product(SQLModel, table=True):
     code: str = Field(unique=True, index=True)  # ÜrünKodu
     name: str  # ÜrünAdı
     pack_per_carton: int = Field(default=10)  # 1 karton = 10 paket
+    display_order: int = Field(default=999)  # Excel'deki gösterim sırası
 
 class Order(SQLModel, table=True):
     """Sipariş modeli"""

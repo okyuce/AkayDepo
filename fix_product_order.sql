@@ -1,0 +1,27 @@
+-- Ürün sıralamasını düzelt
+UPDATE products SET display_order = 1 WHERE code = 'MLR100';
+UPDATE products SET display_order = 2 WHERE code = 'MFTB';
+UPDATE products SET display_order = 3 WHERE code = 'MLFTB';
+UPDATE products SET display_order = 4 WHERE code = 'MLTBLUE';
+UPDATE products SET display_order = 5 WHERE code = 'MLTGRAY';
+UPDATE products SET display_order = 6 WHERE code = 'MLTONE';
+UPDATE products SET display_order = 7 WHERE code = 'MLEDGE';
+UPDATE products SET display_order = 8 WHERE code = 'MLEDBLUE';
+UPDATE products SET display_order = 9 WHERE code = 'MLEDSLIMS';
+UPDATE products SET display_order = 10 WHERE code = 'PL100';
+UPDATE products SET display_order = 11 WHERE code = 'PLLONGRCB';
+UPDATE products SET display_order = 12 WHERE code = 'PLRC';
+UPDATE products SET display_order = 13 WHERE code = 'PLLRC';
+UPDATE products SET display_order = 14 WHERE code = 'PLABS100';
+UPDATE products SET display_order = 15 WHERE code = 'PLRSVRCB';
+UPDATE products SET display_order = 16 WHERE code = 'PLMNRCB';
+UPDATE products SET display_order = 17 WHERE code = 'LAB100RCB';
+UPDATE products SET display_order = 18 WHERE code = 'LARKBRCB';
+UPDATE products SET display_order = 19 WHERE code = 'CHNB100RCB';
+UPDATE products SET display_order = 20 WHERE code = 'CHNAVYBRCB';
+UPDATE products SET display_order = 21 WHERE code = 'CHMODENAVY';
+UPDATE products SET display_order = 22 WHERE code = 'MUARCB';
+UPDATE products SET display_order = 23 WHERE code = 'MUABLU';
+UPDATE products SET display_order = 24 WHERE code = 'LM100RCB';
+UPDATE products SET display_order = 25 WHERE code = 'LMRCB';
+UPDATE products SET display_order = 26 WHERE code = 'MLROLL50';

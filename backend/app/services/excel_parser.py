@@ -60,6 +60,9 @@ class ExcelParser:
             # Boş satırları at
             self.df = self.df.dropna(how='all')
             
+            # Excel'deki orijinal sırayı koru (satır numarası)
+            self.df['_excel_row_index'] = range(len(self.df))
+            
             # Zorunlu kolonları kontrol et
             missing_columns = [col for col in self.REQUIRED_COLUMNS if col not in self.df.columns]
             if missing_columns:
