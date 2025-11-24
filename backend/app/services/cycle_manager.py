@@ -216,28 +216,39 @@ class CycleManager:
         self.session.commit()
     
     def _import_products(self, df: pd.DataFrame):
-        """Ürünleri import et (upsert) - Excel sırasını koru"""
-        # Ürünleri ilk görüldüğü Excel satırına göre sırala
-        # _excel_row_index her satırın Excel'deki orijinal konumunu tutar
-        unique_products = df[['ÜrünKodu', 'ÜrünAdı', '_excel_row_index']].drop_duplicates('ÜrünKodu', keep='first')
-        # Excel sırasına göre sırala
-        unique_products = unique_products.sort_values('_excel_row_index')
+        """Ürünleri import et (upsert) - SABİT sıralama kullan"""
+        # Sabit ürün sıralaması
+        PRODUCT_ORDER = {
+            'MLR100': 1, 'MFTB': 2, 'MLFTB': 3, 'MLTBLUE': 4, 'MLTGRAY': 5,
+            'MLTONE': 6, 'MLEDGE': 7, 'MLEDBLUE': 8, 'MLEDSLIMS': 9, 'PL100': 10,
+            'PLLONGRCB': 11, 'PLRC': 12, 'PLLRC': 13, 'PLABS100': 14, 'PLRSVRCB': 15,
+            'PLMNRCB': 16, 'LAB100RCB': 17, 'LARKBRCB': 18, 'CHNB100RCB': 19,
+            'CHNAVYBRCB': 20, 'CHMODENAVY': 21, 'MUARCB': 22, 'MUABLU': 23,
+            'LM100RCB': 24, 'LMRCB': 25, 'MLROLL50': 26
+        }
         
-        for idx, (_, row_data) in enumerate(unique_products.iterrows()):
-            stmt = select(Product).where(Product.code == row_data['ÜrünKodu'])
+        unique_products = df[['ÜrünKodu', 'ÜrünAdı']].drop_duplicates('ÜrünKodu')
+        
+        for _, row_data in unique_products.iterrows():
+            product_code = row_data['ÜrünKodu']
+            stmt = select(Product).where(Product.code == product_code)
             existing = self.session.exec(stmt).first()
+            
+            # Sabit sıralamadan order al, yoksa 999
+            display_order = PRODUCT_ORDER.get(product_code, 999)
             
             if not existing:
                 product = Product(
-                    code=row_data['ÜrünKodu'],
+                    code=product_code,
                     name=row_data['ÜrünAdı'],
                     pack_per_carton=10,  # Sabit kural
-                    display_order=idx + 1  # Excel'deki görünme sırası
+                    display_order=display_order
                 )
                 self.session.add(product)
             else:
-                # Mevcut ürün varsa display_order'ı güncelle
-                existing.display_order = idx + 1
+                # Mevcut ürün varsa isim güncelle, display_order sabit kalsın
+                existing.name = row_data['ÜrünAdı']
+                existing.display_order = display_order  # Sabit sıra
                 self.session.add(existing)
         
         self.session.commit()

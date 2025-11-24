@@ -8,6 +8,7 @@ import StationDistributionPage from './pages/StationDistributionPage';
 import LoadsheetListPage from './pages/LoadsheetListPage';
 import TerritoryListPage from './pages/TerritoryListPage';
 import TerritoryAssignmentPage from './pages/TerritoryAssignmentPage';
+import StockDistributionPage from './pages/StockDistributionPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -85,6 +86,14 @@ function App() {
           element={
             <AdminRoute>
               <TerritoryAssignmentPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/stock-distribution"
+          element={
+            <AdminRoute>
+              <StockDistributionPage />
             </AdminRoute>
           }
         />

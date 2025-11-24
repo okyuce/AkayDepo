@@ -242,6 +242,30 @@ class ApiService {
     });
     return response.data;
   }
+
+  // Inventory
+  async getStationInventory(stationId: string) {
+    const response = await this.client.get(`/v1/inventory/station/${stationId}`);
+    return response.data as {
+      station_id: string;
+      station_name: string;
+      products: Array<{
+        product_id: string;
+        product_code: string;
+        product_name: string;
+        quantity_carton: number;
+        quantity_pack: number;
+        updated_at: string | null;
+      }>;
+    };
+  }
+
+  async updateStationInventory(stationId: string, products: Array<{ product_id: string; quantity_carton: number; quantity_pack: number }>) {
+    const response = await this.client.post(`/v1/inventory/station/${stationId}`, {
+      products
+    });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

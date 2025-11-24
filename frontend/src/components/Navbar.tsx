@@ -47,6 +47,12 @@ export default function Navbar() {
                     >
                       İstasyon Dağılımı
                     </Link>
+                    <Link
+                      to="/stock-distribution"
+                      className={linkClasses(location.pathname === '/stock-distribution')}
+                    >
+                      Stok Dağılımı
+                    </Link>
                     
                     {/* Tanımlar Dropdown */}
                     <div className="relative">
