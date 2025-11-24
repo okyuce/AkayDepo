@@ -63,19 +63,21 @@ async def save_config(
         if dup:
             raise HTTPException(400, detail={"error": "duplicate_territories", "territories": dup})
 
-    # Replace-all semantics
-    for existing in session.exec(select(StationTerritoryMap)).all():
-        session.delete(existing)
-    session.flush()
+    # Manuel mappingleri GÜNCELLE (otomatik modda koruyoruz, sadece manuel modda güncelliyoruz)
+    if not auto:
+        # Replace-all semantics (sadece manuel modda)
+        for existing in session.exec(select(StationTerritoryMap)).all():
+            session.delete(existing)
+        session.flush()
 
-    # Insert new
-    for it in items:
-        station_id = it.get("station_id")
-        code = it.get("territory_code")
-        if not station_id or not code:
-            continue
-        stm = StationTerritoryMap(station_id=UUID(station_id), territory_code=code)
-        session.add(stm)
+        # Insert new
+        for it in items:
+            station_id = it.get("station_id")
+            code = it.get("territory_code")
+            if not station_id or not code:
+                continue
+            stm = StationTerritoryMap(station_id=UUID(station_id), territory_code=code)
+            session.add(stm)
 
     session.commit()
 

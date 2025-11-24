@@ -18,10 +18,15 @@ export default function ExcelUploadPage() {
   const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string}[]>([]);
   const [isPlanButtonDisabled, setIsPlanButtonDisabled] = useState(false); // Planlama butonu disable durumu
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
+  const [isAutoPlanning, setIsAutoPlanning] = useState(true); // Otomatik planlama modu
 
-  // Sayfa yüklenince son cycle ve planı kontrol et
+  // Sayfa yüklenince son cycle ve planı kontrol et + auto planning kontrolü
   useEffect(() => {
     loadLatestCycle();
+    // Auto planning modunu kontrol et
+    apiService.getAssignmentsConfig().then(cfg => {
+      setIsAutoPlanning(cfg.auto_planning_enabled);
+    }).catch(() => {});
   }, []);
 
   // cycleId değiştiğinde import geçmişini çek
@@ -364,23 +369,32 @@ export default function ExcelUploadPage() {
           <h2 className="text-xl font-semibold mb-4">2. Planlama Oluştur</h2>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                İstasyon Sayısı
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={numStations}
-                onChange={(e) => setNumStations(parseInt(e.target.value))}
-                disabled={isPlanLocked}
-                className={`w-32 px-3 py-2 border rounded-md ${isPlanLocked ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`}
-              />
-              {isPlanLocked && (
-                <p className="text-xs text-gray-500 mt-1">🔒 İstasyon sayısı ilk plandan sonra kilitlendi. Yeni Excel yükleyip Planlama'yı tekrar çalıştırabilirsiniz.</p>
-              )}
-            </div>
+            {/* İstasyon sayısı sadece otomatik modda görünsün */}
+            {isAutoPlanning ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  İstasyon Sayısı
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={numStations}
+                  onChange={(e) => setNumStations(parseInt(e.target.value))}
+                  disabled={isPlanLocked}
+                  className={`w-32 px-3 py-2 border rounded-md ${isPlanLocked ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`}
+                />
+                {isPlanLocked && (
+                  <p className="text-xs text-gray-500 mt-1">🔒 İstasyon sayısı ilk plandan sonra kilitlendi. Yeni Excel yükleyip Planlama'yı tekrar çalıştırabilirsiniz.</p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>📌 Manuel Mod:</strong> İstasyon atamaları "Territory Atama" sayfasından yönetiliyor.
+                </p>
+              </div>
+            )}
 
             <button
               onClick={handleCreatePlan}
