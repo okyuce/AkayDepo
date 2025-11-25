@@ -166,6 +166,11 @@ class ApiService {
     return response.data;
   }
 
+  async getStationTracking(stationId: string, cycleId: string) {
+    const response = await this.client.get(`/v1/stations/${stationId}/tracking/${cycleId}`);
+    return response.data;
+  }
+
   async listStations() {
     const response = await this.client.get('/v1/stations/');
     return response.data as { id: string; name: string; active: boolean }[];

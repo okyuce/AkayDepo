@@ -21,11 +21,15 @@ interface Station {
   active: boolean;
 }
 
+type StockMode = 'set' | 'add' | 'subtract';
+
 export default function StockDistributionPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [stationName, setStationName] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [originalProducts, setOriginalProducts] = useState<Product[]>([]);  // Orijinal stoklar
+  const [mode, setMode] = useState<StockMode>('set');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -47,6 +51,7 @@ export default function StockDistributionPage() {
       .then(data => {
         setStationName(data.station_name);
         setProducts(data.products);
+        setOriginalProducts(data.products);  // Orijinal stokları sakla
       })
       .catch(err => {
         console.error('Stok yükleme hatası:', err);
@@ -54,6 +59,21 @@ export default function StockDistributionPage() {
       })
       .finally(() => setLoading(false));
   }, [selectedStationId]);
+
+  // Mod değiştiğinde input'ları ayarla
+  useEffect(() => {
+    if (mode === 'set') {
+      // Set modunda orijinal değerleri göster
+      setProducts([...originalProducts]);
+    } else {
+      // Ekleme/Eksiltme modunda sıfırla
+      setProducts(originalProducts.map(p => ({
+        ...p,
+        quantity_carton: 0,
+        quantity_pack: 0
+      })));
+    }
+  }, [mode, originalProducts]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -72,21 +92,53 @@ export default function StockDistributionPage() {
 
     setSaving(true);
     try {
-      await apiService.updateStationInventory(
-        selectedStationId,
-        products.map(p => ({
+      // Mode'a göre hesaplama yap
+      const updatedProducts = products.map(p => {
+        const original = originalProducts.find(op => op.product_id === p.product_id);
+        if (!original) return p;
+
+        let finalCarton = p.quantity_carton;
+        let finalPack = p.quantity_pack;
+
+        if (mode === 'add') {
+          // Ekleme: orijinal + girilen
+          finalCarton = original.quantity_carton + p.quantity_carton;
+          finalPack = original.quantity_pack + p.quantity_pack;
+        } else if (mode === 'subtract') {
+          // Eksiltme: orijinal - girilen
+          finalCarton = original.quantity_carton - p.quantity_carton;
+          finalPack = original.quantity_pack - p.quantity_pack;
+        }
+        // mode === 'set' ise zaten p.quantity_carton ve p.quantity_pack kullanılır
+
+        return {
           product_id: p.product_id,
-          quantity_carton: p.quantity_carton,
-          quantity_pack: p.quantity_pack
-        }))
-      );
+          quantity_carton: finalCarton,
+          quantity_pack: finalPack
+        };
+      });
+
+      await apiService.updateStationInventory(selectedStationId, updatedProducts);
       showToast('Stoklar başarıyla güncellendi!', 'success');
+      
+      // Sayfayı yenile
+      const data = await apiService.getStationInventory(selectedStationId);
+      setProducts(data.products);
+      setOriginalProducts(data.products);
+      
+      // Normal moda dön
+      setMode('set');
     } catch (err) {
       console.error('Kaydetme hatası:', err);
       showToast('Stoklar kaydedilemedi', 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    // Hiçbir şey yapmadan normal moda dön
+    setMode('set');
   };
 
   return (
@@ -131,13 +183,69 @@ export default function StockDistributionPage() {
               <h2 className="text-xl font-semibold">
                 {stationName} - Ürün Stokları
               </h2>
-              <button
-                onClick={handleSave}
-                disabled={saving || loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-semibold"
-              >
-                {saving ? 'Kaydediliyor...' : 'Kaydet'}
-              </button>
+              <div className="flex space-x-3">
+                {mode !== 'set' && (
+                  <button
+                    onClick={handleCancel}
+                    disabled={saving || loading}
+                    className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-400 font-semibold"
+                  >
+                    İptal
+                  </button>
+                )}
+                <button
+                  onClick={handleSave}
+                  disabled={saving || loading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-semibold"
+                >
+                  {saving ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+
+            {/* Mod Seçimi */}
+            <div className="mb-4 flex items-center space-x-4">
+              <span className="text-sm font-medium text-gray-700">Mod:</span>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="set"
+                  checked={mode === 'set'}
+                  onChange={(e) => setMode(e.target.value as StockMode)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-sm text-gray-700">Set (Normal)</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="add"
+                  checked={mode === 'add'}
+                  onChange={(e) => setMode(e.target.value as StockMode)}
+                  className="w-4 h-4 text-green-600"
+                />
+                <span className="text-sm text-gray-700">Ekleme (+)</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="subtract"
+                  checked={mode === 'subtract'}
+                  onChange={(e) => setMode(e.target.value as StockMode)}
+                  className="w-4 h-4 text-red-600"
+                />
+                <span className="text-sm text-gray-700">Eksiltme (-)</span>
+              </label>
+            </div>
+
+            {/* Mod Açıklaması */}
+            <div className="mb-4 text-sm text-gray-600 bg-gray-50 p-3 rounded">
+              {mode === 'set' && '❏ Normal mod: Girdiğiniz değer direkt stoğa set edilir.'}
+              {mode === 'add' && '➕ Ekleme modu: Girdiğiniz değer mevcut stoğa eklenir.'}
+              {mode === 'subtract' && '➖ Eksiltme modu: Girdiğiniz değer mevcut stoktan çıkarılır.'}
             </div>
 
             {loading ? (

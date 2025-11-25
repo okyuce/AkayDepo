@@ -289,7 +289,7 @@ class CycleManager:
                 cycle_id=cycle_id,
                 external_order_code=order_code,
                 payment_type=first_row['ÖdemeTipi'],
-                order_date=first_row['SiparişTarihi'].date(),
+                order_date=first_row['SiparişTarihi'],  # datetime olarak sakla
                 delivery_date=first_row['TeslimatTarihi'].date(),
                 territory_id=territory.id,
                 dealer_id=dealer.id,

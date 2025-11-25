@@ -10,7 +10,7 @@ from typing import Dict, List
 from app.core.database import get_session
 from app.models import (
     StationAssignment, Territory, Order, OrderLine, 
-    Product, Dealer, Station
+    Product, Dealer, Station, Loadsheet, LoadsheetLine, StationInventory
 )
 
 router = APIRouter()
@@ -273,3 +273,185 @@ async def get_station_distribution(
         raise
     except Exception as e:
         raise HTTPException(500, f"Dağılım getirme hatası: {str(e)}")
+
+
+@router.get("/{station_id}/tracking/{cycle_id}")
+async def get_station_tracking(
+    station_id: UUID,
+    cycle_id: UUID,
+    session: Session = Depends(get_session)
+):
+    """
+    İstasyon bazlı ürün takip tablosu:
+    - Ürün kodu
+    - Anlık stok (StationInventory'den)
+    - Her territory için: Kalan ve Hazırlanan miktarları
+    Kalan: Henüz tamamlanmamış loadsheet'lerdeki miktar
+    Hazırlanan: Tamamlanmış loadsheet'lerdeki miktar
+    """
+    try:
+        # İstasyon bilgisi
+        station = session.get(Station, station_id)
+        if not station:
+            raise HTTPException(404, "İstasyon bulunamadı")
+        
+        # Bu istasyonun assignment'larını al
+        stmt = select(StationAssignment).where(
+            StationAssignment.cycle_id == cycle_id,
+            StationAssignment.station_id == station_id
+        )
+        assignments = session.exec(stmt).all()
+        
+        if not assignments:
+            return {
+                "station_id": str(station_id),
+                "station_name": station.name,
+                "territories": [],
+                "products": []
+            }
+        
+        # Territory'leri topla
+        territory_ids = [a.territory_id for a in assignments]
+        territories = []
+        
+        for assignment in assignments:
+            territory = session.get(Territory, assignment.territory_id)
+            if territory:
+                territories.append({
+                    "id": str(territory.id),
+                    "code": territory.code,
+                    "display_number": territory.display_number,
+                    "name": territory.name
+                })
+        
+        # Cycle'daki tüm ürünleri al (display_order'a göre sıralı)
+        stmt = (
+            select(Product)
+            .join(OrderLine, OrderLine.product_id == Product.id)
+            .join(Order, Order.id == OrderLine.order_id)
+            .where(Order.cycle_id == cycle_id)
+            .distinct()
+            .order_by(Product.display_order, Product.code)
+        )
+        all_products = session.exec(stmt).all()
+        
+        # İstasyon stoklarını al
+        stmt = select(StationInventory).where(StationInventory.station_id == station_id)
+        inventories = session.exec(stmt).all()
+        inventory_map = {
+            str(inv.product_id): {
+                "carton": inv.quantity_carton,
+                "pack": inv.quantity_pack
+            }
+            for inv in inventories
+        }
+        
+        # Bu istasyonun loadsheet'lerini al (assignment_id üzerinden)
+        assignment_ids = [a.id for a in assignments]
+        # Assignment map oluştur (assignment_id -> territory_id)
+        assignment_territory_map = {a.id: a.territory_id for a in assignments}
+        
+        stmt = select(Loadsheet).where(
+            Loadsheet.cycle_id == cycle_id,
+            Loadsheet.assignment_id.in_(assignment_ids)
+        )
+        loadsheets = session.exec(stmt).all()
+        
+        # Ürün bazında territory'lere göre kalan ve hazırlanan hesapla
+        # Structure: {product_id: {territory_id: {remaining, prepared}}}
+        product_tracking = {}
+        
+        for product in all_products:
+            product_tracking[str(product.id)] = {
+                "product_code": product.code,
+                "product_name": product.name,
+                "territories": {}
+            }
+        
+        # Loadsheet'lerdeki miktarları hesapla
+        for loadsheet in loadsheets:
+            # Territory ID'yi assignment'ından al
+            territory_id = str(assignment_territory_map.get(loadsheet.assignment_id))
+            
+            # Loadsheet lines'ı al
+            stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet.id)
+            lines = session.exec(stmt).all()
+            
+            for line in lines:
+                product_id = str(line.product_id)
+                if product_id not in product_tracking:
+                    continue
+                
+                if territory_id not in product_tracking[product_id]["territories"]:
+                    product_tracking[product_id]["territories"][territory_id] = {
+                        "remaining_carton": 0,
+                        "remaining_pack": 0,
+                        "prepared_carton": 0,
+                        "prepared_pack": 0
+                    }
+                
+                # Loadsheet tamamlanmışsa hazırlanan'a, değilse kalan'a ekle
+                if loadsheet.completed_at:
+                    product_tracking[product_id]["territories"][territory_id]["prepared_carton"] += line.qty_carton
+                    product_tracking[product_id]["territories"][territory_id]["prepared_pack"] += line.qty_pack
+                else:
+                    product_tracking[product_id]["territories"][territory_id]["remaining_carton"] += line.qty_carton
+                    product_tracking[product_id]["territories"][territory_id]["remaining_pack"] += line.qty_pack
+        
+        # Response hazırla
+        products_list = []
+        for product in all_products:
+            product_id = str(product.id)
+            tracking_data = product_tracking.get(product_id)
+            if not tracking_data:
+                continue
+            
+            # Stok bilgisi
+            inventory = inventory_map.get(product_id, {"carton": 0, "pack": 0})
+            
+            # Her territory için kalan ve hazırlanan
+            territory_data = []
+            for territory in territories:
+                t_id = territory["id"]
+                t_data = tracking_data["territories"].get(t_id, {
+                    "remaining_carton": 0,
+                    "remaining_pack": 0,
+                    "prepared_carton": 0,
+                    "prepared_pack": 0
+                })
+                
+                # Karton eşdeğeri hesapla
+                remaining_total = t_data["remaining_carton"] + (t_data["remaining_pack"] / 10)
+                prepared_total = t_data["prepared_carton"] + (t_data["prepared_pack"] / 10)
+                
+                territory_data.append({
+                    "territory_id": t_id,
+                    "territory_display": territory["display_number"],
+                    "remaining_carton": t_data["remaining_carton"],
+                    "remaining_pack": t_data["remaining_pack"],
+                    "remaining_total": round(remaining_total, 1),
+                    "prepared_carton": t_data["prepared_carton"],
+                    "prepared_pack": t_data["prepared_pack"],
+                    "prepared_total": round(prepared_total, 1)
+                })
+            
+            products_list.append({
+                "product_code": tracking_data["product_code"],
+                "product_name": tracking_data["product_name"],
+                "stock_carton": inventory["carton"],
+                "stock_pack": inventory["pack"],
+                "stock_total": round(inventory["carton"] + (inventory["pack"] / 10), 1),
+                "territories": territory_data
+            })
+        
+        return {
+            "station_id": str(station_id),
+            "station_name": station.name,
+            "territories": territories,
+            "products": products_list
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Takip verisi getirme hatası: {str(e)}")

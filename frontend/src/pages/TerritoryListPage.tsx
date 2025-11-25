@@ -20,6 +20,15 @@ export default function TerritoryListPage() {
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingTerritory, setEditingTerritory] = useState<Territory | null>(null);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    display_number: '',
+    color: ''
+  });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     loadTerritories();
@@ -37,35 +46,120 @@ export default function TerritoryListPage() {
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleToggleActive = async (territory: Territory) => {
     try {
       await apiService.updateTerritory(territory.id, {
         is_active: !territory.is_active
       });
       loadTerritories();
+      showToast('Territory durumu güncellendi', 'success');
     } catch (err) {
       console.error('Güncelleme hatası:', err);
-      alert('Territory güncellenemedi');
+      showToast('Territory güncellenemedi', 'error');
+    }
+  };
+
+  const handleOpenModal = (territory?: Territory) => {
+    if (territory) {
+      setEditingTerritory(territory);
+      setFormData({
+        code: territory.code,
+        name: territory.name,
+        display_number: territory.display_number,
+        color: territory.color || ''
+      });
+    } else {
+      setEditingTerritory(null);
+      setFormData({ code: '', name: '', display_number: '', color: '' });
+    }
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingTerritory(null);
+    setFormData({ code: '', name: '', display_number: '', color: '' });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.code || !formData.name || !formData.display_number) {
+      showToast('Tüm alanları doldurun', 'error');
+      return;
+    }
+
+    try {
+      if (editingTerritory) {
+        // Güncelleme
+        await apiService.updateTerritory(editingTerritory.id, {
+          name: formData.name,
+          display_number: formData.display_number,
+          color: formData.color || null
+        });
+        showToast('Territory güncellendi', 'success');
+      } else {
+        // Yeni oluştur
+        await apiService.createTerritory({
+          code: formData.code,
+          name: formData.name,
+          display_number: formData.display_number,
+          color: formData.color || undefined
+        });
+        showToast('Territory oluşturuldu', 'success');
+      }
+      handleCloseModal();
+      loadTerritories();
+    } catch (err: any) {
+      console.error('Kaydetme hatası:', err);
+      const errorMsg = typeof err?.response?.data?.detail === 'string' 
+        ? err.response.data.detail 
+        : 'Kaydetme hatası';
+      showToast(errorMsg, 'error');
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
+      
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-20 right-6 z-50 px-6 py-3 rounded-lg shadow-lg ${
+          toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white font-medium transition-all`}>
+          {toast.message}
+        </div>
+      )}
+
       <div className="p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Territory Tanımları</h1>
             
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm text-gray-700">Pasif territory'leri göster</span>
-            </label>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => handleOpenModal()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+              >
+                + Yeni Territory
+              </button>
+              
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-700">Pasif territory'leri göster</span>
+              </label>
+            </div>
           </div>
 
           {isLoading ? (
@@ -119,7 +213,13 @@ export default function TerritoryListPage() {
                           {territory.is_active ? 'Aktif' : 'Pasif'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-3">
+                        <button
+                          onClick={() => handleOpenModal(territory)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Düzenle
+                        </button>
                         <button
                           onClick={() => handleToggleActive(territory)}
                           className={`${
@@ -145,6 +245,92 @@ export default function TerritoryListPage() {
           )}
         </div>
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4">
+              {editingTerritory ? 'Territory Düzenle' : 'Yeni Territory'}
+            </h2>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kod *
+                </label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  disabled={!!editingTerritory}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    editingTerritory ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  placeholder="örn: TERR030728"
+                />
+                {editingTerritory && (
+                  <p className="text-xs text-gray-500 mt-1">Kod değiştirilemez</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İsim *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="örn: Merkez"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Görünüm Numarası *
+                </label>
+                <input
+                  type="text"
+                  value={formData.display_number}
+                  onChange={(e) => setFormData({ ...formData, display_number: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="örn: T28"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Renk (Opsiyonel)
+                </label>
+                <input
+                  type="color"
+                  value={formData.color || '#3B82F6'}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-full h-10 px-2 py-1 border border-gray-300 rounded-md"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+                >
+                  {editingTerritory ? 'Güncelle' : 'Oluştur'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

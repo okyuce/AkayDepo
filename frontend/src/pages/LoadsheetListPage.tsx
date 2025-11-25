@@ -48,6 +48,8 @@ interface DealerGroup {
 export default function LoadsheetListPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStationId, setSelectedStationId] = useState<string>('');
+  const [selectedTerritoryCode, setSelectedTerritoryCode] = useState<string>('');  // Territory filtresi
+  const [availableTerritories, setAvailableTerritories] = useState<{code: string; display_number: string; name: string}[]>([]);
   const [loadsheets, setLoadsheets] = useState<Loadsheet[]>([]);
   const [dealerGroups, setDealerGroups] = useState<DealerGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -114,8 +116,25 @@ export default function LoadsheetListPage() {
       }
       setLoadsheets(allLoadsheets);
       
+      // Unique territory'leri çıkar
+      const territoriesSet = new Map<string, {code: string; display_number: string; name: string}>();
+      allLoadsheets.forEach(ls => {
+        if (ls.territory && !territoriesSet.has(ls.territory.code)) {
+          territoriesSet.set(ls.territory.code, ls.territory);
+        }
+      });
+      const territories = Array.from(territoriesSet.values());
+      // Display number'a göre sırala
+      territories.sort((a, b) => a.display_number.localeCompare(b.display_number));
+      setAvailableTerritories(territories);
+      
+      // Territory filtresini uygula
+      const filteredLoadsheets = selectedTerritoryCode 
+        ? allLoadsheets.filter(ls => ls.territory?.code === selectedTerritoryCode)
+        : allLoadsheets;
+      
       // Dealer bazında grupla
-      const grouped = groupLoadsheetsByDealer(allLoadsheets);
+      const grouped = groupLoadsheetsByDealer(filteredLoadsheets);
       setDealerGroups(grouped);
     } catch (err) {
       console.error('Fişler yüklenemedi:', err);
@@ -172,9 +191,20 @@ export default function LoadsheetListPage() {
 
   const handleStationChange = (stationId: string) => {
     setSelectedStationId(stationId);
+    setSelectedTerritoryCode('');  // Territory filtresini sıfırla
     if (stationId) {
       loadLoadsheets(stationId);
     }
+  };
+
+  const handleTerritoryChange = (territoryCode: string) => {
+    setSelectedTerritoryCode(territoryCode);
+    // Mevcut loadsheet'leri filtrele
+    const filteredLoadsheets = territoryCode 
+      ? loadsheets.filter(ls => ls.territory?.code === territoryCode)
+      : loadsheets;
+    const grouped = groupLoadsheetsByDealer(filteredLoadsheets);
+    setDealerGroups(grouped);
   };
 
   const handleDealerCardClick = async (dealerCode: string) => {
@@ -260,25 +290,47 @@ export default function LoadsheetListPage() {
             </div>
           ) : (
             <>
-              {/* İstasyon Seçimi */}
+              {/* İstasyon ve Territory Seçimi */}
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      İstasyon Seçin
-                    </label>
-                    <select
-                      value={selectedStationId}
-                      onChange={(e) => handleStationChange(e.target.value)}
-                      className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">İstasyon Seçiniz...</option>
-                      {stations.map((station) => (
-                        <option key={station.id} value={station.id}>
-                          {station.name}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex-1 flex gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        İstasyon Seçin
+                      </label>
+                      <select
+                        value={selectedStationId}
+                        onChange={(e) => handleStationChange(e.target.value)}
+                        className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">İstasyon Seçiniz...</option>
+                        {stations.map((station) => (
+                          <option key={station.id} value={station.id}>
+                            {station.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedStationId && availableTerritories.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Territory Filtrele (Opsiyonel)
+                        </label>
+                        <select
+                          value={selectedTerritoryCode}
+                          onChange={(e) => handleTerritoryChange(e.target.value)}
+                          className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Tüm Territory'ler</option>
+                          {availableTerritories.map((territory) => (
+                            <option key={territory.code} value={territory.code}>
+                              {territory.display_number} - {territory.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   
                   <button

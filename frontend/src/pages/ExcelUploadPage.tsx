@@ -15,7 +15,7 @@ export default function ExcelUploadPage() {
   const [planResult, setPlanResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPlanLocked, setIsPlanLocked] = useState(false);
-  const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string}[]>([]);
+  const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string;plan_date?:string;first_delivery_time?:string;last_delivery_time?:string}[]>([]);
   const [isPlanButtonDisabled, setIsPlanButtonDisabled] = useState(false); // Planlama butonu disable durumu
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
   const [isAutoPlanning, setIsAutoPlanning] = useState(true); // Otomatik planlama modu
@@ -32,7 +32,15 @@ export default function ExcelUploadPage() {
   // cycleId değiştiğinde import geçmişini çek
   useEffect(() => {
     if (!cycleId) { setImports([]); return; }
-    apiService.getCycleImports(cycleId).then(setImports).catch(() => {});
+    apiService.getCycleImports(cycleId)
+      .then(data => {
+        console.log('Import geçmişi:', data);
+        setImports(data);
+      })
+      .catch(err => {
+        console.error('Import geçmişi yüklenemedi:', err);
+        setImports([]);
+      });
   }, [cycleId]);
 
   const loadLatestCycle = async () => {
@@ -333,7 +341,7 @@ export default function ExcelUploadPage() {
                 disabled={!selectedFile || isUploading}
                 className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
               >
-                {isUploading ? 'Yükleniyor...' : 'Excel Yükle'}
+                {isUploading ? 'Yüklüyor...' : 'Excel Yükle'}
               </button>
 
               {cycleId && (
@@ -351,12 +359,29 @@ export default function ExcelUploadPage() {
                   <div className="p-3 text-sm text-gray-500">Henüz yükleme yok</div>
                 ) : (
                   <ul className="divide-y">
-                    {imports.map((it) => (
-                      <li key={it.id} className="p-3 text-sm">
-                        <p className="font-medium truncate" title={it.filename}>{it.filename}</p>
-                        <p className="text-gray-500 text-xs">Batch {it.batch_number} • {new Date(it.uploaded_at).toLocaleTimeString()}</p>
-                      </li>
-                    ))}
+                    {imports.map((it) => {
+                      // Tarih-saat formatı oluştur
+                      let dateInfo = '';
+                      if (it.plan_date) {
+                        const date = new Date(it.plan_date);
+                        const dateStr = date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        
+                        if (it.first_delivery_time && it.last_delivery_time) {
+                          dateInfo = `${dateStr} ${it.first_delivery_time} - ${it.last_delivery_time}`;
+                        } else {
+                          dateInfo = dateStr;
+                        }
+                      }
+                      
+                      return (
+                        <li key={it.id} className="p-3 text-sm">
+                          <p className="font-medium truncate" title={it.filename}>{it.filename}</p>
+                          {dateInfo && (
+                            <p className="text-gray-600 text-xs mt-1">{dateInfo}</p>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

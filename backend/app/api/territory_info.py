@@ -5,10 +5,26 @@ Territory tanımları yönetimi
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from uuid import UUID
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from app.core.database import get_session
 from app.models import TerritoryInfo
+
+
+class TerritoryCreate(BaseModel):
+    code: str
+    name: str
+    display_number: str
+    color: Optional[str] = None
+    is_active: bool = True
+
+
+class TerritoryUpdate(BaseModel):
+    name: Optional[str] = None
+    display_number: Optional[str] = None
+    is_active: Optional[bool] = None
+    color: Optional[str] = None
 
 router = APIRouter()
 
@@ -63,16 +79,12 @@ async def get_territory(
 
 @router.post("/")
 async def create_territory(
-    code: str,
-    name: str,
-    display_number: str,
-    is_active: bool = True,
-    color: str = None,
+    data: TerritoryCreate,
     session: Session = Depends(get_session)
 ):
     """Yeni territory ekle"""
     # Code unique kontrolü
-    stmt = select(TerritoryInfo).where(TerritoryInfo.code == code)
+    stmt = select(TerritoryInfo).where(TerritoryInfo.code == data.code)
     existing = session.exec(stmt).first()
     if existing:
         raise HTTPException(400, "Bu territory kodu zaten mevcut")
@@ -83,11 +95,11 @@ async def create_territory(
     next_sort_order = (last.sort_order + 1) if last else 1
     
     territory = TerritoryInfo(
-        code=code,
-        name=name,
-        display_number=display_number,
-        is_active=is_active,
-        color=color,
+        code=data.code,
+        name=data.name,
+        display_number=data.display_number,
+        is_active=data.is_active,
+        color=data.color,
         sort_order=next_sort_order
     )
     
@@ -109,10 +121,7 @@ async def create_territory(
 @router.put("/{territory_id}")
 async def update_territory(
     territory_id: UUID,
-    name: str = None,
-    display_number: str = None,
-    is_active: bool = None,
-    color: str = None,
+    data: TerritoryUpdate,
     session: Session = Depends(get_session)
 ):
     """Territory güncelle"""
@@ -120,14 +129,14 @@ async def update_territory(
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
     
-    if name is not None:
-        territory.name = name
-    if display_number is not None:
-        territory.display_number = display_number
-    if is_active is not None:
-        territory.is_active = is_active
-    if color is not None:
-        territory.color = color
+    if data.name is not None:
+        territory.name = data.name
+    if data.display_number is not None:
+        territory.display_number = data.display_number
+    if data.is_active is not None:
+        territory.is_active = data.is_active
+    if data.color is not None:
+        territory.color = data.color
     
     session.add(territory)
     session.commit()

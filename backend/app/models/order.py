@@ -32,7 +32,7 @@ class Order(SQLModel, table=True):
     cycle_id: UUID = Field(foreign_key="cycles.id", index=True)
     external_order_code: str = Field(index=True)  # SiparişKodu
     payment_type: str  # ÖdemeTipi
-    order_date: date  # SiparişTarihi
+    order_date: datetime  # SiparişTarihi (tarih + saat)
     delivery_date: date  # TeslimatTarihi
     territory_id: UUID = Field(foreign_key="territories.id")
     dealer_id: UUID = Field(foreign_key="dealers.id")

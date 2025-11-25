@@ -104,20 +104,50 @@ async def list_cycle_imports(
     session: Session = Depends(get_session)
 ):
     """Bir döngüdeki Excel import geçmişini sırayla getirir"""
-    from app.models import CycleImport
-    from sqlmodel import select
+    from app.models import CycleImport, Order
+    from sqlmodel import select, func
+    
+    # Cycle tarihi
+    cycle = session.get(Cycle, cycle_id)
+    if not cycle:
+        return []
+    
+    # Import listesi
     stmt = select(CycleImport).where(CycleImport.cycle_id == cycle_id).order_by(CycleImport.batch_number)
     items = session.exec(stmt).all()
-    return [
-        {
+    
+    # Her batch için ayrı ayrı saat aralığı hesapla
+    result_list = []
+    for x in items:
+        # Bu batch'teki order'ların min/max order_date'ini al
+        stmt = select(
+            func.min(Order.order_date),
+            func.max(Order.order_date)
+        ).where(
+            Order.cycle_id == cycle_id,
+            Order.import_batch == x.batch_number
+        )
+        result = session.exec(stmt).first()
+        
+        first_time = None
+        last_time = None
+        if result and result[0] and result[1]:
+            # HH:MM formatında saat bilgisi
+            first_time = result[0].strftime('%H:%M')
+            last_time = result[1].strftime('%H:%M')
+        
+        result_list.append({
             "id": str(x.id),
             "batch_number": x.batch_number,
             "filename": x.filename,
             "file_size": x.file_size,
-            "uploaded_at": x.uploaded_at.isoformat()
-        }
-        for x in items
-    ]
+            "uploaded_at": x.uploaded_at.isoformat(),
+            "plan_date": str(cycle.plan_date),
+            "first_delivery_time": first_time,
+            "last_delivery_time": last_time
+        })
+    
+    return result_list
 
 @router.get("/{cycle_id}/status")
 async def get_cycle_status(
