@@ -224,7 +224,9 @@ async def complete_loadsheet(
     loadsheet_id: UUID,
     session: Session = Depends(get_session)
 ):
-    """Fişi tamamla (Yükleme Tamamlandı)"""
+    """Fişi tamamla (Yükleme Tamamlandı) ve stoktan düş"""
+    from app.models import StationInventory
+    
     loadsheet = session.get(Loadsheet, loadsheet_id)
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")
@@ -234,6 +236,34 @@ async def complete_loadsheet(
     loadsheet.loaded_at = datetime.utcnow()
     loadsheet.completed_at = datetime.utcnow()
     session.add(loadsheet)
+    
+    # STOK DÜŞURME: Loadsheet'teki ürünleri istasyon stoğundan düşür
+    assignment = session.get(StationAssignment, loadsheet.assignment_id)
+    if assignment:
+        # Loadsheet lines'ı al
+        stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet_id)
+        lines = session.exec(stmt).all()
+        
+        for line in lines:
+            # Mevcut stok kaydını bul
+            stmt = select(StationInventory).where(
+                StationInventory.station_id == assignment.station_id,
+                StationInventory.product_id == line.product_id
+            )
+            inventory = session.exec(stmt).first()
+            
+            if inventory:
+                # Stoktan düşür
+                inventory.quantity_carton -= line.qty_carton
+                inventory.quantity_pack -= line.qty_pack
+                
+                # Negatif stok kontrolü (uyarı için, engellemeyin)
+                if inventory.quantity_carton < 0 or inventory.quantity_pack < 0:
+                    print(f"UYARI: {assignment.station_id} istasyonunda {line.product_id} ürünü için stok negatif oldu!")
+                
+                inventory.updated_at = datetime.utcnow()
+                session.add(inventory)
+    
     session.commit()
     
     # Territory tamamlandı mı kontrol et

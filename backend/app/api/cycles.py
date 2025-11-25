@@ -164,8 +164,8 @@ async def cancel_pending(
     session: Session = Depends(get_session)
 ):
     """
-    Yeni döngü başlat - Döngüye özgü verileri sil (territories, dealers, products, orders, loadsheets, cycles)
-    NOT: Station'lar ve StationTerritoryMap manuel atamalar korunur!
+    Yeni döngü başlat - Döngüye özgü verileri sil (territories, dealers, orders, loadsheets, cycles)
+    NOT: Station'lar, StationTerritoryMap, StationInventory ve Product'lar korunur!
     """
     from app.models import (
         Territory, Dealer, Product, Order, OrderLine, 
@@ -225,15 +225,14 @@ async def cancel_pending(
         for item in session.exec(select(Territory)).all():
             session.delete(item)
         
-        # 13. Product (parent tablo)
-        for item in session.exec(select(Product)).all():
-            session.delete(item)
+        # 13. Product'ları SİLME - Stok yönetimi için korunmalı!
+        # StationInventory de korunur (foreign key CASCADE yok)
         
         session.commit()
         
         return {
             "success": True,
-            "message": "Tüm veriler silindi. Yeni döngü başlatmaya hazır.",
+            "message": "Döngü verileri silindi. Station'lar, stoklar ve ürünler korundu. Yeni döngü başlatmaya hazır.",
             "can_start_next_cycle": True
         }
     

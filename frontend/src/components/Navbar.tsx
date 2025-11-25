@@ -53,43 +53,6 @@ export default function Navbar() {
                     >
                       Stok Dağılımı
                     </Link>
-                    
-                    {/* Tanımlar Dropdown */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
-                        className={
-                          'px-3 py-2 rounded-md text-sm font-medium transition flex items-center ' +
-                          (location.pathname.startsWith('/territories')
-                            ? 'bg-blue-700 text-white'
-                            : 'text-blue-100 hover:bg-blue-500')
-                        }
-                      >
-                        Tanımlar
-                        <svg className="ml-1 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      
-                      {isDefinitionsOpen && (
-                        <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
-                          <Link
-                            to="/territories"
-                            onClick={() => setIsDefinitionsOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
-                          >
-                            Territory Tanımları
-                          </Link>
-                          <Link
-                            to="/territory-assignment"
-                            onClick={() => setIsDefinitionsOpen(false)}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
-                          >
-                            Territory Atama
-                          </Link>
-                        </div>
-                      )}
-                    </div>
                   </>
                 )}
                 
@@ -100,6 +63,45 @@ export default function Navbar() {
                 >
                   Yükleme Fişleri
                 </Link>
+                
+                {/* Tanımlar Dropdown - EN SONDA */}
+                {user.role === 'admin' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
+                      className={
+                        'px-3 py-2 rounded-md text-sm font-medium transition flex items-center ' +
+                        (location.pathname.startsWith('/territories')
+                          ? 'bg-blue-700 text-white'
+                          : 'text-blue-100 hover:bg-blue-500')
+                      }
+                    >
+                      Tanımlar
+                      <svg className="ml-1 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {isDefinitionsOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                        <Link
+                          to="/territories"
+                          onClick={() => setIsDefinitionsOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                        >
+                          Territory Tanımları
+                        </Link>
+                        <Link
+                          to="/territory-assignment"
+                          onClick={() => setIsDefinitionsOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                        >
+                          Territory Atama
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
               </nav>
             )}
           </div>
