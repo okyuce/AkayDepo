@@ -410,21 +410,43 @@ export default function LoadsheetListPage() {
                         {/* Expanded: Tüm fişler */}
                         {isExpanded && (
                           <div className="bg-white border-t-2 border-gray-300 p-4 space-y-6">
-                            {group.loadsheets.map((loadsheet) => {
+                            {group.loadsheets.map((loadsheet, index) => {
                               const totalCartons = loadsheet.lines?.reduce((sum, line) => sum + line.qty_carton, 0) || 0;
                               const totalPacks = loadsheet.lines?.reduce((sum, line) => sum + (line.qty_pack || 0), 0) || 0;
+                              
+                              // Son fiş mi kontrol et (en yüksek batch number)
+                              const isLastLoadsheet = index === group.loadsheets.length - 1;
+                              // Önceki fişler iptal olarak işaretlenir
+                              const isCancelled = !isLastLoadsheet;
 
                               return (
-                                <div key={loadsheet.id} className="border-2 border-gray-200 rounded">
+                                <div key={loadsheet.id} className={`border-2 rounded ${
+                                  isCancelled ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                }`}>
                                   {/* Fiş Başlık */}
-                                  <div className="bg-gray-50 p-3 flex justify-between items-center">
-<div className="flex items-center gap-2">
-                                      <span className={loadsheet.batch_number >= 2 ? 'font-bold text-lg bg-orange-100 text-orange-800 px-2 py-0.5 rounded' : 'font-bold text-lg'}>
+                                  <div className={`p-3 flex justify-between items-center ${
+                                    isCancelled ? 'bg-red-100' : 'bg-gray-50'
+                                  }`}>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-bold text-lg px-2 py-0.5 rounded ${
+                                        isCancelled 
+                                          ? 'bg-red-200 text-red-900' 
+                                          : loadsheet.batch_number >= 2 
+                                            ? 'bg-orange-100 text-orange-800' 
+                                            : ''
+                                      }`}>
                                         FIŞ-{loadsheet.batch_number}
                                       </span>
                                       <span className="text-sm text-gray-600 ml-1">{loadsheet.package_number}</span>
+                                      {isCancelled && (
+                                        <span className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded ml-2">
+                                          ❌ İPTAL
+                                        </span>
+                                      )}
                                     </div>
-                                    {!loadsheet.completed_at ? (
+                                    {isCancelled ? (
+                                      <span className="text-red-700 font-semibold text-sm">❌ İptal Edildi</span>
+                                    ) : !loadsheet.completed_at ? (
                                       <button
                                         onClick={() => handleCompleteLoadsheet(loadsheet.id)}
                                         className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-semibold"

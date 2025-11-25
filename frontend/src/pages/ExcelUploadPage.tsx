@@ -17,6 +17,7 @@ export default function ExcelUploadPage() {
   const [isPlanLocked, setIsPlanLocked] = useState(false);
   const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string;plan_date?:string;first_delivery_time?:string;last_delivery_time?:string}[]>([]);
   const [isPlanButtonDisabled, setIsPlanButtonDisabled] = useState(false); // Planlama butonu disable durumu
+  const [needsPlanning, setNeedsPlanning] = useState(false); // Excel yüklendi, planlama bekleniyor
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
   const [isAutoPlanning, setIsAutoPlanning] = useState(true); // Otomatik planlama modu
 
@@ -127,8 +128,9 @@ export default function ExcelUploadPage() {
       // Yükleme geçmişini yenile
       try { const list = await apiService.getCycleImports(result.cycle_id); setImports(list); } catch {}
       
-      // Yeni Excel yüklendi - planlama butonunu tekrar aktif et
-      setIsPlanButtonDisabled(false);
+      // Yeni Excel yüklendi - planlama yapana kadar Excel yüklemeyi engelle
+      setNeedsPlanning(true);
+      setIsPlanButtonDisabled(false); // Planlama butonunu aktif et
       localStorage.removeItem('plan_button_disabled_' + result.cycle_id);
       
       setToast({ message: 'Excel başarıyla yüklendi! Şimdi planlama oluşturun.', type: 'success' });
@@ -184,6 +186,7 @@ export default function ExcelUploadPage() {
       setSelectedFile(null);
       setIsPlanLocked(false);
       setImports([]);
+      setNeedsPlanning(false);
       setIsPlanButtonDisabled(false); // Plan butonunu tekrar aktif et
       
       // LocalStorage temizle
@@ -241,7 +244,8 @@ export default function ExcelUploadPage() {
       
       setPlanResult(formattedPlan);
       
-      // Plan oluşturuldu - butonu disable et (yeni Excel yüklenene kadar)
+      // Plan oluşturuldu - Excel yüklemeye izin ver, planlama butonunu disable et
+      setNeedsPlanning(false);
       setIsPlanButtonDisabled(true);
       localStorage.setItem('plan_button_disabled_' + cycleId, 'true');
       
@@ -322,12 +326,14 @@ export default function ExcelUploadPage() {
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
-                  className="block w-full text-sm text-gray-500
+                  disabled={needsPlanning}
+                  className={`block w-full text-sm text-gray-500
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-md file:border-0
                     file:text-sm file:font-semibold
                     file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100"
+                    hover:file:bg-blue-100
+                    ${needsPlanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 {selectedFile && (
                   <p className="mt-2 text-sm text-gray-600">
@@ -338,7 +344,7 @@ export default function ExcelUploadPage() {
 
               <button
                 onClick={handleUpload}
-                disabled={!selectedFile || isUploading}
+                disabled={!selectedFile || isUploading || needsPlanning}
                 className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {isUploading ? 'Yüklüyor...' : 'Excel Yükle'}

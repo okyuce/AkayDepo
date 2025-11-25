@@ -141,43 +141,19 @@ class LoadsheetGenerator:
         self.session.flush()  # ID için
         
         # Order lines'ı loadsheet lines'a kopyala
-        # Revizyon ise sadece değişen ürünleri ekle, normal ise tümünü
-        if is_revision and revision_diff:
-            # Revision diff'ten değişen ürünleri al ve sadece fark miktarını ekle
-            import json
-            diff_data = json.loads(revision_diff)
-            
-            for diff_item in diff_data:
-                product_id = UUID(diff_item["product_id"])
-                # Yeni yapı: diff_carton ve diff_pack olabilir; eskiden diff (karton) vardı
-                diff_carton = diff_item.get("diff_carton")
-                diff_pack = diff_item.get("diff_pack")
-                if diff_carton is None and diff_pack is None:
-                    # Geriye dönük uyumluluk
-                    diff_carton = diff_item.get("diff", 0)
-                    diff_pack = 0
-                total_zero = (diff_carton == 0 and diff_pack == 0)
-                if not total_zero:
-                    loadsheet_line = LoadsheetLine(
-                        loadsheet_id=loadsheet.id,
-                        product_id=product_id,
-                        qty_carton=abs(int(diff_carton)),
-                        qty_pack=abs(int(diff_pack))
-                    )
-                    self.session.add(loadsheet_line)
-        else:
-            # Normal order - tüm lines'ı kopyala
-            stmt = select(OrderLine).where(OrderLine.order_id == order.id)
-            order_lines = self.session.exec(stmt).all()
-            
-            for line in order_lines:
-                loadsheet_line = LoadsheetLine(
-                    loadsheet_id=loadsheet.id,
-                    product_id=line.product_id,
-                    qty_carton=line.qty_carton,
-                    qty_pack=line.qty_pack
-                )
-                self.session.add(loadsheet_line)
+        # YENİ MANTIK: Her fişte order'ın tam içeriğini göster (fark hesaplama yok)
+        # Revizyon bilgisi sadece referans için revision_diff'te saklanır
+        stmt = select(OrderLine).where(OrderLine.order_id == order.id)
+        order_lines = self.session.exec(stmt).all()
+        
+        for line in order_lines:
+            loadsheet_line = LoadsheetLine(
+                loadsheet_id=loadsheet.id,
+                product_id=line.product_id,
+                qty_carton=line.qty_carton,
+                qty_pack=line.qty_pack
+            )
+            self.session.add(loadsheet_line)
         
         return 1
     
