@@ -234,8 +234,11 @@ export default function LoadsheetListPage() {
       });
       setLoadsheets(updatedLoadsheets);
       
-      // Dealer groups'u yenile (güncel loadsheets ile)
-      const updatedGroups = groupLoadsheetsByDealer(updatedLoadsheets);
+      // Territory filtresini uygula ve dealer groups'u yenile
+      const filteredLoadsheets = selectedTerritoryCode 
+        ? updatedLoadsheets.filter(ls => ls.territory?.code === selectedTerritoryCode)
+        : updatedLoadsheets;
+      const updatedGroups = groupLoadsheetsByDealer(filteredLoadsheets);
       setDealerGroups(updatedGroups);
       
       // Dealer grubu aç
@@ -418,6 +421,8 @@ export default function LoadsheetListPage() {
                               const isLastLoadsheet = index === group.loadsheets.length - 1;
                               // Önceki fişler iptal olarak işaretlenir
                               const isCancelled = !isLastLoadsheet;
+                              // Fiş numarası: dealer için kaçıncı fiş (1'den başlar)
+                              const loadsheetNumber = index + 1;
 
                               return (
                                 <div key={loadsheet.id} className={`border-2 rounded ${
@@ -431,11 +436,11 @@ export default function LoadsheetListPage() {
                                       <span className={`font-bold text-lg px-2 py-0.5 rounded ${
                                         isCancelled 
                                           ? 'bg-red-200 text-red-900' 
-                                          : loadsheet.batch_number >= 2 
+                                          : loadsheetNumber >= 2 
                                             ? 'bg-orange-100 text-orange-800' 
                                             : ''
                                       }`}>
-                                        FIŞ-{loadsheet.batch_number}
+                                        FIŞ-{loadsheetNumber}
                                       </span>
                                       <span className="text-sm text-gray-600 ml-1">{loadsheet.package_number}</span>
                                       {isCancelled && (
@@ -479,7 +484,7 @@ export default function LoadsheetListPage() {
                                         </tr>
                                         <tr className="bg-black text-white">
                                           <td className="p-2" colSpan={3}>
-                                            {loadsheet.territory ? `${loadsheet.territory.code}-${loadsheet.territory.name}` : 'TERR'}
+                                            {loadsheet.territory ? loadsheet.territory.code : 'TERR'}
                                           </td>
                                         </tr>
                                         {loadsheet.lines.map((line, idx) => (
