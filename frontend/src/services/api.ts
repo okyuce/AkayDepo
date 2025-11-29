@@ -231,7 +231,7 @@ class ApiService {
     return response.data;
   }
 
-  async updateTerritory(id: string, data: { name?: string; display_number?: string; is_active?: boolean; color?: string }) {
+  async updateTerritory(id: string, data: { code?: string; name?: string; display_number?: string; is_active?: boolean; color?: string }) {
     const response = await this.client.put(`/v1/territory-info/${id}`, data);
     return response.data;
   }
