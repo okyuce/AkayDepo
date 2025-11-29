@@ -60,9 +60,9 @@ function App() {
         <Route
           path="/distribution"
           element={
-            <AdminRoute>
+            <PrivateRoute>
               <StationDistributionPage />
-            </AdminRoute>
+            </PrivateRoute>
           }
         />
         <Route

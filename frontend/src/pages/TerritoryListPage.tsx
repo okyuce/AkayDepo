@@ -98,9 +98,10 @@ export default function TerritoryListPage() {
       if (editingTerritory) {
         // Güncelleme
         await apiService.updateTerritory(editingTerritory.id, {
+          code: formData.code,
           name: formData.name,
           display_number: formData.display_number,
-          color: formData.color || null
+          color: formData.color ? formData.color : undefined
         });
         showToast('Territory güncellendi', 'success');
       } else {
@@ -263,15 +264,9 @@ export default function TerritoryListPage() {
                   type="text"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  disabled={!!editingTerritory}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    editingTerritory ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
-                  placeholder="örn: TERR030728"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="örn: TERR030702-Kadınlarpazarı"
                 />
-                {editingTerritory && (
-                  <p className="text-xs text-gray-500 mt-1">Kod değiştirilemez</p>
-                )}
               </div>
 
               <div>

@@ -42,12 +42,6 @@ export default function Navbar() {
                       Planlama
                     </Link>
                     <Link
-                      to="/distribution"
-                      className={linkClasses(location.pathname === '/distribution')}
-                    >
-                      İstasyon Dağılımı
-                    </Link>
-                    <Link
                       to="/stock-distribution"
                       className={linkClasses(location.pathname === '/stock-distribution')}
                     >
@@ -62,6 +56,14 @@ export default function Navbar() {
                   className={linkClasses(location.pathname === '/loadsheets')}
                 >
                   Yükleme Fişleri
+                </Link>
+                
+                {/* Tüm kullanıcılar için İstasyon Dağılımı */}
+                <Link
+                  to="/distribution"
+                  className={linkClasses(location.pathname === '/distribution')}
+                >
+                  İstasyon Dağılımı
                 </Link>
                 
                 {/* Tanımlar Dropdown - EN SONDA */}

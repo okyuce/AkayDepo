@@ -34,7 +34,6 @@ export default function TerritoryAssignmentPage() {
   const [assignments, setAssignments] = useState<Record<string, string | null>>({}); // territory_code -> station_id or null
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showAddStation, setShowAddStation] = useState(false);
   const [newStationName, setNewStationName] = useState('');
   const [hasActiveCycle, setHasActiveCycle] = useState(false);
@@ -59,8 +58,7 @@ export default function TerritoryAssignmentPage() {
         cfg.assignments.forEach((a) => { map[a.territory_code] = a.station_id; });
         setAssignments(map);
       } catch (e: any) {
-        setError('Yükleme hatası');
-        console.error(e);
+        console.error('Yükleme hatası:', e);
       } finally {
         setLoading(false);
       }
@@ -95,7 +93,6 @@ export default function TerritoryAssignmentPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setError(null);
     
     // Manuel modda validasyon yap
     if (!autoPlanning) {
@@ -112,8 +109,8 @@ export default function TerritoryAssignmentPage() {
       const payload = {
         auto_planning_enabled: autoPlanning,
         assignments: autoPlanning ? [] : Object.entries(assignments)
-          .filter(([code, sid]) => !!sid)
-          .map(([code, sid]) => ({ territory_code: code, station_id: sid as string })),
+          .filter(([, sid]) => !!sid)
+          .map(([territoryCode, sid]) => ({ territory_code: territoryCode, station_id: sid as string })),
       };
       await apiService.saveAssignmentsConfig(payload);
       alert(autoPlanning ? 'Otomatik planlama aktif edildi' : 'Manuel atamalar kaydedildi');

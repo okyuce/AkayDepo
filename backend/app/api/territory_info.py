@@ -21,6 +21,7 @@ class TerritoryCreate(BaseModel):
 
 
 class TerritoryUpdate(BaseModel):
+    code: Optional[str] = None
     name: Optional[str] = None
     display_number: Optional[str] = None
     is_active: Optional[bool] = None
@@ -128,6 +129,14 @@ async def update_territory(
     territory = session.get(TerritoryInfo, territory_id)
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
+    
+    # Code unique kontrolü (eğer değiştirildiyse)
+    if data.code is not None and data.code != territory.code:
+        stmt = select(TerritoryInfo).where(TerritoryInfo.code == data.code)
+        existing = session.exec(stmt).first()
+        if existing:
+            raise HTTPException(400, "Bu territory kodu zaten mevcut")
+        territory.code = data.code
     
     if data.name is not None:
         territory.name = data.name
