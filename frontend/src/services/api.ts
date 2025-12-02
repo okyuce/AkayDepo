@@ -271,6 +271,27 @@ class ApiService {
     });
     return response.data;
   }
+
+  // Product Order
+  async getProductOrder() {
+    const response = await this.client.get('/v1/product-order/');
+    return response.data as Array<{
+      id: string;
+      code: string;
+      name: string;
+      display_order: number;
+    }>;
+  }
+
+  async updateProductOrder(products: Array<{ id: string; display_order: number }>) {
+    const response = await this.client.put('/v1/product-order/', { products });
+    return response.data;
+  }
+
+  async resetProductOrder() {
+    const response = await this.client.post('/v1/product-order/reset', {});
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
