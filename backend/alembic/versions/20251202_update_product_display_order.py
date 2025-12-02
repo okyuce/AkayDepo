@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251202_product_order'
-down_revision = 'fix_revision_diff_type'
+down_revision = '6094d11a2370'
 branch_labels = None
 depends_on = None
 
