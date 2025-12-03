@@ -469,8 +469,8 @@ export default function LoadsheetListPage() {
                                       <thead className="bg-gray-100">
                                         <tr>
                                           <th className="text-left p-3 font-bold border-b-2 border-gray-300">Rut Sırası</th>
-                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-20">Krt</th>
-                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-20">Pkt</th>
+                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-16">Krt</th>
+                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-16">Pkt</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -489,9 +489,9 @@ export default function LoadsheetListPage() {
                                         </tr>
                                         {loadsheet.lines.map((line, idx) => (
                                           <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                                            <td className="p-2">{line.product_name}</td>
-                                            <td className="p-2 text-right font-semibold">{line.qty_carton}</td>
-                                            <td className="p-2 text-right">{line.qty_pack || ''}</td>
+                                            <td className="p-2 text-base font-bold">{line.product_name}</td>
+                                            <td className="p-2 text-right font-bold text-base">{line.qty_carton}</td>
+                                            <td className="p-2 text-right font-bold text-base">{line.qty_pack || ''}</td>
                                           </tr>
                                         ))}
                                         <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
