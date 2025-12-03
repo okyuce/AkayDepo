@@ -465,12 +465,12 @@ export default function LoadsheetListPage() {
 
                                   {/* Fiş Detay Tablosu */}
                                   {loadsheet.lines && (
-                                    <table className="w-full">
+                                    <table className="w-full table-fixed">
                                       <thead className="bg-gray-100">
                                         <tr>
-                                          <th className="text-left p-3 font-bold border-b-2 border-gray-300">Rut Sırası</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-24">Krt</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-24">Pkt</th>
+                                          <th className="text-left p-3 font-bold border-b-2 border-gray-300 w-3/5">Rut Sırası</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-1/5">Krt</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-1/5">Pkt</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -488,10 +488,12 @@ export default function LoadsheetListPage() {
                                           </td>
                                         </tr>
                                         {loadsheet.lines.map((line, idx) => (
-                                          <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                                            <td className="p-2 text-lg font-bold">{line.product_name}</td>
-                                            <td className="p-2 text-center font-bold text-lg">{line.qty_carton}</td>
-                                            <td className="p-2 text-center font-bold text-lg">{line.qty_pack || ''}</td>
+                                          <tr key={idx} className={`border-b border-gray-200 ${
+                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'
+                                          }`}>
+                                            <td className="p-2 text-lg font-bold truncate">{line.product_name}</td>
+                                            <td className="p-2 text-center font-bold text-lg w-1/5">{line.qty_carton}</td>
+                                            <td className="p-2 text-center font-bold text-lg w-1/5">{line.qty_pack || ''}</td>
                                           </tr>
                                         ))}
                                         <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
