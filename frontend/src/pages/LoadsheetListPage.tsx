@@ -469,15 +469,15 @@ export default function LoadsheetListPage() {
                                       <thead className="bg-gray-100">
                                         <tr>
                                           <th className="text-left p-3 font-bold border-b-2 border-gray-300">Rut Sırası</th>
-                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-16">Krt</th>
-                                          <th className="text-right p-3 font-bold border-b-2 border-gray-300 w-16">Pkt</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-24">Krt</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-24">Pkt</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         <tr className="bg-black text-white font-bold">
                                           <td className="p-2">{loadsheet.dealer_name}</td>
-                                          <td className="p-2 text-right">{totalCartons}</td>
-                                          <td className="p-2 text-right">{totalPacks || ''}</td>
+                                          <td className="p-2 text-center">{totalCartons}</td>
+                                          <td className="p-2 text-center">{totalPacks || ''}</td>
                                         </tr>
                                         <tr>
                                           <td className="p-2" colSpan={3}>{loadsheet.dealer_code}</td>
@@ -489,15 +489,15 @@ export default function LoadsheetListPage() {
                                         </tr>
                                         {loadsheet.lines.map((line, idx) => (
                                           <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                                            <td className="p-2 text-base font-bold">{line.product_name}</td>
-                                            <td className="p-2 text-right font-bold text-base">{line.qty_carton}</td>
-                                            <td className="p-2 text-right font-bold text-base">{line.qty_pack || ''}</td>
+                                            <td className="p-2 text-lg font-bold">{line.product_name}</td>
+                                            <td className="p-2 text-center font-bold text-lg">{line.qty_carton}</td>
+                                            <td className="p-2 text-center font-bold text-lg">{line.qty_pack || ''}</td>
                                           </tr>
                                         ))}
                                         <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
                                           <td className="p-3">Toplam</td>
-                                          <td className="p-3 text-right">{totalCartons}</td>
-                                          <td className="p-3 text-right">{totalPacks || ''}</td>
+                                          <td className="p-3 text-center">{totalCartons}</td>
+                                          <td className="p-3 text-center">{totalPacks || ''}</td>
                                         </tr>
                                       </tbody>
                                     </table>
