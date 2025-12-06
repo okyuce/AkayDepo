@@ -115,6 +115,9 @@ class LoadsheetGenerator:
         if is_revision and order.previous_order_id:
             # Önceki order ile karşılaştır ve diff hesapla
             revision_diff, loadsheet_type = self._calculate_revision_diff(order.id, order.previous_order_id)
+            
+            # ÖNEMLİ: Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
+            self._cancel_previous_loadsheet(cycle_id, dealer_id, order.previous_order_id, assignment.station_id)
         
         # Idempotency: Aynı dealer + batch için zaten fiş varsa atla
         from app.models import Loadsheet as Ls
@@ -224,3 +227,84 @@ class LoadsheetGenerator:
         revision_diff_json = json.dumps(diffs) if diffs else None
         
         return revision_diff_json, loadsheet_type
+    
+    def _cancel_previous_loadsheet(self, cycle_id: UUID, dealer_id: UUID, previous_order_id: UUID, station_id: UUID):
+        """
+        Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
+        
+        Args:
+            cycle_id: Döngü ID
+            dealer_id: Bayi ID
+            previous_order_id: Önceki order ID
+            station_id: İstasyon ID
+        """
+        from app.models import Loadsheet, StationInventory
+        from datetime import datetime
+        
+        # Önceki order'a ait fişi bul
+        # Önceki order'dan oluşan loadsheet'i bulmak için dealer_id ve cycle_id kullan
+        # Not: Aynı dealer için birden fazla batch olabilir, önceki batch'i bul
+        stmt = select(Loadsheet).join(
+            Order, Loadsheet.dealer_id == Order.dealer_id
+        ).where(
+            Loadsheet.cycle_id == cycle_id,
+            Loadsheet.dealer_id == dealer_id,
+            Order.id == previous_order_id
+        )
+        
+        # Alternatif: Daha basit yöntem - aynı dealer için önceki batch'teki fiş
+        # Önceki batch numarasını order'dan al
+        prev_order = self.session.get(Order, previous_order_id)
+        if not prev_order:
+            return
+        
+        prev_batch = prev_order.import_batch
+        
+        # Önceki fişi bul
+        stmt = select(Loadsheet).where(
+            Loadsheet.cycle_id == cycle_id,
+            Loadsheet.dealer_id == dealer_id,
+            Loadsheet.batch_number == prev_batch
+        )
+        previous_loadsheet = self.session.exec(stmt).first()
+        
+        if not previous_loadsheet:
+            print(f"UYARI: Önceki fiş bulunamadı - dealer: {dealer_id}, batch: {prev_batch}")
+            return
+        
+        # Eğer fiş zaten iptal ise, tekrar işleme gerek yok
+        if previous_loadsheet.status == "cancelled":
+            return
+        
+        # Eğer fiş tamamlanmışsa (completed_at != null), stoka iade et
+        if previous_loadsheet.completed_at is not None:
+            print(f"INFO: İptal edilen fiş tamamlanmıştı, stoka iade ediliyor - {previous_loadsheet.id}")
+            
+            # Loadsheet lines'ları al
+            stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == previous_loadsheet.id)
+            lines = self.session.exec(stmt).all()
+            
+            # Her ürün için stoka iade et
+            for line in lines:
+                # Stok kaydını bul
+                stmt = select(StationInventory).where(
+                    StationInventory.station_id == station_id,
+                    StationInventory.product_id == line.product_id
+                )
+                inventory = self.session.exec(stmt).first()
+                
+                if inventory:
+                    # Stoka iade et (düşenler geri eklenir)
+                    inventory.quantity_carton += line.qty_carton
+                    inventory.quantity_pack += line.qty_pack
+                    inventory.updated_at = datetime.utcnow()
+                    self.session.add(inventory)
+                    
+                    print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket")
+        else:
+            print(f"INFO: İptal edilen fiş tamamlanmamış, stoka dokunulmadı - {previous_loadsheet.id}")
+        
+        # Fişi iptal et
+        previous_loadsheet.status = "cancelled"
+        self.session.add(previous_loadsheet)
+        print(f"INFO: Fiş iptal edildi - {previous_loadsheet.id}")
