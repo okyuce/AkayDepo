@@ -134,17 +134,22 @@ export default function TerritoryAssignmentPage() {
   };
 
   const handleAddStation = async () => {
-    if (!newStationName.trim()) {
-      alert('İstasyon adı giriniz');
-      return;
-    }
     try {
-      const newStation = await apiService.createStation(newStationName.trim());
+      const newStation = await apiService.createStation();
       setStations(prev => [...prev, newStation]);
       setNewStationName('');
       setShowAddStation(false);
+      
+      // Başarı mesajı göster
+      const message = newStation.tablet_user 
+        ? `${newStation.name} oluşturuldu! Kullanıcı: ${newStation.tablet_user} (Şifre: tablet123)`
+        : `${newStation.name} başarıyla oluşturuldu!`;
+      setToast({ message, type: 'success' });
+      setTimeout(() => setToast(null), 5000);
     } catch (e: any) {
-      alert(e?.response?.data?.detail || 'İstasyon oluşturma hatası');
+      const errorMsg = e?.response?.data?.detail || 'İstasyon oluşturma hatası';
+      setToast({ message: errorMsg, type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -282,37 +287,13 @@ export default function TerritoryAssignmentPage() {
         {/* Add Station Button */}
         {!autoPlanning && (
           <div className="mb-4">
-            {!showAddStation ? (
-              <button
-                onClick={() => setShowAddStation(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center space-x-2"
-              >
-                <span>+ Yeni İstasyon Ekle</span>
-              </button>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-4 flex items-center space-x-3">
-              <input
-                type="text"
-                value={newStationName}
-                onChange={(e) => setNewStationName(e.target.value)}
-                placeholder="İstasyon adı (örn: İstasyon-6)"
-                className="flex-1 px-3 py-2 border rounded-md"
-                onKeyPress={(e) => e.key === 'Enter' && handleAddStation()}
-              />
-              <button
-                onClick={handleAddStation}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Ekle
-              </button>
-              <button
-                onClick={() => { setShowAddStation(false); setNewStationName(''); }}
-                className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500"
-              >
-                İptal
-              </button>
-            </div>
-          )}
+            <button
+              onClick={handleAddStation}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center space-x-2"
+            >
+              <span>+ Yeni İstasyon Ekle</span>
+              <span className="text-xs text-green-100">(Otomatik isimlendirilir)</span>
+            </button>
           </div>
         )}
 

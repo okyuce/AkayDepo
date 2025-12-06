@@ -181,9 +181,9 @@ class ApiService {
     return response.data as { id: string; name: string; active: boolean };
   }
 
-  async createStation(name: string) {
-    const response = await this.client.post('/v1/stations/', { name });
-    return response.data as { id: string; name: string; active: boolean };
+  async createStation() {
+    const response = await this.client.post('/v1/stations/', {});
+    return response.data as { id: string; name: string; active: boolean; tablet_user?: string };
   }
 
   async deleteStation(stationId: string) {
@@ -290,6 +290,40 @@ class ApiService {
 
   async resetProductOrder() {
     const response = await this.client.post('/v1/product-order/reset', {});
+    return response.data;
+  }
+
+  // Users Management
+  async getUsers() {
+    const response = await this.client.get('/v1/users/');
+    return response.data as Array<{
+      id: string;
+      username: string;
+      full_name: string | null;
+      role: string;
+      station_id: string | null;
+      is_active: boolean;
+      created_at: string;
+    }>;
+  }
+
+  async updateUser(userId: string, data: { full_name?: string | null; is_active?: boolean }) {
+    const response = await this.client.patch(`/v1/users/${userId}`, data);
+    return response.data;
+  }
+
+  async resetUserPassword(userId: string, newPassword: string) {
+    const response = await this.client.post(`/v1/users/${userId}/reset-password`, {
+      new_password: newPassword,
+    });
+    return response.data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response = await this.client.post('/v1/users/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
     return response.data;
   }
 }

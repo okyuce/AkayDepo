@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
+import { useAuthStore } from '../stores/authStore';
 
 interface Station {
   id: string;
@@ -46,6 +47,7 @@ interface DealerGroup {
 }
 
 export default function LoadsheetListPage() {
+  const { user } = useAuthStore();
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [selectedTerritoryCode, setSelectedTerritoryCode] = useState<string>('');  // Territory filtresi
@@ -78,12 +80,23 @@ export default function LoadsheetListPage() {
     try {
       const plan = await apiService.getPlan(cycleId);
       if (plan && plan.stations) {
-        const stationList = plan.stations.map((s: any) => ({
+        let stationList = plan.stations.map((s: any) => ({
           id: s.station_id,
           name: s.station_name
         }));
+        
+        // Tablet kullanıcıları için sadece kendi istasyonlarını göster
+        if (user?.role === 'tablet' && user?.station_id) {
+          stationList = stationList.filter((s: Station) => s.id === user.station_id);
+          
+          // Otomatik olarak kendi istasyonunu seç
+          if (stationList.length > 0) {
+            setSelectedStationId(stationList[0].id);
+            loadLoadsheets(stationList[0].id);
+          }
+        }
+        
         setStations(stationList);
-        // İlk istasyonu otomatik seçme - kullanıcı manuel seçsin
       }
     } catch (err) {
       console.error('İstasyonlar yüklenemedi:', err);

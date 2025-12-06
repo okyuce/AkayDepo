@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
+import { useAuthStore } from '../stores/authStore';
 
 interface Station {
   id: string;
@@ -47,6 +48,7 @@ interface TrackingData {
 }
 
 export default function StationDistributionPage() {
+  const { user } = useAuthStore();
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
@@ -76,12 +78,23 @@ export default function StationDistributionPage() {
       const plan = await apiService.getPlan(cycleId);
       if (plan && plan.stations) {
         // İstasyonları parse et - backend'den station_id geliyor
-        const stationList = plan.stations.map((s: any) => ({
+        let stationList = plan.stations.map((s: any) => ({
           id: s.station_id,
           name: s.station_name
         }));
+        
+        // Tablet kullanıcıları için sadece kendi istasyonlarını göster
+        if (user?.role === 'tablet' && user?.station_id) {
+          stationList = stationList.filter((s: Station) => s.id === user.station_id);
+          
+          // Otomatik olarak kendi istasyonunu seç
+          if (stationList.length > 0) {
+            setSelectedStationId(stationList[0].id);
+            loadStationTracking(stationList[0].id);
+          }
+        }
+        
         setStations(stationList);
-        // İlk istasyonu otomatik seçme - kullanıcı manuel seçsin
       }
     } catch (err) {
       console.error('İstasyonlar yüklenemedi:', err);

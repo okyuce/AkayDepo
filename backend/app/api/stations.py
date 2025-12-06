@@ -5,15 +5,82 @@ Stations API Router
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from uuid import UUID
-from typing import Dict, List
+from typing import Dict, List, Optional
+from pydantic import BaseModel
+import re
 
 from app.core.database import get_session
 from app.models import (
     StationAssignment, Territory, Order, OrderLine, 
     Product, Dealer, Station, Loadsheet, LoadsheetLine, StationInventory
 )
+from app.models.user import User
 
 router = APIRouter()
+
+
+class CreateStationRequest(BaseModel):
+    """İstasyon oluşturma isteği - isim otomatik oluşturulur"""
+    pass  # İsim parametresi yok, otomatik oluşturulacak
+
+
+def get_next_station_number(session: Session) -> int:
+    """Sonraki istasyon numarasını bul (boşlukları doldur, yoksa sıradan devam et)"""
+    # Tüm istasyonları al
+    stmt = select(Station).order_by(Station.name)
+    stations = session.exec(stmt).all()
+    
+    if not stations:
+        return 1
+    
+    # İstasyon isimlerinden numaraları çıkar (İstasyon-1, İstasyon-2 gibi)
+    numbers = []
+    pattern = r'İstasyon-(\d+)'
+    
+    for station in stations:
+        match = re.match(pattern, station.name)
+        if match:
+            numbers.append(int(match.group(1)))
+    
+    if not numbers:
+        return 1
+    
+    numbers.sort()
+    
+    # Önce boşlukları kontrol et
+    for i in range(1, numbers[-1]):
+        if i not in numbers:
+            return i
+    
+    # Boşluk yoksa sıradan devam et
+    return numbers[-1] + 1
+
+
+def create_tablet_user(station_number: int, station_id: UUID, session: Session) -> User:
+    """İstasyon için tablet kullanıcısı oluştur"""
+    username = f"tablet{station_number}"
+    
+    # Kullanıcı zaten var mı kontrol et
+    stmt = select(User).where(User.username == username)
+    existing_user = session.exec(stmt).first()
+    
+    if existing_user:
+        # Mevcut kullanıcıyı güncelle
+        existing_user.station_id = station_id
+        existing_user.is_active = True
+        session.add(existing_user)
+        return existing_user
+    
+    # Yeni kullanıcı oluştur
+    user = User(
+        username=username,
+        role="tablet",
+        station_id=station_id,
+        is_active=True
+    )
+    user.set_password("tablet123")  # Default şifre
+    session.add(user)
+    return user
 
 @router.get("/")
 async def list_stations(session: Session = Depends(get_session)):
@@ -21,32 +88,62 @@ async def list_stations(session: Session = Depends(get_session)):
     return [{"id": str(s.id), "name": s.name, "active": s.active} for s in stations]
 
 @router.post("/")
-async def create_station(payload: Dict, session: Session = Depends(get_session)):
-    """Yeni istasyon oluştur"""
-    name = payload.get("name")
-    if not name:
-        raise HTTPException(400, "İstasyon adı gerekli")
+async def create_station(session: Session = Depends(get_session)):
+    """
+    Yeni istasyon oluştur (otomatik isimlendirme)
+    İstasyon adı: İstasyon-1, İstasyon-2, ...
+    Her istasyon için tablet kullanıcısı otomatik oluşturulur: tablet1, tablet2, ...
+    """
+    # Sonraki istasyon numarasını bul
+    station_number = get_next_station_number(session)
+    station_name = f"İstasyon-{station_number}"
     
-    # Aynı isimde istasyon var mı kontrol et
-    existing = session.exec(select(Station).where(Station.name == name)).first()
-    if existing:
-        raise HTTPException(400, "Bu isimde bir istasyon zaten var")
-    
-    station = Station(name=name, active=True)
+    # İstasyon oluştur
+    station = Station(name=station_name, active=True)
     session.add(station)
+    session.flush()  # ID'yi almak için flush
+    
+    # Tablet kullanıcısı oluştur
+    tablet_user = create_tablet_user(station_number, station.id, session)
+    
     session.commit()
     session.refresh(station)
-    return {"id": str(station.id), "name": station.name, "active": station.active}
+    
+    return {
+        "id": str(station.id),
+        "name": station.name,
+        "active": station.active,
+        "tablet_user": tablet_user.username
+    }
 
 @router.delete("/{station_id}")
 async def delete_station(station_id: UUID, session: Session = Depends(get_session)):
-    """İstasyon sil"""
+    """
+    İstasyon sil
+    İlgili tablet kullanıcısı da silinir
+    """
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
+    
+    # İlgili tablet kullanıcısını bul ve sil
+    stmt = select(User).where(
+        User.station_id == station_id,
+        User.role == "tablet"
+    )
+    tablet_users = session.exec(stmt).all()
+    
+    for user in tablet_users:
+        session.delete(user)
+    
+    # İstasyonu sil
     session.delete(station)
     session.commit()
-    return {"success": True}
+    
+    return {
+        "success": True,
+        "deleted_users": [user.username for user in tablet_users]
+    }
 
 @router.put("/{station_id}")
 async def update_station(station_id: UUID, payload: Dict, session: Session = Depends(get_session)):

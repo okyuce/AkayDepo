@@ -8,6 +8,9 @@ import { apiService } from '../services/api';
 interface User {
   username: string;
   role: string;
+  station_id?: string | null;
+  full_name?: string | null;
+  user_id?: string;
 }
 
 interface AuthState {

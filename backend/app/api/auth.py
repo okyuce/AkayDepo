@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 import jwt  # PyJWT
 import os
+from sqlmodel import Session, select
+from ..core.database import get_session
+from ..models.user import User
 
 router = APIRouter()
 security = HTTPBearer()
@@ -32,15 +35,6 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
-# Basit kullanıcı listesi (production'da DB'den gelir)
-USERS = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "tablet1": {"password": "tablet123", "role": "tablet"},
-    "tablet2": {"password": "tablet123", "role": "tablet"},
-    "tablet3": {"password": "tablet123", "role": "tablet"},
-    "tablet4": {"password": "tablet123", "role": "tablet"},
-    "tablet5": {"password": "tablet123", "role": "tablet"},
-}
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -67,20 +61,32 @@ def verify_token(token: str) -> dict:
         raise HTTPException(401, "Geçersiz token")
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    session: Session = Depends(get_session)
+):
     """Mevcut kullanıcıyı al (dependency)"""
     token = credentials.credentials
     payload = verify_token(token)
     username = payload.get("sub")
+    user_id = payload.get("user_id")
     
-    if username not in USERS:
-        raise HTTPException(401, "Kullanıcı bulunamadı")
+    # Kullanıcıyı DB'den al
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "Kullanıcı bulunamadı veya aktif değil")
     
-    return {"username": username, "role": payload.get("role")}
+    return {
+        "user_id": str(user.id),
+        "username": user.username,
+        "role": user.role,
+        "station_id": str(user.station_id) if user.station_id else None,
+        "full_name": user.full_name
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, session: Session = Depends(get_session)):
     """
     Kullanıcı girişi
     
@@ -91,9 +97,12 @@ async def login(request: LoginRequest):
     Returns:
         JWT access token
     """
-    # Kullanıcı kontrolü
-    user = USERS.get(request.username)
-    if not user or user["password"] != request.password:
+    # Kullanıcıyı DB'den bul
+    statement = select(User).where(User.username == request.username)
+    user = session.exec(statement).first()
+    
+    # Kullanıcı kontrolü ve şifre doğrulama
+    if not user or not user.is_active or not user.verify_password(request.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Kullanıcı adı veya şifre hatalı",
@@ -103,7 +112,11 @@ async def login(request: LoginRequest):
     # Token oluştur
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": request.username, "role": user["role"]},
+        data={
+            "sub": user.username,
+            "user_id": str(user.id),
+            "role": user.role
+        },
         expires_delta=access_token_expires
     )
     
