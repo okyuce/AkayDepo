@@ -253,6 +253,15 @@ async def complete_loadsheet(
             inventory = session.exec(stmt).first()
             
             if inventory:
+                # Paketten düşülecek miktar kontrolü
+                # Eğer paketten düşülecek miktar > stokta olan paket VE stokta karton varsa
+                # Bir karton boz (1 karton = 10 paket)
+                if line.qty_pack > 0 and inventory.quantity_pack < line.qty_pack and inventory.quantity_carton > 0:
+                    # Bir karton boz
+                    inventory.quantity_carton -= 1
+                    inventory.quantity_pack += 10
+                    print(f"INFO: Karton bozuldu - {assignment.station_id} istasyonunda {line.product_id} ürünü")
+                
                 # Stoktan düşür
                 inventory.quantity_carton -= line.qty_carton
                 inventory.quantity_pack -= line.qty_pack
