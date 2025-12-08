@@ -309,7 +309,9 @@ class LoadsheetGenerator:
         else:
             print(f"INFO: İptal edilen fiş tamamlanmamış, stoka dokunulmadı - {previous_loadsheet.id}")
         
-        # Fişi iptal et
+        # Fişi iptal et ve zaman damgalarını temizle (hazırlanan hesaplarından düşmesi için)
         previous_loadsheet.status = "cancelled"
+        previous_loadsheet.completed_at = None
+        previous_loadsheet.loaded_at = None
         self.session.add(previous_loadsheet)
         print(f"INFO: Fiş iptal edildi - {previous_loadsheet.id}")

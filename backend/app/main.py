@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
-VERSION = "1.0.12"
+VERSION = "1.0.13"
 
 app = FastAPI(
     title="AkayDepo API",
