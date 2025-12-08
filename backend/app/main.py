@@ -2,10 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
+VERSION = "1.0.11"
+
 app = FastAPI(
     title="AkayDepo API",
     description="Depo Transfer Yönetim Sistemi",
-    version="0.1.0"
+    version=VERSION
 )
 
 # CORS
@@ -21,9 +23,13 @@ app.add_middleware(
 async def root():
     return {
         "message": "AkayDepo API",
-        "version": "0.1.0",
+        "version": VERSION,
         "environment": settings.ENVIRONMENT
     }
+
+@app.get("/v1/version")
+async def get_version():
+    return {"version": VERSION}
 
 @app.get("/health")
 async def health_check():
