@@ -284,7 +284,7 @@ class LoadsheetGenerator:
             stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == previous_loadsheet.id)
             lines = self.session.exec(stmt).all()
             
-            # Her ürün için stoka iade et
+            # Her ürün için stoka iade et (pack-equivalent ile atomik)
             for line in lines:
                 # Stok kaydını bul
                 stmt = select(StationInventory).where(
@@ -294,13 +294,18 @@ class LoadsheetGenerator:
                 inventory = self.session.exec(stmt).first()
                 
                 if inventory:
-                    # Stoka iade et (düşenler geri eklenir)
-                    inventory.quantity_carton += line.qty_carton
-                    inventory.quantity_pack += line.qty_pack
+                    # Mevcut toplam ve iade miktarını paket eşdeğerine çevir
+                    total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
+                    refund_packs_equiv = line.qty_carton * 10 + line.qty_pack
+                    new_total = total_packs_equiv + refund_packs_equiv
+                    
+                    # Normalize ederek geri yaz
+                    inventory.quantity_carton = new_total // 10
+                    inventory.quantity_pack = new_total % 10
                     inventory.updated_at = datetime.utcnow()
                     self.session.add(inventory)
                     
-                    print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket")
+                    print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket (toplam={new_total} pack)")
         else:
             print(f"INFO: İptal edilen fiş tamamlanmamış, stoka dokunulmadı - {previous_loadsheet.id}")
         

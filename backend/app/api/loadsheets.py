@@ -237,7 +237,7 @@ async def complete_loadsheet(
     loadsheet.completed_at = datetime.utcnow()
     session.add(loadsheet)
     
-    # STOK DÜŞURME: Loadsheet'teki ürünleri istasyon stoğundan düşür
+    # STOK DÜŞÜRME: Pack-equivalent ile atomik düşüm (1 karton = 10 paket)
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
     if assignment:
         # Loadsheet lines'ı al
@@ -253,23 +253,18 @@ async def complete_loadsheet(
             inventory = session.exec(stmt).first()
             
             if inventory:
-                # Paketten düşülecek miktar kontrolü
-                # Eğer paketten düşülecek miktar > stokta olan paket VE stokta karton varsa
-                # Bir karton boz (1 karton = 10 paket)
-                if line.qty_pack > 0 and inventory.quantity_pack < line.qty_pack and inventory.quantity_carton > 0:
-                    # Bir karton boz
-                    inventory.quantity_carton -= 1
-                    inventory.quantity_pack += 10
-                    print(f"INFO: Karton bozuldu - {assignment.station_id} istasyonunda {line.product_id} ürünü")
+                # Toplam stok ve talep edilen miktarı paket eşdeğerine çevir
+                total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
+                demand_packs_equiv = line.qty_carton * 10 + line.qty_pack
+                new_total = total_packs_equiv - demand_packs_equiv
                 
-                # Stoktan düşür
-                inventory.quantity_carton -= line.qty_carton
-                inventory.quantity_pack -= line.qty_pack
+                # UYARI: Negatif olabilir, engellemiyoruz ama loglayalım
+                if new_total < 0:
+                    print(f"UYARI: {assignment.station_id} / ürün {line.product_id} için stok yetersiz: {total_packs_equiv} -> {new_total}")
                 
-                # Negatif stok kontrolü (uyarı için, engellemeyin)
-                if inventory.quantity_carton < 0 or inventory.quantity_pack < 0:
-                    print(f"UYARI: {assignment.station_id} istasyonunda {line.product_id} ürünü için stok negatif oldu!")
-                
+                # Normalize ederek geri yaz (karton, paket)
+                inventory.quantity_carton = new_total // 10
+                inventory.quantity_pack = new_total % 10
                 inventory.updated_at = datetime.utcnow()
                 session.add(inventory)
     
