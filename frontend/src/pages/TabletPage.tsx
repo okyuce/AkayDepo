@@ -80,6 +80,19 @@ export default function TabletPage() {
     setIsLoading(true);
     try {
       await apiService.completeLoadsheet(loadsheetId);
+
+      // Anında UI güncelle: tamamlanan fişi alta indir
+      setTerritories((prev) => prev.map((t) => ({
+        ...t,
+        loadsheets: [...t.loadsheets]
+          .map((ls) => ls.id === loadsheetId ? { ...ls, status: 'loaded', completed_at: new Date().toISOString() } : ls)
+          .sort((a, b) => {
+            const aDone = !!(a as any).completed_at || a.status === 'loaded' || a.status === 'cancelled';
+            const bDone = !!(b as any).completed_at || b.status === 'loaded' || b.status === 'cancelled';
+            return Number(aDone) - Number(bDone);
+          })
+      })));
+
       setSelectedLoadsheet(null);
       setLoadsheetDetail(null);
       await loadData();
@@ -144,7 +157,13 @@ export default function TabletPage() {
 
             {/* Loadsheets */}
             <div className="divide-y">
-              {territory.loadsheets.map((loadsheet) => (
+              {[...territory.loadsheets]
+                .sort((a, b) => {
+                  const aDone = !!(a as any).completed_at || a.status === 'loaded' || a.status === 'cancelled';
+                  const bDone = !!(b as any).completed_at || b.status === 'loaded' || b.status === 'cancelled';
+                  return Number(aDone) - Number(bDone);
+                })
+                .map((loadsheet) => (
                 <button
                   key={loadsheet.id}
                   onClick={() => loadLoadsheetDetail(loadsheet.id)}

@@ -107,6 +107,11 @@ async def get_station_loadsheets(
             territory_total = assignment.target_total_carton
             progress_percent = int((territory_completed / territory_total * 100)) if territory_total > 0 else 0
             
+            # Sıralama: tamamlanmayanlar üstte, tamamlananlar/cancelled altta; eşitlikte batch_number küçük önce
+            def _is_completed(item):
+                return (item.get("completed_at") is not None) or (item.get("status") in ["loaded", "cancelled"])
+            loadsheet_data.sort(key=lambda x: (_is_completed(x), x["batch_number"]))
+            
             territories_data.append({
                 "territory_code": territory.code if territory else "",
                 "display_number": territory.display_number if territory else "",

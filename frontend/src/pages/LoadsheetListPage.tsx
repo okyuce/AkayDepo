@@ -170,10 +170,15 @@ export default function LoadsheetListPage() {
     // Her grup için renk hesapla
     const groups: DealerGroup[] = [];
     groupMap.forEach((lsList, dealerCode) => {
-      // Batch numarasına göre sırala
-      lsList.sort((a, b) => a.batch_number - b.batch_number);
+      // Sıralama: tamamlanmayanlar üstte, tamamlananlar altta; eşitlikte batch numarası küçük önce
+      lsList.sort((a, b) => {
+        const aDone = (a.completed_at !== null && a.completed_at !== undefined) || a.status === 'loaded' || a.status === 'cancelled';
+        const bDone = (b.completed_at !== null && b.completed_at !== undefined) || b.status === 'loaded' || b.status === 'cancelled';
+        if (aDone !== bDone) return Number(aDone) - Number(bDone);
+        return a.batch_number - b.batch_number;
+      });
       
-      const completedCount = lsList.filter(ls => ls.completed_at !== null).length;
+      const completedCount = lsList.filter(ls => ls.completed_at !== null || ls.status === 'loaded').length;
       const totalCount = lsList.length;
       
       let cardColor: 'gray' | 'green' | 'orange' = 'gray';
@@ -196,8 +201,13 @@ export default function LoadsheetListPage() {
       });
     });
     
-    // Route order'a göre sırala
-    groups.sort((a, b) => a.route_order - b.route_order);
+    // Grupları sırala: tamamlanmamış gruplar (gray/orange) üstte, tamamlanmış (green) altta; eşitlikte rut sırası
+    groups.sort((a, b) => {
+      const aDone = a.cardColor === 'green';
+      const bDone = b.cardColor === 'green';
+      if (aDone !== bDone) return Number(aDone) - Number(bDone);
+      return a.route_order - b.route_order;
+    });
     
     return groups;
   };
@@ -378,6 +388,21 @@ export default function LoadsheetListPage() {
                   {dealerGroups.map((group) => {
                     const isExpanded = expandedDealerCode === group.dealer_code;
 
+                    // Sıralama ve iptal hesaplamaları (IIFE yerine burada)
+                    const lastByBatch = group.loadsheets.reduce((prev, curr) =>
+                      (prev.batch_number > curr.batch_number ? prev : curr)
+                    );
+                    const orderByBatch = [...group.loadsheets]
+                      .sort((a, b) => a.batch_number - b.batch_number)
+                      .map(ls => ls.id);
+const sortedLoadsheets = [...group.loadsheets]
+                      .sort((a, b) => {
+                        const aDone = (a.completed_at !== null && a.completed_at !== undefined) || a.status === 'loaded' || a.status === 'cancelled';
+                        const bDone = (b.completed_at !== null && b.completed_at !== undefined) || b.status === 'loaded' || b.status === 'cancelled';
+                        if (aDone !== bDone) return Number(aDone) - Number(bDone); // incomplete first
+                        return a.batch_number - b.batch_number; // tie-breaker
+                      });
+
                     return (
                       <div
                         key={group.dealer_code}
@@ -426,18 +451,16 @@ export default function LoadsheetListPage() {
                         {/* Expanded: Tüm fişler */}
                         {isExpanded && (
                           <div className="bg-white border-t-2 border-gray-300 p-4 space-y-6">
-                            {group.loadsheets.map((loadsheet, index) => {
-                              const totalCartons = loadsheet.lines?.reduce((sum, line) => sum + line.qty_carton, 0) || 0;
-                              const totalPacks = loadsheet.lines?.reduce((sum, line) => sum + (line.qty_pack || 0), 0) || 0;
-                              
-                              // Son fiş mi kontrol et (en yüksek batch number)
-                              const isLastLoadsheet = index === group.loadsheets.length - 1;
-                              // Önceki fişler iptal olarak işaretlenir
-                              const isCancelled = !isLastLoadsheet;
-                              // Fiş numarası: dealer için kaçıncı fiş (1'den başlar)
-                              const loadsheetNumber = index + 1;
+                            {sortedLoadsheets.map((loadsheet) => {
+                                const totalCartons = loadsheet.lines?.reduce((sum, line) => sum + line.qty_carton, 0) || 0;
+                                const totalPacks = loadsheet.lines?.reduce((sum, line) => sum + (line.qty_pack || 0), 0) || 0;
+                                
+                                // İptal: son batch dışındaki tümü iptal
+                                const isCancelled = loadsheet.id !== lastByBatch.id;
+                                // Fiş numarası: batch sırasındaki konum (1'den başlar)
+                                const loadsheetNumber = orderByBatch.indexOf(loadsheet.id) + 1;
 
-                              return (
+                                return (
                                 <div key={loadsheet.id} className={`border-2 rounded ${
                                   isCancelled ? 'border-red-300 bg-red-50' : 'border-gray-200'
                                 }`}>
