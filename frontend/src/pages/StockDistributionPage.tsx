@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { apiService } from '../services/api';
+import * as XLSX from 'xlsx';
 
 interface Product {
   product_id: string;
@@ -141,6 +142,34 @@ export default function StockDistributionPage() {
     setMode('set');
   };
 
+  const handleExportExcel = () => {
+    if (!selectedStationId || products.length === 0) {
+      showToast('Aktif istasyon ya da ürün yok', 'error');
+      return;
+    }
+
+    const rows = products.map((p) => ({
+      'Ürün Kodu': p.product_code,
+      'Ürün Adı': p.product_name,
+      'Karton': p.quantity_carton,
+      'Paket': p.quantity_pack,
+      'Toplam (Krt)': Number((p.quantity_carton + (p.quantity_pack / 10)).toFixed(1)),
+      'Son Güncelleme': p.updated_at ? new Date(p.updated_at).toLocaleString('tr-TR') : ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'StokDagilimi');
+
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const safeStation = stationName.replace(/[^\w\-]+/g, '_');
+    const filename = `StokDagilimi_${safeStation}_${ts}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
@@ -184,6 +213,13 @@ export default function StockDistributionPage() {
                 {stationName} - Ürün Stokları
               </h2>
               <div className="flex space-x-3">
+                <button
+                  onClick={handleExportExcel}
+                  disabled={!selectedStationId || loading}
+                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 font-semibold"
+                >
+                  Excel İndir
+                </button>
                 {mode !== 'set' && (
                   <button
                     onClick={handleCancel}

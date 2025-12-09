@@ -47,7 +47,7 @@ async def get_station_inventory(
             "product_name": product.name,
             "quantity_carton": inv.quantity_carton if inv else 0,
             "quantity_pack": inv.quantity_pack if inv else 0,
-            "updated_at": inv.updated_at.isoformat() if inv else None
+            "updated_at": (inv.updated_at.isoformat() if (inv and getattr(inv, 'updated_at', None)) else None)
         })
     
     return {
@@ -97,6 +97,7 @@ async def update_station_inventory(
                 quantity_carton=qty_carton,
                 quantity_pack=qty_pack
             )
+            new_inv.updated_at = datetime.utcnow()
             session.add(new_inv)
     
     session.commit()
