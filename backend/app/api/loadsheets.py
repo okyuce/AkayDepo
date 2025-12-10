@@ -257,21 +257,33 @@ async def complete_loadsheet(
             )
             inventory = session.exec(stmt).first()
             
-            if inventory:
-                # Toplam stok ve talep edilen miktarı paket eşdeğerine çevir
-                total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
-                demand_packs_equiv = line.qty_carton * 10 + line.qty_pack
-                new_total = total_packs_equiv - demand_packs_equiv
-                
-                # UYARI: Negatif olabilir, engellemiyoruz ama loglayalım
-                if new_total < 0:
-                    print(f"UYARI: {assignment.station_id} / ürün {line.product_id} için stok yetersiz: {total_packs_equiv} -> {new_total}")
-                
-                # Normalize ederek geri yaz (karton, paket)
-                inventory.quantity_carton = new_total // 10
-                inventory.quantity_pack = new_total % 10
-                inventory.updated_at = datetime.utcnow()
+            # Upsert: Kayıt yoksa 0'dan oluştur
+            if not inventory:
+                from app.models import StationInventory as SI
+                inventory = SI(
+                    station_id=assignment.station_id,
+                    product_id=line.product_id,
+                    quantity_carton=0,
+                    quantity_pack=0
+                )
+                print(f"INFO: StationInventory kaydı yoktu, oluşturuldu (station={assignment.station_id}, product={line.product_id})")
                 session.add(inventory)
+                session.flush()
+            
+            # Toplam stok ve talep edilen miktarı paket eşdeğerine çevir
+            total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
+            demand_packs_equiv = line.qty_carton * 10 + line.qty_pack
+            new_total = total_packs_equiv - demand_packs_equiv
+            
+            # UYARI: Negatif olabilir, engellemiyoruz ama loglayalım
+            if new_total < 0:
+                print(f"UYARI: {assignment.station_id} / ürün {line.product_id} için stok yetersiz: {total_packs_equiv} -> {new_total}")
+            
+            # Normalize ederek geri yaz (karton, paket)
+            inventory.quantity_carton = new_total // 10
+            inventory.quantity_pack = new_total % 10
+            inventory.updated_at = datetime.utcnow()
+            session.add(inventory)
     
     session.commit()
     

@@ -293,19 +293,30 @@ class LoadsheetGenerator:
                 )
                 inventory = self.session.exec(stmt).first()
                 
-                if inventory:
-                    # Mevcut toplam ve iade miktarını paket eşdeğerine çevir
-                    total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
-                    refund_packs_equiv = line.qty_carton * 10 + line.qty_pack
-                    new_total = total_packs_equiv + refund_packs_equiv
-                    
-                    # Normalize ederek geri yaz
-                    inventory.quantity_carton = new_total // 10
-                    inventory.quantity_pack = new_total % 10
-                    inventory.updated_at = datetime.utcnow()
+                # Upsert: Kayıt yoksa 0'dan oluştur
+                if not inventory:
+                    inventory = StationInventory(
+                        station_id=station_id,
+                        product_id=line.product_id,
+                        quantity_carton=0,
+                        quantity_pack=0
+                    )
+                    print(f"INFO: StationInventory kaydı yoktu, iade için oluşturuldu (station={station_id}, product={line.product_id})")
                     self.session.add(inventory)
-                    
-                    print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket (toplam={new_total} pack)")
+                    self.session.flush()
+                
+                # Mevcut toplam ve iade miktarını paket eşdeğerine çevir
+                total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
+                refund_packs_equiv = line.qty_carton * 10 + line.qty_pack
+                new_total = total_packs_equiv + refund_packs_equiv
+                
+                # Normalize ederek geri yaz
+                inventory.quantity_carton = new_total // 10
+                inventory.quantity_pack = new_total % 10
+                inventory.updated_at = datetime.utcnow()
+                self.session.add(inventory)
+                
+                print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket (toplam={new_total} pack)")
         else:
             print(f"INFO: İptal edilen fiş tamamlanmamış, stoka dokunulmadı - {previous_loadsheet.id}")
         
