@@ -21,6 +21,7 @@ router = APIRouter()
 async def get_station_loadsheets(
     station_id: UUID,
     cycle_id: Optional[UUID] = None,
+    import_batch: Optional[int] = None,
     session: Session = Depends(get_session)
 ):
     """
@@ -64,14 +65,32 @@ async def get_station_loadsheets(
         for assignment in assignments:
             territory = session.get(Territory, assignment.territory_id)
             
-            # Bu territory'nin fişleri - route_order ile sırala
-            stmt = (
+            # Bu territory'nin fişleri - opsiyonel import_batch filtresi ve parent dahil etme
+            base_stmt = (
                 select(Loadsheet)
                 .join(Dealer, Loadsheet.dealer_id == Dealer.id)
                 .where(Loadsheet.assignment_id == assignment.id)
                 .order_by(Dealer.route_order)
             )
-            loadsheets = session.exec(stmt).all()
+            if import_batch is not None:
+                base_stmt = base_stmt.where(Loadsheet.batch_number == import_batch)
+            base_loadsheets = session.exec(base_stmt).all()
+
+            parent_ids: set = set()
+            extra_parents = []
+            if import_batch is not None:
+                for bls in base_loadsheets:
+                    if getattr(bls, "is_revision", False) and getattr(bls, "parent_loadsheet_id", None):
+                        parent_ids.add(bls.parent_loadsheet_id)
+                if parent_ids:
+                    parent_stmt = select(Loadsheet).where(Loadsheet.id.in_(parent_ids))
+                    extra_parents = session.exec(parent_stmt).all()
+
+            # Birleştir (tekrarları önle)
+            loadsheets_map = {ls.id: ls for ls in base_loadsheets}
+            for pls in extra_parents:
+                loadsheets_map[pls.id] = pls
+            loadsheets = list(loadsheets_map.values())
             
             # Fiş detayları
             loadsheet_data = []
@@ -98,7 +117,8 @@ async def get_station_loadsheets(
                     "completed_at": ls.completed_at.isoformat() if ls.completed_at else None,
                     "is_revision": ls.is_revision,
                     "parent_loadsheet_id": str(ls.parent_loadsheet_id) if ls.parent_loadsheet_id else None,
-                    "loaded_at": ls.loaded_at.isoformat() if ls.loaded_at else None
+                    "loaded_at": ls.loaded_at.isoformat() if ls.loaded_at else None,
+                    "included_as_parent": (ls.id in parent_ids) if import_batch is not None else False
                 })
                 
                 if ls.status == "loaded":
@@ -107,10 +127,15 @@ async def get_station_loadsheets(
             territory_total = assignment.target_total_carton
             progress_percent = int((territory_completed / territory_total * 100)) if territory_total > 0 else 0
             
-            # Sıralama: tamamlanmayanlar üstte, tamamlananlar/cancelled altta; eşitlikte batch_number küçük önce
+            # Sıralama:
+            # - import_batch verildiyse: parent önce, sonra batch_number ASC, ardından tamamlanmayan üstte
+            # - aksi halde: tamamlanmayanlar üstte, ardından batch_number ASC
             def _is_completed(item):
                 return (item.get("completed_at") is not None) or (item.get("status") in ["loaded", "cancelled"])
-            loadsheet_data.sort(key=lambda x: (_is_completed(x), x["batch_number"]))
+            if import_batch is not None:
+                loadsheet_data.sort(key=lambda x: (not x.get("included_as_parent", False), x["batch_number"], _is_completed(x)))
+            else:
+                loadsheet_data.sort(key=lambda x: (_is_completed(x), x["batch_number"]))
             
             territories_data.append({
                 "territory_code": territory.code if territory else "",

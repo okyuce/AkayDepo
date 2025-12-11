@@ -123,11 +123,11 @@ class ApiService {
   }
 
   // Loadsheets
-  async getStationLoadsheets(stationId: string, cycleId?: string) {
-    const params = cycleId ? { cycle_id: cycleId } : {};
-    const response = await this.client.get(`/v1/loadsheets/station/${stationId}`, {
-      params,
-    });
+  async getStationLoadsheets(stationId: string, cycleId?: string, importBatch?: number) {
+    const params: any = {};
+    if (cycleId) params.cycle_id = cycleId;
+    if (importBatch !== undefined && importBatch !== null) params.import_batch = importBatch;
+    const response = await this.client.get(`/v1/loadsheets/station/${stationId}`, { params });
     return response.data;
   }
 

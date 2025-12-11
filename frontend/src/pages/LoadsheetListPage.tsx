@@ -36,6 +36,7 @@ interface Loadsheet {
     display_number: string;
     name: string;
   };
+  included_as_parent?: boolean;
 }
 
 interface DealerGroup {
@@ -52,6 +53,8 @@ export default function LoadsheetListPage() {
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [selectedTerritoryCode, setSelectedTerritoryCode] = useState<string>('');  // Territory filtresi
   const [availableTerritories, setAvailableTerritories] = useState<{code: string; display_number: string; name: string}[]>([]);
+  const [imports, setImports] = useState<Array<{ id: string; batch_number: number; filename: string; uploaded_at: string }>>([]);
+  const [selectedBatch, setSelectedBatch] = useState<string>(''); // ''=Tümü, '1','2',...
   const [loadsheets, setLoadsheets] = useState<Loadsheet[]>([]);
   const [dealerGroups, setDealerGroups] = useState<DealerGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,8 +68,11 @@ export default function LoadsheetListPage() {
   const loadActiveCycle = async () => {
     try {
       const activeData = await apiService.getActivecycle();
-      if (activeData.has_active_cycle && activeData.cycle) {
+        if (activeData.has_active_cycle && activeData.cycle) {
         setCycleId(activeData.cycle.id);
+        // Batch listesi (Excel importları)
+        const imp = await apiService.getCycleImports(activeData.cycle.id);
+        setImports(imp);
         if (activeData.cycle.has_plan) {
           await loadStations(activeData.cycle.id);
         }
@@ -103,12 +109,14 @@ export default function LoadsheetListPage() {
     }
   };
 
-  const loadLoadsheets = async (stationId: string) => {
+  const loadLoadsheets = async (stationId: string, batchOverride?: string, territoryOverride?: string) => {
     if (!cycleId) return;
     
     setIsLoading(true);
     try {
-      const data = await apiService.getStationLoadsheets(stationId, cycleId);
+      const batchNum = batchOverride !== undefined ? (batchOverride ? parseInt(batchOverride, 10) : undefined)
+        : (selectedBatch ? parseInt(selectedBatch, 10) : undefined);
+      const data = await apiService.getStationLoadsheets(stationId, cycleId, batchNum);
       // territories içindeki tüm loadsheet'leri düzleştir ve territory bilgisini ekle
       const allLoadsheets: Loadsheet[] = [];
       if (data.territories) {
@@ -121,7 +129,8 @@ export default function LoadsheetListPage() {
                 code: territory.territory_code,
                 display_number: territory.display_number,
                 name: territory.name
-              }
+              },
+              included_as_parent: ls.included_as_parent || false
             }));
             allLoadsheets.push(...loadsheets);
           }
@@ -141,9 +150,10 @@ export default function LoadsheetListPage() {
       territories.sort((a, b) => a.display_number.localeCompare(b.display_number));
       setAvailableTerritories(territories);
       
-      // Territory filtresini uygula
-      const filteredLoadsheets = selectedTerritoryCode 
-        ? allLoadsheets.filter(ls => ls.territory?.code === selectedTerritoryCode)
+      // Territory filtresini uygula (override varsa onu kullan)
+      const territoryCode = territoryOverride !== undefined ? territoryOverride : selectedTerritoryCode;
+      const filteredLoadsheets = territoryCode 
+        ? allLoadsheets.filter(ls => ls.territory?.code === territoryCode)
         : allLoadsheets;
       
       // Dealer bazında grupla
@@ -214,9 +224,16 @@ export default function LoadsheetListPage() {
 
   const handleStationChange = (stationId: string) => {
     setSelectedStationId(stationId);
-    setSelectedTerritoryCode('');  // Territory filtresini sıfırla
+    // Filtreleri sıfırla
+    setSelectedTerritoryCode('');
+    setSelectedBatch('');
+    // Eski verileri temizle (UI yanılmasın)
+    setDealerGroups([]);
+    setAvailableTerritories([]);
+    setLoadsheets([]);
+    // Yeni istasyon için batch'i "Tümü" (override) olarak zorla yükle
     if (stationId) {
-      loadLoadsheets(stationId);
+      loadLoadsheets(stationId, '', '');
     }
   };
 
@@ -338,12 +355,14 @@ export default function LoadsheetListPage() {
                       </select>
                     </div>
 
-                    {selectedStationId && availableTerritories.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Territory Filtrele (Opsiyonel)
-                        </label>
-                        <select
+                    {selectedStationId && (
+                      <div className="flex gap-6">
+                        {availableTerritories.length > 0 && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Territory Filtrele (Opsiyonel)
+                            </label>
+                            <select
                           value={selectedTerritoryCode}
                           onChange={(e) => handleTerritoryChange(e.target.value)}
                           className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -355,6 +374,24 @@ export default function LoadsheetListPage() {
                             </option>
                           ))}
                         </select>
+                      </div>
+                        )}
+                        {/* Excel (Batch) Filtresi */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Excel (Batch)</label>
+                          <select
+                            value={selectedBatch}
+                            onChange={(e) => { const v = e.target.value; setSelectedBatch(v); if (selectedStationId) loadLoadsheets(selectedStationId, v); }}
+                            className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Tümü</option>
+                            {imports.map(imp => (
+                              <option key={imp.id} value={imp.batch_number}>
+                                {imp.batch_number}. Excel - {imp.filename}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -451,7 +488,21 @@ const sortedLoadsheets = [...group.loadsheets]
                         {/* Expanded: Tüm fişler */}
                         {isExpanded && (
                           <div className="bg-white border-t-2 border-gray-300 p-4 space-y-6">
-                            {sortedLoadsheets.map((loadsheet) => {
+                            {sortedLoadsheets
+                              .sort((a, b) => {
+                                // Batch filtresi aktifse: parent (included_as_parent) önce, sonra batch ASC, sonra tamamlanmayan üstte
+                                if (selectedBatch) {
+                                  const ap = a.included_as_parent ? 0 : 1;
+                                  const bp = b.included_as_parent ? 0 : 1;
+                                  if (ap !== bp) return ap - bp;
+                                  if (a.batch_number !== b.batch_number) return a.batch_number - b.batch_number;
+                                  const aDone = (a.completed_at !== null && a.completed_at !== undefined) || a.status === 'loaded' || a.status === 'cancelled';
+                                  const bDone = (b.completed_at !== null && b.completed_at !== undefined) || b.status === 'loaded' || b.status === 'cancelled';
+                                  return Number(aDone) - Number(bDone);
+                                }
+                                return 0;
+                              })
+                              .map((loadsheet) => {
                                 const totalCartons = loadsheet.lines?.reduce((sum, line) => sum + line.qty_carton, 0) || 0;
                                 const totalPacks = loadsheet.lines?.reduce((sum, line) => sum + (line.qty_pack || 0), 0) || 0;
                                 
