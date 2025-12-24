@@ -99,10 +99,12 @@ async def get_station_loadsheets(
             for ls in loadsheets:
                 dealer = session.get(Dealer, ls.dealer_id)
                 
-                # Toplam karton hesapla
+                # Toplam karton ve paket hesapla
                 stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == ls.id)
                 lines = session.exec(stmt).all()
-                ls_total_carton = sum(line.qty_carton + (line.qty_pack / 10) for line in lines)
+                ls_total_carton = sum(line.qty_carton for line in lines)
+                ls_total_pack = sum(line.qty_pack for line in lines)
+                ls_total_carton_equiv = sum(line.qty_carton + (line.qty_pack / 10) for line in lines)
                 
                 loadsheet_data.append({
                     "id": str(ls.id),
@@ -110,7 +112,8 @@ async def get_station_loadsheets(
                     "dealer_code": dealer.code if dealer else "",
                     "dealer_name": dealer.name if dealer else "",
                     "route_order": dealer.route_order if dealer else 0,
-                    "total_carton": round(ls_total_carton, 1),
+                    "total_carton": ls_total_carton,
+                    "total_pack": ls_total_pack,
                     "status": ls.status,
                     "batch_number": ls.batch_number,
                     "loadsheet_type": ls.loadsheet_type,
@@ -122,7 +125,7 @@ async def get_station_loadsheets(
                 })
                 
                 if ls.status == "loaded":
-                    territory_completed += ls_total_carton
+                    territory_completed += ls_total_carton_equiv
             
             territory_total = assignment.target_total_carton
             progress_percent = int((territory_completed / territory_total * 100)) if territory_total > 0 else 0

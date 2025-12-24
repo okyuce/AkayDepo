@@ -26,6 +26,7 @@ interface Loadsheet {
   dealer_code: string;
   route_order: number;
   total_carton: number;
+  total_pack: number;
   status: string;
   loadsheet_type: string;
   batch_number: number;
@@ -464,12 +465,20 @@ const sortedLoadsheets = [...group.loadsheets]
                                 </p>
                                 <div className="flex items-center gap-3 mt-2">
                                   <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                    group.loadsheets.length > 1 
-                                      ? 'bg-orange-500 text-white' 
+                                    group.loadsheets.length > 1
+                                      ? 'bg-orange-500 text-white'
                                       : 'bg-white text-gray-800'
                                   }`}>
                                     {group.loadsheets.length} Fiş
                                   </span>
+                                  <span className="text-xs px-2 py-1 rounded font-semibold bg-blue-100 text-blue-800">
+                                    {group.loadsheets.reduce((sum, ls) => sum + (ls.total_carton || 0), 0)} Krt
+                                  </span>
+                                  {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0) > 0 && (
+                                    <span className="text-xs px-2 py-1 rounded font-semibold bg-purple-100 text-purple-800">
+                                      {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0)} Pkt
+                                    </span>
+                                  )}
                                   {group.cardColor === 'green' && (
                                     <span className="text-xs text-green-700 font-semibold">✓ Tamam</span>
                                   )}

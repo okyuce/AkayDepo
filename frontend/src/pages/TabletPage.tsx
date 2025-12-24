@@ -13,6 +13,7 @@ interface Loadsheet {
   dealer_code: string;
   dealer_name: string;
   total_carton: number;
+  total_pack: number;
   status: string;
   is_revision: boolean;
 }
@@ -186,7 +187,10 @@ export default function TabletPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xl font-bold">{loadsheet.total_carton} krt</p>
+                      <div className="flex items-baseline gap-2 justify-end">
+                        <p className="text-xl font-bold">{loadsheet.total_carton} krt</p>
+                        <p className="text-lg font-semibold text-gray-600">{loadsheet.total_pack} pkt</p>
+                      </div>
                       {loadsheet.status === 'loaded' ? (
                         <span className="text-green-600 font-semibold">✓ Tamamlandı</span>
                       ) : (
