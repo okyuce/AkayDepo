@@ -34,8 +34,8 @@ export default function TerritoryAssignmentPage() {
   const [assignments, setAssignments] = useState<Record<string, string | null>>({}); // territory_code -> station_id or null
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showAddStation, setShowAddStation] = useState(false);
-  const [newStationName, setNewStationName] = useState('');
+  const [_showAddStation, _setShowAddStation] = useState(false);
+  const [_newStationName, _setNewStationName] = useState('');
   const [hasActiveCycle, setHasActiveCycle] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
 
