@@ -73,6 +73,16 @@ export default function Navbar() {
                 >
                   Yükleme Fişleri
                 </Link>
+
+                {/* Admin kullanıcılar için Stok Hareketleri - en sonda */}
+                {user.role === 'admin' && (
+                  <Link
+                    to="/stock-movements"
+                    className={linkClasses(location.pathname === '/stock-movements')}
+                  >
+                    Stok Hareketleri
+                  </Link>
+                )}
               </nav>
             )}
           </div>

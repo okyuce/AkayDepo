@@ -258,12 +258,27 @@ async def complete_loadsheet(
     session: Session = Depends(get_session)
 ):
     """Fişi tamamla (Yükleme Tamamlandı) ve stoktan düş"""
-    from app.models import StationInventory
+    from app.models import StationInventory, StockMovement
     
     loadsheet = session.get(Loadsheet, loadsheet_id)
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")
-    
+
+    # İdempotency: Zaten tamamlanmış fişi tekrar işleme alma
+    if loadsheet.status == "loaded":
+        assignment = session.get(StationAssignment, loadsheet.assignment_id)
+        stmt = select(Loadsheet).where(Loadsheet.assignment_id == assignment.id)
+        all_loadsheets = session.exec(stmt).all()
+        territory_completed = all(ls.status == "loaded" for ls in all_loadsheets)
+
+        return {
+            "loadsheet_id": str(loadsheet_id),
+            "status": "loaded",
+            "loaded_at": loadsheet.loaded_at.isoformat() if loadsheet.loaded_at else None,
+            "territory_completed": territory_completed,
+            "already_completed": True
+        }
+
     # Durumu güncelle
     loadsheet.status = "loaded"
     loadsheet.loaded_at = datetime.utcnow()
@@ -298,20 +313,39 @@ async def complete_loadsheet(
                 session.add(inventory)
                 session.flush()
             
+            # Önceki stok durumunu kaydet (hareket logu için)
+            before_carton = inventory.quantity_carton
+            before_pack = inventory.quantity_pack
+
             # Toplam stok ve talep edilen miktarı paket eşdeğerine çevir
             total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
             demand_packs_equiv = line.qty_carton * 10 + line.qty_pack
             new_total = total_packs_equiv - demand_packs_equiv
-            
+
             # UYARI: Negatif olabilir, engellemiyoruz ama loglayalım
             if new_total < 0:
                 print(f"UYARI: {assignment.station_id} / ürün {line.product_id} için stok yetersiz: {total_packs_equiv} -> {new_total}")
-            
+
             # Normalize ederek geri yaz (karton, paket)
             inventory.quantity_carton = new_total // 10
             inventory.quantity_pack = new_total % 10
             inventory.updated_at = datetime.utcnow()
             session.add(inventory)
+
+            # Stok hareket logu kaydet
+            movement = StockMovement(
+                station_id=assignment.station_id,
+                product_id=line.product_id,
+                loadsheet_id=loadsheet_id,
+                movement_type="deduction",
+                quantity_carton=line.qty_carton,
+                quantity_pack=line.qty_pack,
+                before_carton=before_carton,
+                before_pack=before_pack,
+                after_carton=inventory.quantity_carton,
+                after_pack=inventory.quantity_pack
+            )
+            session.add(movement)
     
     session.commit()
     

@@ -326,6 +326,52 @@ class ApiService {
     });
     return response.data;
   }
+
+  // Stock Movements
+  async getStockMovementsByCycle(
+    cycleId: string,
+    params?: {
+      station_id?: string;
+      territory_id?: string;
+      dealer_id?: string;
+      movement_type?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
+    const response = await this.client.get(`/v1/inventory/movements/cycle/${cycleId}`, { params });
+    return response.data as {
+      cycle_id: string;
+      movements: Array<{
+        id: string;
+        station_id: string;
+        station_name: string;
+        territory_name: string;
+        product_id: string;
+        product_code: string;
+        product_name: string;
+        loadsheet_id: string | null;
+        package_number: string;
+        sheet_no: string;
+        dealer_id: string | null;
+        dealer_code: string;
+        dealer_name: string;
+        movement_type: string;
+        quantity_carton: number;
+        quantity_pack: number;
+        before_carton: number;
+        before_pack: number;
+        after_carton: number;
+        after_pack: number;
+        created_at: string;
+        note: string | null;
+      }>;
+      count: number;
+      total: number;
+      limit: number;
+      offset: number;
+    };
+  }
 }
 
 export const apiService = new ApiService();

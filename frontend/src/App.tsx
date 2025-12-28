@@ -13,6 +13,7 @@ import StockDistributionPage from './pages/StockDistributionPage';
 import ProductOrderPage from './pages/ProductOrderPage';
 import UsersManagementPage from './pages/UsersManagementPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import StockMovementsPage from './pages/StockMovementsPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -126,6 +127,14 @@ function App() {
             <PrivateRoute>
               <ChangePasswordPage />
             </PrivateRoute>
+          }
+        />
+        <Route
+          path="/stock-movements"
+          element={
+            <AdminRoute>
+              <StockMovementsPage />
+            </AdminRoute>
           }
         />
       </Routes>

@@ -238,7 +238,7 @@ class LoadsheetGenerator:
             previous_order_id: Önceki order ID
             station_id: İstasyon ID
         """
-        from app.models import Loadsheet, StationInventory
+        from app.models import Loadsheet, StationInventory, StockMovement
         from datetime import datetime
         
         # Önceki order'a ait fişi bul
@@ -305,17 +305,37 @@ class LoadsheetGenerator:
                     self.session.add(inventory)
                     self.session.flush()
                 
+                # Önceki stok durumunu kaydet (hareket logu için)
+                before_carton = inventory.quantity_carton
+                before_pack = inventory.quantity_pack
+
                 # Mevcut toplam ve iade miktarını paket eşdeğerine çevir
                 total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
                 refund_packs_equiv = line.qty_carton * 10 + line.qty_pack
                 new_total = total_packs_equiv + refund_packs_equiv
-                
+
                 # Normalize ederek geri yaz
                 inventory.quantity_carton = new_total // 10
                 inventory.quantity_pack = new_total % 10
                 inventory.updated_at = datetime.utcnow()
                 self.session.add(inventory)
-                
+
+                # Stok hareket logu kaydet (refund)
+                movement = StockMovement(
+                    station_id=station_id,
+                    product_id=line.product_id,
+                    loadsheet_id=previous_loadsheet.id,
+                    movement_type="refund",
+                    quantity_carton=line.qty_carton,
+                    quantity_pack=line.qty_pack,
+                    before_carton=before_carton,
+                    before_pack=before_pack,
+                    after_carton=inventory.quantity_carton,
+                    after_pack=inventory.quantity_pack,
+                    note="Revizyon nedeniyle iade"
+                )
+                self.session.add(movement)
+
                 print(f"  - Ürün {line.product_id}: +{line.qty_carton} karton, +{line.qty_pack} paket (toplam={new_total} pack)")
         else:
             print(f"INFO: İptal edilen fiş tamamlanmamış, stoka dokunulmadı - {previous_loadsheet.id}")

@@ -9,7 +9,7 @@ from uuid import UUID
 from datetime import datetime
 
 from app.core.database import get_session
-from app.models import StationInventory, Station, Product
+from app.models import StationInventory, StockMovement, Station, Product, Loadsheet, Territory, StationAssignment, Dealer
 
 router = APIRouter()
 
@@ -84,11 +84,36 @@ async def update_station_inventory(
         ).first()
         
         if existing:
+            # Önceki değerleri kaydet
+            before_carton = existing.quantity_carton
+            before_pack = existing.quantity_pack
+
             # Güncelle
             existing.quantity_carton = qty_carton
             existing.quantity_pack = qty_pack
             existing.updated_at = datetime.utcnow()
             session.add(existing)
+
+            # Stok hareket logu kaydet (sadece değişiklik varsa)
+            if before_carton != qty_carton or before_pack != qty_pack:
+                diff_carton = qty_carton - before_carton
+                diff_pack = qty_pack - before_pack
+                movement_type = "manual_add" if (diff_carton > 0 or diff_pack > 0) else "manual_remove"
+
+                movement = StockMovement(
+                    station_id=station_id,
+                    product_id=product_id,
+                    loadsheet_id=None,
+                    movement_type=movement_type,
+                    quantity_carton=abs(diff_carton),
+                    quantity_pack=abs(diff_pack),
+                    before_carton=before_carton,
+                    before_pack=before_pack,
+                    after_carton=qty_carton,
+                    after_pack=qty_pack,
+                    note="Manuel stok düzenleme"
+                )
+                session.add(movement)
         else:
             # Yeni kayıt
             new_inv = StationInventory(
@@ -99,7 +124,307 @@ async def update_station_inventory(
             )
             new_inv.updated_at = datetime.utcnow()
             session.add(new_inv)
-    
+
+            # İlk kayıt için hareket logu (sıfırdan ekleme)
+            if qty_carton > 0 or qty_pack > 0:
+                movement = StockMovement(
+                    station_id=station_id,
+                    product_id=product_id,
+                    loadsheet_id=None,
+                    movement_type="manual_add",
+                    quantity_carton=qty_carton,
+                    quantity_pack=qty_pack,
+                    before_carton=0,
+                    before_pack=0,
+                    after_carton=qty_carton,
+                    after_pack=qty_pack,
+                    note="İlk stok girişi"
+                )
+                session.add(movement)
+
     session.commit()
-    
+
     return {"success": True, "message": "Stoklar güncellendi"}
+
+
+@router.get("/station/{station_id}/movements")
+async def get_stock_movements(
+    station_id: UUID,
+    product_id: UUID = None,
+    loadsheet_id: UUID = None,
+    movement_type: str = None,
+    limit: int = 100,
+    session: Session = Depends(get_session)
+):
+    """
+    İstasyonun stok hareketlerini getir
+
+    Filtreler:
+    - product_id: Belirli ürün
+    - loadsheet_id: Belirli fiş
+    - movement_type: deduction, refund, manual_add, manual_remove
+    - limit: Maksimum kayıt sayısı (varsayılan 100)
+    """
+    # İstasyon kontrolü
+    station = session.get(Station, station_id)
+    if not station:
+        raise HTTPException(404, "İstasyon bulunamadı")
+
+    # Query oluştur
+    query = select(StockMovement).where(StockMovement.station_id == station_id)
+
+    if product_id:
+        query = query.where(StockMovement.product_id == product_id)
+    if loadsheet_id:
+        query = query.where(StockMovement.loadsheet_id == loadsheet_id)
+    if movement_type:
+        query = query.where(StockMovement.movement_type == movement_type)
+
+    query = query.order_by(StockMovement.created_at.desc()).limit(limit)
+
+    movements = session.exec(query).all()
+
+    # Ürün bilgilerini al
+    product_ids = list(set(m.product_id for m in movements))
+    products = {}
+    if product_ids:
+        prods = session.exec(select(Product).where(Product.id.in_(product_ids))).all()
+        products = {str(p.id): {"code": p.code, "name": p.name} for p in prods}
+
+    result = []
+    for m in movements:
+        prod = products.get(str(m.product_id), {})
+        result.append({
+            "id": str(m.id),
+            "product_id": str(m.product_id),
+            "product_code": prod.get("code", ""),
+            "product_name": prod.get("name", ""),
+            "loadsheet_id": str(m.loadsheet_id) if m.loadsheet_id else None,
+            "movement_type": m.movement_type,
+            "quantity_carton": m.quantity_carton,
+            "quantity_pack": m.quantity_pack,
+            "before_carton": m.before_carton,
+            "before_pack": m.before_pack,
+            "after_carton": m.after_carton,
+            "after_pack": m.after_pack,
+            "created_at": m.created_at.isoformat(),
+            "note": m.note
+        })
+
+    return {
+        "station_id": str(station_id),
+        "station_name": station.name,
+        "movements": result,
+        "count": len(result)
+    }
+
+
+@router.get("/movements/loadsheet/{loadsheet_id}")
+async def get_movements_by_loadsheet(
+    loadsheet_id: UUID,
+    session: Session = Depends(get_session)
+):
+    """Belirli bir fişe ait tüm stok hareketlerini getir"""
+    movements = session.exec(
+        select(StockMovement)
+        .where(StockMovement.loadsheet_id == loadsheet_id)
+        .order_by(StockMovement.created_at.desc())
+    ).all()
+
+    # Ürün bilgilerini al
+    product_ids = list(set(m.product_id for m in movements))
+    products = {}
+    if product_ids:
+        prods = session.exec(select(Product).where(Product.id.in_(product_ids))).all()
+        products = {str(p.id): {"code": p.code, "name": p.name} for p in prods}
+
+    result = []
+    for m in movements:
+        prod = products.get(str(m.product_id), {})
+        result.append({
+            "id": str(m.id),
+            "station_id": str(m.station_id),
+            "product_id": str(m.product_id),
+            "product_code": prod.get("code", ""),
+            "product_name": prod.get("name", ""),
+            "movement_type": m.movement_type,
+            "quantity_carton": m.quantity_carton,
+            "quantity_pack": m.quantity_pack,
+            "before_carton": m.before_carton,
+            "before_pack": m.before_pack,
+            "after_carton": m.after_carton,
+            "after_pack": m.after_pack,
+            "created_at": m.created_at.isoformat(),
+            "note": m.note
+        })
+
+    return {
+        "loadsheet_id": str(loadsheet_id),
+        "movements": result,
+        "count": len(result)
+    }
+
+
+@router.get("/movements/cycle/{cycle_id}")
+async def get_movements_by_cycle(
+    cycle_id: UUID,
+    station_id: UUID = None,
+    territory_id: UUID = None,
+    dealer_id: UUID = None,
+    movement_type: str = None,
+    limit: int = 500,
+    offset: int = 0,
+    session: Session = Depends(get_session)
+):
+    """
+    Döngüye ait tüm stok hareketlerini getir
+
+    Filtreler:
+    - station_id: Belirli istasyon
+    - territory_id: Belirli territory
+    - dealer_id: Belirli bayi
+    - movement_type: deduction, refund, manual_add, manual_remove
+    - limit: Maksimum kayıt sayısı (varsayılan 500)
+    - offset: Sayfalama için başlangıç
+    """
+    # Döngüye ait loadsheet'leri bul
+    loadsheet_query = select(Loadsheet.id).where(Loadsheet.cycle_id == cycle_id)
+    loadsheet_ids = [ls_id for ls_id in session.exec(loadsheet_query).all()]
+
+    if not loadsheet_ids:
+        return {"cycle_id": str(cycle_id), "movements": [], "count": 0, "total": 0}
+
+    # Base query
+    query = select(StockMovement).where(StockMovement.loadsheet_id.in_(loadsheet_ids))
+
+    # Filtreler
+    if station_id:
+        query = query.where(StockMovement.station_id == station_id)
+
+    if territory_id:
+        # Territory'ye ait istasyonları bul
+        assignment_query = select(StationAssignment.station_id).where(
+            StationAssignment.cycle_id == cycle_id,
+            StationAssignment.territory_id == territory_id
+        )
+        station_ids = [s_id for s_id in session.exec(assignment_query).all()]
+        if station_ids:
+            query = query.where(StockMovement.station_id.in_(station_ids))
+
+    if movement_type:
+        query = query.where(StockMovement.movement_type == movement_type)
+
+    if dealer_id:
+        # Bayiye ait loadsheet'leri bul
+        dealer_loadsheet_query = select(Loadsheet.id).where(
+            Loadsheet.cycle_id == cycle_id,
+            Loadsheet.dealer_id == dealer_id
+        )
+        dealer_loadsheet_ids = [ls_id for ls_id in session.exec(dealer_loadsheet_query).all()]
+        if dealer_loadsheet_ids:
+            query = query.where(StockMovement.loadsheet_id.in_(dealer_loadsheet_ids))
+        else:
+            # Bayi için loadsheet yoksa boş döndür
+            return {"cycle_id": str(cycle_id), "movements": [], "count": 0, "total": 0, "limit": limit, "offset": offset}
+
+    # Toplam sayı
+    count_query = select(StockMovement.id).where(StockMovement.loadsheet_id.in_(loadsheet_ids))
+    if station_id:
+        count_query = count_query.where(StockMovement.station_id == station_id)
+    if movement_type:
+        count_query = count_query.where(StockMovement.movement_type == movement_type)
+
+    total = len(session.exec(count_query).all())
+
+    # Sıralama ve sayfalama
+    query = query.order_by(StockMovement.created_at.desc()).offset(offset).limit(limit)
+    movements = session.exec(query).all()
+
+    # İlişkili verileri al
+    product_ids = list(set(m.product_id for m in movements))
+    station_ids_list = list(set(m.station_id for m in movements))
+    loadsheet_ids_list = list(set(m.loadsheet_id for m in movements if m.loadsheet_id))
+
+    products = {}
+    if product_ids:
+        prods = session.exec(select(Product).where(Product.id.in_(product_ids))).all()
+        products = {str(p.id): {"code": p.code, "name": p.name} for p in prods}
+
+    stations = {}
+    if station_ids_list:
+        stats = session.exec(select(Station).where(Station.id.in_(station_ids_list))).all()
+        stations = {str(s.id): s.name for s in stats}
+
+    loadsheets = {}
+    dealer_ids_set = set()
+    if loadsheet_ids_list:
+        lss = session.exec(select(Loadsheet).where(Loadsheet.id.in_(loadsheet_ids_list))).all()
+        for ls in lss:
+            loadsheets[str(ls.id)] = {
+                "package_number": ls.package_number,
+                "sheet_no": ls.sheet_no,
+                "dealer_id": str(ls.dealer_id) if ls.dealer_id else None
+            }
+            if ls.dealer_id:
+                dealer_ids_set.add(ls.dealer_id)
+
+    # Bayi bilgilerini al
+    dealers = {}
+    if dealer_ids_set:
+        dealer_list = session.exec(select(Dealer).where(Dealer.id.in_(list(dealer_ids_set)))).all()
+        dealers = {str(d.id): {"code": d.code, "name": d.name} for d in dealer_list}
+
+    # Territory bilgisi için assignment'ları al
+    territories = {}
+    if station_ids_list:
+        assignments = session.exec(
+            select(StationAssignment)
+            .where(StationAssignment.cycle_id == cycle_id)
+            .where(StationAssignment.station_id.in_(station_ids_list))
+        ).all()
+        territory_ids = list(set(a.territory_id for a in assignments))
+        if territory_ids:
+            terrs = session.exec(select(Territory).where(Territory.id.in_(territory_ids))).all()
+            terr_map = {str(t.id): t.name for t in terrs}
+            for a in assignments:
+                territories[str(a.station_id)] = terr_map.get(str(a.territory_id), "")
+
+    result = []
+    for m in movements:
+        prod = products.get(str(m.product_id), {})
+        ls = loadsheets.get(str(m.loadsheet_id), {}) if m.loadsheet_id else {}
+        dealer_id = ls.get("dealer_id")
+        dealer = dealers.get(dealer_id, {}) if dealer_id else {}
+        result.append({
+            "id": str(m.id),
+            "station_id": str(m.station_id),
+            "station_name": stations.get(str(m.station_id), ""),
+            "territory_name": territories.get(str(m.station_id), ""),
+            "product_id": str(m.product_id),
+            "product_code": prod.get("code", ""),
+            "product_name": prod.get("name", ""),
+            "loadsheet_id": str(m.loadsheet_id) if m.loadsheet_id else None,
+            "package_number": ls.get("package_number", ""),
+            "sheet_no": ls.get("sheet_no", ""),
+            "dealer_id": dealer_id,
+            "dealer_code": dealer.get("code", ""),
+            "dealer_name": dealer.get("name", ""),
+            "movement_type": m.movement_type,
+            "quantity_carton": m.quantity_carton,
+            "quantity_pack": m.quantity_pack,
+            "before_carton": m.before_carton,
+            "before_pack": m.before_pack,
+            "after_carton": m.after_carton,
+            "after_pack": m.after_pack,
+            "created_at": m.created_at.isoformat(),
+            "note": m.note
+        })
+
+    return {
+        "cycle_id": str(cycle_id),
+        "movements": result,
+        "count": len(result),
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }

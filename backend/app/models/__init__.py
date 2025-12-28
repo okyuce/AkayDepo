@@ -6,7 +6,7 @@ from app.models.loadsheet import Station, StationAssignment, Loadsheet, Loadshee
 from app.models.revision import RevisionDiff
 from app.models.import_log import CycleImport
 from app.models.mapping import PlanningConfig, StationTerritoryMap
-from app.models.inventory import StationInventory
+from app.models.inventory import StationInventory, StockMovement
 from app.models.user import User
 
 __all__ = [
@@ -27,5 +27,6 @@ __all__ = [
     "PlanningConfig",
     "StationTerritoryMap",
     "StationInventory",
+    "StockMovement",
     "User",
 ]
