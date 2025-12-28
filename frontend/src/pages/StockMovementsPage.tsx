@@ -153,7 +153,7 @@ export default function StockMovementsPage() {
 
         // Bayi listesini movements'tan oluştur (unique)
         const uniqueDealers: Record<string, string> = {};
-        data.movements.forEach((m: { dealer_id?: string; dealer_name?: string }) => {
+        data.movements.forEach((m) => {
           if (m.dealer_id && m.dealer_name) {
             uniqueDealers[m.dealer_id] = m.dealer_name;
           }
