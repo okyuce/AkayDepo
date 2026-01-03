@@ -227,12 +227,36 @@ export default function StationDistributionPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {trackingData.products.map((product, idx) => (
+                        {trackingData.products.map((product, idx) => {
+                          // Toplam territory kalan miktarı hesapla
+                          const totalRemaining = product.territories.reduce(
+                            (sum, t) => sum + t.remaining_total, 0
+                          );
+                          // Stok yetersiz mi?
+                          const isStockInsufficient = totalRemaining > product.stock_total;
+
+                          // Stok farkı (pozitif = fazla, negatif = eksik)
+                          const stockDifference = product.stock_total - totalRemaining;
+
+                          return (
                           <tr key={idx} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm font-medium text-gray-900 border border-gray-300">
-                              {product.product_code}
+                              <div className="flex justify-between items-center">
+                                <span>{product.product_code}</span>
+                                {stockDifference !== 0 && (
+                                  <span className={`text-xs font-bold ${
+                                    stockDifference < 0 ? 'text-red-600' : 'text-green-600'
+                                  }`}>
+                                    {stockDifference > 0 ? '+' : ''}{stockDifference.toFixed(1).replace(/\.0$/, '')}
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-2 text-center text-sm font-semibold text-blue-700 border border-gray-300 bg-blue-50">
+                            <td className={`px-4 py-2 text-center text-sm font-semibold border border-gray-300 ${
+                              isStockInsufficient
+                                ? 'bg-red-600 text-white'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}>
                               {product.stock_total.toFixed(1).replace(/\.0$/, '')}
                             </td>
                             {product.territories.map((tData) => (
@@ -246,7 +270,8 @@ export default function StationDistributionPage() {
                               </>
                             ))}
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                       <tfoot className="bg-gray-200">
                         <tr>
