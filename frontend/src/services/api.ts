@@ -328,6 +328,11 @@ class ApiService {
   }
 
   // Stock Movements
+  async getTerritoriesByCycle(cycleId: string) {
+    const response = await this.client.get(`/v1/inventory/territories/cycle/${cycleId}`);
+    return response.data;
+  }
+
   async getStockMovementsByCycle(
     cycleId: string,
     params?: {

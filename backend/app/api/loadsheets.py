@@ -199,36 +199,120 @@ async def get_loadsheet_detail(
     )
     lines = session.exec(stmt).all()
     
+    # Önceki fiş miktarlarını al (revizyon veya aynı bayi için önceki batch)
+    parent_lines_map = {}
+    has_previous = False
+
+    if loadsheet.is_revision and loadsheet.parent_loadsheet_id:
+        # Revizyon fişi - parent loadsheet ile karşılaştır
+        parent_lines = session.exec(
+            select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet.parent_loadsheet_id)
+        ).all()
+        for pl in parent_lines:
+            parent_lines_map[str(pl.product_id)] = {
+                "qty_carton": pl.qty_carton,
+                "qty_pack": pl.qty_pack
+            }
+        has_previous = True
+    else:
+        # Revizyon değilse, aynı dealer ve cycle için önceki batch'te fiş var mı kontrol et
+        previous_loadsheet = session.exec(
+            select(Loadsheet)
+            .where(
+                Loadsheet.cycle_id == loadsheet.cycle_id,
+                Loadsheet.dealer_id == loadsheet.dealer_id,
+                Loadsheet.batch_number < loadsheet.batch_number,
+                Loadsheet.id != loadsheet.id
+            )
+            .order_by(Loadsheet.batch_number.desc())
+        ).first()
+
+        if previous_loadsheet:
+            parent_lines = session.exec(
+                select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == previous_loadsheet.id)
+            ).all()
+            for pl in parent_lines:
+                parent_lines_map[str(pl.product_id)] = {
+                    "qty_carton": pl.qty_carton,
+                    "qty_pack": pl.qty_pack
+                }
+            has_previous = True
+
     lines_data = []
     total_carton = 0
-    
+    changes = [] if has_previous else None
+    processed_product_ids = set()
+
     for line in lines:
         product = session.get(Product, line.product_id)
         line_total = line.qty_carton + (line.qty_pack / 10)
         total_carton += line_total
-        
+        processed_product_ids.add(str(line.product_id))
+
+        # Değişim hesapla (önceki fiş varsa)
+        qty_change_carton = None
+        qty_change_pack = None
+        if has_previous:
+            parent_qty = parent_lines_map.get(str(line.product_id), {"qty_carton": 0, "qty_pack": 0})
+            qty_change_carton = line.qty_carton - parent_qty["qty_carton"]
+            qty_change_pack = line.qty_pack - parent_qty["qty_pack"]
+
+            # changes listesine de ekle (mevcut yapıyı koru)
+            if qty_change_carton != 0 or qty_change_pack != 0:
+                change_type = "addition" if qty_change_carton > 0 else "reduction"
+                changes.append({
+                    "product_code": product.code if product else "",
+                    "product_name": product.name if product else "",
+                    "qty_change_carton": qty_change_carton,
+                    "qty_change_pack": qty_change_pack,
+                    "change_type": change_type
+                })
+
         lines_data.append({
             "product_code": product.code if product else "",
             "product_name": product.name if product else "",
             "qty_carton": line.qty_carton,
-            "qty_pack": line.qty_pack
+            "qty_pack": line.qty_pack,
+            "qty_change_carton": qty_change_carton,
+            "qty_change_pack": qty_change_pack,
+            "display_order": product.display_order if product else 999
         })
-    
-    # Revizyon ise değişiklikleri hesapla
-    changes = None
-    if loadsheet.is_revision and loadsheet.parent_loadsheet_id:
-        changes = []
-        for line in lines:
-            product = session.get(Product, line.product_id)
-            change_type = "addition" if line.qty_carton > 0 else "reduction"
-            
-            changes.append({
-                "product_code": product.code if product else "",
-                "product_name": product.name if product else "",
-                "qty_change_carton": line.qty_carton,
-                "change_type": change_type
-            })
-    
+
+    # Önceki fişte olup yeni fişte olmayan ürünleri ekle (komple iptal edilenler)
+    if has_previous:
+        for product_id_str, parent_qty in parent_lines_map.items():
+            if product_id_str not in processed_product_ids:
+                product = session.get(Product, product_id_str)
+                qty_change_carton = 0 - parent_qty["qty_carton"]
+                qty_change_pack = 0 - parent_qty["qty_pack"]
+
+                # changes listesine ekle
+                if qty_change_carton != 0 or qty_change_pack != 0:
+                    changes.append({
+                        "product_code": product.code if product else "",
+                        "product_name": product.name if product else "",
+                        "qty_change_carton": qty_change_carton,
+                        "qty_change_pack": qty_change_pack,
+                        "change_type": "removed"
+                    })
+
+                lines_data.append({
+                    "product_code": product.code if product else "",
+                    "product_name": product.name if product else "",
+                    "qty_carton": 0,
+                    "qty_pack": 0,
+                    "qty_change_carton": qty_change_carton,
+                    "qty_change_pack": qty_change_pack,
+                    "display_order": product.display_order if product else 999
+                })
+
+    # Tüm ürünleri display_order'a göre sırala
+    lines_data.sort(key=lambda x: (x.get("display_order", 999), x.get("product_code", "")))
+
+    # Response'dan display_order'ı kaldır (frontend'e gitmesine gerek yok)
+    for line in lines_data:
+        line.pop("display_order", None)
+
     return {
         "id": str(loadsheet.id),
         "package_number": loadsheet.package_number,

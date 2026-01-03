@@ -17,6 +17,8 @@ interface LoadsheetLine {
   product_name: string;
   qty_carton: number;
   qty_pack: number;
+  qty_change_carton?: number | null;
+  qty_change_pack?: number | null;
 }
 
 interface Loadsheet {
@@ -588,8 +590,26 @@ const sortedLoadsheets = [...group.loadsheets]
                                             idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'
                                           }`}>
                                             <td className="p-2 text-lg font-bold truncate">{line.product_name}</td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5">{line.qty_carton}</td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5">{line.qty_pack || ''}</td>
+                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative">
+                                              {line.qty_carton}
+                                              {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
+                                                <sup className={`ml-1 text-xs font-bold ${
+                                                  line.qty_change_carton > 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
+                                                </sup>
+                                              )}
+                                            </td>
+                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative">
+                                              {line.qty_pack || ''}
+                                              {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
+                                                <sup className={`ml-1 text-xs font-bold ${
+                                                  line.qty_change_pack > 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
+                                                </sup>
+                                              )}
+                                            </td>
                                           </tr>
                                         ))}
                                         <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">

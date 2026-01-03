@@ -265,6 +265,35 @@ async def get_movements_by_loadsheet(
     }
 
 
+@router.get("/territories/cycle/{cycle_id}")
+async def get_territories_by_cycle(
+    cycle_id: UUID,
+    session: Session = Depends(get_session)
+):
+    """
+    Döngüye ait territory listesini getir
+    StationAssignment üzerinden cycle'a bağlı territory'leri döndürür
+    """
+    # Bu cycle'daki assignment'lardan unique territory'leri al
+    assignments = session.exec(
+        select(StationAssignment.territory_id)
+        .where(StationAssignment.cycle_id == cycle_id)
+        .distinct()
+    ).all()
+
+    territory_ids = list(set(assignments))
+    if not territory_ids:
+        return []
+
+    territories = session.exec(
+        select(Territory)
+        .where(Territory.id.in_(territory_ids))
+        .order_by(Territory.name)
+    ).all()
+
+    return [{"id": str(t.id), "name": t.name} for t in territories]
+
+
 @router.get("/movements/cycle/{cycle_id}")
 async def get_movements_by_cycle(
     cycle_id: UUID,
@@ -272,6 +301,7 @@ async def get_movements_by_cycle(
     territory_id: UUID = None,
     dealer_id: UUID = None,
     movement_type: str = None,
+    sku: str = None,
     limit: int = 500,
     offset: int = 0,
     session: Session = Depends(get_session)
@@ -284,6 +314,7 @@ async def get_movements_by_cycle(
     - territory_id: Belirli territory
     - dealer_id: Belirli bayi
     - movement_type: deduction, refund, manual_add, manual_remove
+    - sku: Ürün kodu (product_code) filtresi
     - limit: Maksimum kayıt sayısı (varsayılan 500)
     - offset: Sayfalama için başlangıç
     """
@@ -302,17 +333,36 @@ async def get_movements_by_cycle(
         query = query.where(StockMovement.station_id == station_id)
 
     if territory_id:
-        # Territory'ye ait istasyonları bul
-        assignment_query = select(StationAssignment.station_id).where(
-            StationAssignment.cycle_id == cycle_id,
-            StationAssignment.territory_id == territory_id
+        # Territory'ye ait loadsheet'leri bul (Loadsheet -> StationAssignment -> territory_id)
+        territory_loadsheet_query = (
+            select(Loadsheet.id)
+            .join(StationAssignment, Loadsheet.assignment_id == StationAssignment.id)
+            .where(
+                Loadsheet.cycle_id == cycle_id,
+                StationAssignment.territory_id == territory_id
+            )
         )
-        station_ids = [s_id for s_id in session.exec(assignment_query).all()]
-        if station_ids:
-            query = query.where(StockMovement.station_id.in_(station_ids))
+        territory_loadsheet_ids = [ls_id for ls_id in session.exec(territory_loadsheet_query).all()]
+        if territory_loadsheet_ids:
+            query = query.where(StockMovement.loadsheet_id.in_(territory_loadsheet_ids))
+        else:
+            return {"cycle_id": str(cycle_id), "movements": [], "count": 0, "total": 0, "limit": limit, "offset": offset}
 
     if movement_type:
         query = query.where(StockMovement.movement_type == movement_type)
+
+    if sku:
+        # SKU (ürün kodu) ile eşleşen ürünleri bul - virgülle ayrılmış birden fazla SKU desteklenir
+        sku_list = [s.strip() for s in sku.split(',') if s.strip()]
+        if sku_list:
+            from sqlalchemy import or_
+            sku_conditions = [Product.code == s for s in sku_list]
+            product_query = select(Product.id).where(or_(*sku_conditions))
+            matching_product_ids = [p_id for p_id in session.exec(product_query).all()]
+            if matching_product_ids:
+                query = query.where(StockMovement.product_id.in_(matching_product_ids))
+            else:
+                return {"cycle_id": str(cycle_id), "movements": [], "count": 0, "total": 0, "limit": limit, "offset": offset}
 
     if dealer_id:
         # Bayiye ait loadsheet'leri bul
@@ -327,12 +377,41 @@ async def get_movements_by_cycle(
             # Bayi için loadsheet yoksa boş döndür
             return {"cycle_id": str(cycle_id), "movements": [], "count": 0, "total": 0, "limit": limit, "offset": offset}
 
-    # Toplam sayı
+    # Toplam sayı - tüm filtreler uygulanmalı
     count_query = select(StockMovement.id).where(StockMovement.loadsheet_id.in_(loadsheet_ids))
     if station_id:
         count_query = count_query.where(StockMovement.station_id == station_id)
+    if territory_id:
+        territory_loadsheet_query = (
+            select(Loadsheet.id)
+            .join(StationAssignment, Loadsheet.assignment_id == StationAssignment.id)
+            .where(
+                Loadsheet.cycle_id == cycle_id,
+                StationAssignment.territory_id == territory_id
+            )
+        )
+        territory_ls_ids = [ls_id for ls_id in session.exec(territory_loadsheet_query).all()]
+        if territory_ls_ids:
+            count_query = count_query.where(StockMovement.loadsheet_id.in_(territory_ls_ids))
+    if dealer_id:
+        dealer_ls_query = select(Loadsheet.id).where(
+            Loadsheet.cycle_id == cycle_id,
+            Loadsheet.dealer_id == dealer_id
+        )
+        dealer_ls_ids = [ls_id for ls_id in session.exec(dealer_ls_query).all()]
+        if dealer_ls_ids:
+            count_query = count_query.where(StockMovement.loadsheet_id.in_(dealer_ls_ids))
     if movement_type:
         count_query = count_query.where(StockMovement.movement_type == movement_type)
+    if sku:
+        sku_list = [s.strip() for s in sku.split(',') if s.strip()]
+        if sku_list:
+            from sqlalchemy import or_
+            sku_conditions = [Product.code == s for s in sku_list]
+            product_query = select(Product.id).where(or_(*sku_conditions))
+            matching_product_ids = [p_id for p_id in session.exec(product_query).all()]
+            if matching_product_ids:
+                count_query = count_query.where(StockMovement.product_id.in_(matching_product_ids))
 
     total = len(session.exec(count_query).all())
 
@@ -374,20 +453,22 @@ async def get_movements_by_cycle(
         dealer_list = session.exec(select(Dealer).where(Dealer.id.in_(list(dealer_ids_set)))).all()
         dealers = {str(d.id): {"code": d.code, "name": d.name} for d in dealer_list}
 
-    # Territory bilgisi için assignment'ları al
-    territories = {}
-    if station_ids_list:
-        assignments = session.exec(
-            select(StationAssignment)
-            .where(StationAssignment.cycle_id == cycle_id)
-            .where(StationAssignment.station_id.in_(station_ids_list))
-        ).all()
-        territory_ids = list(set(a.territory_id for a in assignments))
+    # Territory bilgisi için loadsheet -> assignment -> territory ilişkisini kullan
+    loadsheet_territories = {}
+    if loadsheet_ids_list:
+        # Loadsheet'lerin assignment'larını al
+        loadsheet_assignment_query = (
+            select(Loadsheet.id, StationAssignment.territory_id)
+            .join(StationAssignment, Loadsheet.assignment_id == StationAssignment.id)
+            .where(Loadsheet.id.in_(loadsheet_ids_list))
+        )
+        ls_assignments = session.exec(loadsheet_assignment_query).all()
+        territory_ids = list(set(la[1] for la in ls_assignments))
         if territory_ids:
             terrs = session.exec(select(Territory).where(Territory.id.in_(territory_ids))).all()
             terr_map = {str(t.id): t.name for t in terrs}
-            for a in assignments:
-                territories[str(a.station_id)] = terr_map.get(str(a.territory_id), "")
+            for la in ls_assignments:
+                loadsheet_territories[str(la[0])] = terr_map.get(str(la[1]), "")
 
     result = []
     for m in movements:
@@ -399,7 +480,7 @@ async def get_movements_by_cycle(
             "id": str(m.id),
             "station_id": str(m.station_id),
             "station_name": stations.get(str(m.station_id), ""),
-            "territory_name": territories.get(str(m.station_id), ""),
+            "territory_name": loadsheet_territories.get(str(m.loadsheet_id), "") if m.loadsheet_id else "",
             "product_id": str(m.product_id),
             "product_code": prod.get("code", ""),
             "product_name": prod.get("name", ""),

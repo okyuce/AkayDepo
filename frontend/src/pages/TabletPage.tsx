@@ -260,9 +260,19 @@ export default function TabletPage() {
                       <p className="text-sm text-gray-600">{line.product_name}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">
+                      <p className="font-semibold relative inline-block">
                         {line.qty_carton} karton
                         {line.qty_pack > 0 && ` + ${line.qty_pack} paket`}
+                        {/* Revizyon değişimi gösterimi */}
+                        {line.qty_change_carton !== null && line.qty_change_carton !== 0 && (
+                          <span
+                            className={`absolute -top-2 -right-8 text-xs font-bold ${
+                              line.qty_change_carton > 0 ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

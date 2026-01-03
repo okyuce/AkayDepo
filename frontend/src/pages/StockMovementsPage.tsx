@@ -2,7 +2,7 @@
  * Stok Hareketleri Sayfası
  * Döngü bazlı stok hareket loglarını görüntüleme ve filtreleme
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import * as XLSX from 'xlsx';
 import Navbar from '../components/Navbar';
@@ -44,6 +44,12 @@ interface Dealer {
   name: string;
 }
 
+interface Product {
+  id: string;
+  code: string;
+  name: string;
+}
+
 const MOVEMENT_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   deduction: { label: 'Düşüm', color: 'bg-red-100 text-red-800' },
   refund: { label: 'İade', color: 'bg-green-100 text-green-800' },
@@ -63,6 +69,9 @@ export default function StockMovementsPage() {
   const [territoryFilter, setTerritoryFilter] = useState<string>('');
   const [dealerFilter, setDealerFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  const [skuDropdownOpen, setSkuDropdownOpen] = useState(false);
+  const skuDropdownRef = useRef<HTMLDivElement>(null);
 
   // Dropdown verileri
   const [stations, setStations] = useState<Station[]>([]);
@@ -70,6 +79,7 @@ export default function StockMovementsPage() {
   const [allTerritories, setAllTerritories] = useState<Territory[]>([]);
   const [stationTerritoryMap, setStationTerritoryMap] = useState<Record<string, string[]>>({});
   const [dealers, setDealers] = useState<Dealer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   // Sayfalama
   const [page, setPage] = useState(0);
@@ -85,8 +95,8 @@ export default function StockMovementsPage() {
           setCycleId(cycle.id);
           setCycleName(`Döngü ${cycle.cycle_no} - ${cycle.run_time}`);
 
-          // Territory listesini territory-info'dan al
-          const territoryList = await apiService.getTerritories();
+          // Territory listesini cycle'dan al (doğru ID'ler için)
+          const territoryList = await apiService.getTerritoriesByCycle(cycle.id);
           const mappedTerritories = territoryList.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }));
           setAllTerritories(mappedTerritories);
           setTerritories(mappedTerritories);
@@ -107,12 +117,31 @@ export default function StockMovementsPage() {
 
         const stationList = await apiService.listStations();
         setStations(stationList.filter(s => s.active));
+
+        // Ürün listesini yükle
+        const productList = await apiService.getProductOrder();
+        setProducts(productList.map((p: { id: string; code: string; name: string }) => ({
+          id: p.id,
+          code: p.code,
+          name: p.name
+        })));
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
       }
     };
 
     loadInitialData();
+  }, []);
+
+  // SKU dropdown dışına tıklandığında kapat
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (skuDropdownRef.current && !skuDropdownRef.current.contains(event.target as Node)) {
+        setSkuDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // İstasyon filtresi değiştiğinde territory'leri filtrele
@@ -146,6 +175,7 @@ export default function StockMovementsPage() {
         if (territoryFilter) params.territory_id = territoryFilter;
         if (dealerFilter) params.dealer_id = dealerFilter;
         if (typeFilter) params.movement_type = typeFilter;
+        if (selectedSkus.length > 0) params.sku = selectedSkus.join(',');
 
         const data = await apiService.getStockMovementsByCycle(cycleId, params);
         setMovements(data.movements);
@@ -167,7 +197,7 @@ export default function StockMovementsPage() {
     };
 
     loadMovements();
-  }, [cycleId, stationFilter, territoryFilter, dealerFilter, typeFilter, page]);
+  }, [cycleId, stationFilter, territoryFilter, dealerFilter, typeFilter, selectedSkus, page]);
 
   // Filtre değiştiğinde sayfayı sıfırla
   const handleFilterChange = (setter: (val: string) => void, value: string) => {
@@ -185,6 +215,7 @@ export default function StockMovementsPage() {
       if (stationFilter) params.station_id = stationFilter;
       if (territoryFilter) params.territory_id = territoryFilter;
       if (typeFilter) params.movement_type = typeFilter;
+      if (selectedSkus.length > 0) params.sku = selectedSkus.join(',');
 
       const data = await apiService.getStockMovementsByCycle(cycleId, params);
 
@@ -269,7 +300,61 @@ export default function StockMovementsPage() {
 
       {/* Filtreler */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          {/* SKU Filtresi - Çoktan Seçmeli */}
+          <div className="relative" ref={skuDropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+            <button
+              type="button"
+              onClick={() => setSkuDropdownOpen(!skuDropdownOpen)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-left bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex justify-between items-center"
+            >
+              <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                {selectedSkus.length === 0 ? 'Seçiniz...' : `${selectedSkus.length} ürün seçili`}
+              </span>
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {skuDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="p-2 border-b border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedSkus([]); setPage(0); }}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Temizle
+                  </button>
+                </div>
+                {products.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSkus.includes(p.code)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSkus([...selectedSkus, p.code]);
+                        } else {
+                          setSelectedSkus(selectedSkus.filter(s => s !== p.code));
+                        }
+                        setPage(0);
+                      }}
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">
+                      <span className="font-medium">{p.code}</span>
+                      <span className="text-gray-500 ml-1">- {p.name}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* İstasyon Filtresi */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">İstasyon</label>
