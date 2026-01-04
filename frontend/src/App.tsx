@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
-import { useVersionCheck } from './hooks/useVersionCheck';
+// import { useVersionCheck } from './hooks/useVersionCheck';
 import LoginPage from './pages/LoginPage';
 import ExcelUploadPage from './pages/ExcelUploadPage';
 import TabletPage from './pages/TabletPage';
@@ -38,8 +38,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function App() {
   const { checkAuth } = useAuthStore();
   
-  // Otomatik versiyon kontrolü
-  useVersionCheck();
+  // Otomatik versiyon kontrolü - devre dışı
+  // useVersionCheck();
 
   useEffect(() => {
     checkAuth();
