@@ -7,7 +7,8 @@ from typing import Optional, Dict, List
 from uuid import UUID, uuid4
 from sqlmodel import Session, select
 from app.models import (
-    Cycle, Territory, Dealer, Product, Order, OrderLine, RevisionDiff
+    Cycle, Territory, Dealer, Product, Order, OrderLine, RevisionDiff,
+    Station, StationInventory
 )
 from app.services.excel_parser import ExcelParser, extract_territory_info
 import pandas as pd
@@ -49,7 +50,7 @@ class CycleManager:
         else:
             # YENİ DÖNGÜ: Farklı gün için yeni cycle oluştur
             cycle_no = self._get_next_cycle_no(plan_date)
-            
+
             cycle = Cycle(
                 cycle_no=cycle_no,
                 run_time=run_time,
@@ -60,6 +61,9 @@ class CycleManager:
             self.session.commit()
             self.session.refresh(cycle)
             batch_number = 1
+
+            # Yeni döngüde AnaStok envanterini sıfırla
+            self._reset_main_stock_inventory()
         
         # Excel'i parse et ve import et
         parser = ExcelParser(excel_content, sheet_name='Recipe2')
@@ -159,13 +163,39 @@ class CycleManager:
         """Döngüdeki bir sonraki batch numarasını hesapla"""
         stmt = select(Order).where(Order.cycle_id == cycle_id)
         orders = self.session.exec(stmt).all()
-        
+
         if not orders:
             return 1
-        
+
         max_batch = max(o.import_batch for o in orders)
         return max_batch + 1
-    
+
+    def _reset_main_stock_inventory(self):
+        """
+        AnaStok istasyonunun envanterini sıfırla.
+        Yeni döngü başladığında çağrılır.
+        """
+        # AnaStok istasyonunu bul
+        main_stock = self.session.exec(
+            select(Station).where(Station.is_main_stock == True)
+        ).first()
+
+        if not main_stock:
+            return
+
+        # AnaStok'un tüm envanter kayıtlarını sil veya sıfırla
+        inventory_items = self.session.exec(
+            select(StationInventory).where(StationInventory.station_id == main_stock.id)
+        ).all()
+
+        for item in inventory_items:
+            item.quantity_carton = 0
+            item.quantity_pack = 0
+            self.session.add(item)
+
+        self.session.commit()
+        print(f"INFO: AnaStok envanteri sıfırlandı ({len(inventory_items)} kayıt)")
+
     def _import_territories(self, df: pd.DataFrame):
         """Territory'leri import et (upsert)"""
         unique_territories = df['Territory'].unique()

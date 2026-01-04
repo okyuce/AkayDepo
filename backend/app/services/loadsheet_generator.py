@@ -6,54 +6,170 @@ from typing import List, Dict, Optional
 from uuid import UUID
 from sqlmodel import Session, select
 from app.models import (
-    StationAssignment, Loadsheet, LoadsheetLine, 
-    Order, OrderLine, Dealer, Territory, Product
+    StationAssignment, Loadsheet, LoadsheetLine,
+    Order, OrderLine, Dealer, Territory, Product, Station
 )
+
+# AnaStok için minimum karton limiti
+MAIN_STOCK_THRESHOLD = 300
 
 class LoadsheetGenerator:
     """Fiş üretici"""
-    
+
     def __init__(self, session: Session):
         self.session = session
-    
+        self._main_stock_station = None
+        self._main_stock_assignments = {}  # territory_id -> assignment cache
+
+    def _get_main_stock_station(self) -> Optional[Station]:
+        """AnaStok istasyonunu al (cache)"""
+        if self._main_stock_station is None:
+            self._main_stock_station = self.session.exec(
+                select(Station).where(Station.is_main_stock == True)
+            ).first()
+        return self._main_stock_station
+
+    def _get_dealer_total_cartons(self, cycle_id: UUID, dealer_id: UUID) -> float:
+        """Bayinin döngüdeki toplam sipariş miktarını hesapla (karton)"""
+        stmt = select(Order).where(
+            Order.cycle_id == cycle_id,
+            Order.dealer_id == dealer_id
+        )
+        orders = self.session.exec(stmt).all()
+
+        total_cartons = 0.0
+        for order in orders:
+            lines = self.session.exec(
+                select(OrderLine).where(OrderLine.order_id == order.id)
+            ).all()
+            for line in lines:
+                total_cartons += line.qty_carton + (line.qty_pack / 10)
+
+        return total_cartons
+
+    def _get_or_create_main_stock_assignment(
+        self, cycle_id: UUID, territory_id: UUID, plan_date
+    ) -> Optional[StationAssignment]:
+        """AnaStok için territory assignment al veya oluştur"""
+        main_stock = self._get_main_stock_station()
+        if not main_stock:
+            return None
+
+        # Cache kontrol
+        cache_key = (cycle_id, territory_id)
+        if cache_key in self._main_stock_assignments:
+            return self._main_stock_assignments[cache_key]
+
+        # Mevcut assignment var mı?
+        assignment = self.session.exec(
+            select(StationAssignment).where(
+                StationAssignment.cycle_id == cycle_id,
+                StationAssignment.station_id == main_stock.id,
+                StationAssignment.territory_id == territory_id
+            )
+        ).first()
+
+        if not assignment:
+            # Yeni assignment oluştur
+            assignment = StationAssignment(
+                cycle_id=cycle_id,
+                plan_date=plan_date,
+                station_id=main_stock.id,
+                territory_id=territory_id,
+                load_rank=1,
+                target_total_carton=0,
+                target_total_pack=0
+            )
+            self.session.add(assignment)
+            self.session.flush()
+
+        self._main_stock_assignments[cache_key] = assignment
+        return assignment
+
     def generate_loadsheets_for_cycle(self, cycle_id: UUID, only_batch: Optional[int] = None) -> int:
         """
         Bir döngü için tüm fişleri oluştur (multi-batch desteği ile)
-        
+
         Args:
             cycle_id: Döngü ID
-            
+
         Returns:
             int: Oluşturulan fiş sayısı
         """
-        # Döngünün station assignments'ını al
+        from app.models import Cycle
+
+        # Döngü bilgisini al (plan_date için)
+        cycle = self.session.get(Cycle, cycle_id)
+        if not cycle:
+            raise Exception("Döngü bulunamadı.")
+
+        # Döngünün station assignments'ını al (AnaStok hariç - normal istasyonlar)
+        main_stock = self._get_main_stock_station()
         stmt = select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
+        if main_stock:
+            stmt = stmt.where(StationAssignment.station_id != main_stock.id)
         assignments = self.session.exec(stmt).all()
-        
+
         if not assignments:
             raise Exception("İstasyon planı bulunamadı. Önce plan oluşturun.")
-        
+
         loadsheet_count = 0
-        
+
+        # Dealer toplam kartonlarını cache'le (performans için)
+        dealer_cartons_cache = {}
+
         # Her assignment için fişler oluştur
         for assignment in assignments:
             # Bu territory için tüm dealer'ları ve batch'leri al
             dealer_batches = self._get_dealer_batches_for_territory(cycle_id, assignment.territory_id, only_batch=only_batch)
-            
+
             # Territory bilgisi
             territory = self.session.get(Territory, assignment.territory_id)
-            
+
             # Her dealer+batch kombinasyonu için fiş oluştur
             dealer_index = {}
+            main_stock_dealer_index = {}  # AnaStok için ayrı index
+
             for dealer_id, batch_number, order in dealer_batches:
-                # Dealer index - ilk görüşte set et
+                # Bayi toplam kartonunu hesapla (cache ile)
+                if dealer_id not in dealer_cartons_cache:
+                    dealer_cartons_cache[dealer_id] = self._get_dealer_total_cartons(cycle_id, dealer_id)
+                dealer_total = dealer_cartons_cache[dealer_id]
+
+                # 300+ karton mu? AnaStok'a yönlendir
+                if dealer_total >= MAIN_STOCK_THRESHOLD and main_stock:
+                    # AnaStok assignment'ı al veya oluştur
+                    main_stock_assignment = self._get_or_create_main_stock_assignment(
+                        cycle_id, assignment.territory_id, cycle.plan_date
+                    )
+                    if main_stock_assignment:
+                        # AnaStok için dealer index
+                        if dealer_id not in main_stock_dealer_index:
+                            main_stock_dealer_index[dealer_id] = len(main_stock_dealer_index) + 1
+                        idx = main_stock_dealer_index[dealer_id]
+
+                        # Paket numarası (AnaStok için)
+                        package_number = f"{territory.display_number}-B{idx:02d}"
+
+                        # Loadsheet oluştur (AnaStok assignment ile)
+                        loadsheet_count += self._create_loadsheet_for_order(
+                            cycle_id=cycle_id,
+                            assignment=main_stock_assignment,
+                            dealer_id=dealer_id,
+                            order=order,
+                            package_number=package_number,
+                            batch_number=batch_number
+                        )
+                        continue  # Normal istasyona ekleme
+
+                # Normal istasyon için
                 if dealer_id not in dealer_index:
                     dealer_index[dealer_id] = len(dealer_index) + 1
                 idx = dealer_index[dealer_id]
-                
+
                 # Paket numarası: T07-B01 (dealer index'e göre)
                 package_number = f"{territory.display_number}-B{idx:02d}"
-                
+
                 # Loadsheet oluştur
                 loadsheet_count += self._create_loadsheet_for_order(
                     cycle_id=cycle_id,
@@ -63,7 +179,7 @@ class LoadsheetGenerator:
                     package_number=package_number,
                     batch_number=batch_number
                 )
-        
+
         self.session.commit()
         return loadsheet_count
     

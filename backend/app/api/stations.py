@@ -85,7 +85,15 @@ def create_tablet_user(station_number: int, station_id: UUID, session: Session) 
 @router.get("/")
 async def list_stations(session: Session = Depends(get_session)):
     stations = session.exec(select(Station)).all()
-    return [{"id": str(s.id), "name": s.name, "active": s.active} for s in stations]
+    return [
+        {
+            "id": str(s.id),
+            "name": s.name,
+            "active": s.active,
+            "is_main_stock": getattr(s, 'is_main_stock', False)
+        }
+        for s in stations
+    ]
 
 @router.post("/")
 async def create_station(session: Session = Depends(get_session)):

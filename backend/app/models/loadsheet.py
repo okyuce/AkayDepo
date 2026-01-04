@@ -6,11 +6,12 @@ from uuid import UUID, uuid4
 class Station(SQLModel, table=True):
     """İstasyon modeli"""
     __tablename__ = "stations"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str  # İstasyon-1, İstasyon-2
+    name: str  # İstasyon-1, İstasyon-2, AnaStok
     active: bool = Field(default=True)
     worker_id: Optional[UUID] = None  # Depo görevlisi (opsiyonel)
+    is_main_stock: bool = Field(default=False)  # AnaStok istasyonu mu?
 
 class StationAssignment(SQLModel, table=True):
     """İstasyon atama - territory'yi istasyona bağlar"""
