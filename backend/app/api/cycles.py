@@ -198,64 +198,68 @@ async def cancel_pending(
     NOT: Station'lar, StationTerritoryMap, StationInventory ve Product'lar korunur!
     """
     from app.models import (
-        Territory, Dealer, Product, Order, OrderLine, 
+        Territory, Dealer, Product, Order, OrderLine,
         Loadsheet, LoadsheetLine, Station, StationAssignment,
         LoadCounter, RevisionDiff, CycleImport
     )
+    from app.models.inventory import StockMovement
     
     try:
         # TÜM verileri sil (foreign key cascade ile ilişkili veriler de silinir)
         # Sıralama önemli: önce bağımlı tablolar, sonra parent tablolar
         
-        # 1. LoadsheetLine (Loadsheet'e bağlı)
-        session.exec(select(LoadsheetLine)).all()
+        # 1. StockMovement (Loadsheet'e bağlı - foreign key)
+        for item in session.exec(select(StockMovement)).all():
+            session.delete(item)
+
+        # 2. LoadsheetLine (Loadsheet'e bağlı)
         for item in session.exec(select(LoadsheetLine)).all():
             session.delete(item)
-        
-        # 2. Loadsheet (Station, Dealer, Cycle'a bağlı)
+
+        # 3. Loadsheet (Station, Dealer, Cycle'a bağlı)
         for item in session.exec(select(Loadsheet)).all():
             session.delete(item)
         
-        # 3. StationAssignment (Station, Territory, Cycle'a bağlı)
+        # 4. StationAssignment (Station, Territory, Cycle'a bağlı)
         for item in session.exec(select(StationAssignment)).all():
             session.delete(item)
-        
-        # 4. Station'ları SİLME - manuel atamalar için korunmalı!
+
+        # 5. Station'ları SİLME - manuel atamalar için korunmalı!
         # StationTerritoryMap de korunur (CASCADE nedeniyle otomatik silinmez)
-        
-        # 5. OrderLine (Order'a bağlı)
+
+        # 6. OrderLine (Order'a bağlı)
         for item in session.exec(select(OrderLine)).all():
             session.delete(item)
-        
-        # 6. Order (Cycle, Dealer, Territory'ye bağlı)
+
+        # 7. Order (Cycle, Dealer, Territory'ye bağlı)
         for item in session.exec(select(Order)).all():
             session.delete(item)
-        
-        # 7. LoadCounter (Station, Cycle'a bağlı)
+
+        # 8. LoadCounter (Station, Cycle'a bağlı)
         for item in session.exec(select(LoadCounter)).all():
             session.delete(item)
-        
-        # 8. RevisionDiff (Cycle'a bağlı)
+
+        # 9. RevisionDiff (Cycle'a bağlı)
         for item in session.exec(select(RevisionDiff)).all():
             session.delete(item)
-        
-        # 9. CycleImport (Cycle'a bağlı)
+
+        # 10. CycleImport (Cycle'a bağlı)
         for item in session.exec(select(CycleImport)).all():
             session.delete(item)
-        
-        # 10. Cycle
+
+        # 11. Cycle
         for item in session.exec(select(Cycle)).all():
             session.delete(item)
-        
-        # 11. Dealer (Territory'ye bağlı)
+
+        # 12. Dealer (Territory'ye bağlı)
         for item in session.exec(select(Dealer)).all():
             session.delete(item)
-        
-        # 12. Territory (parent tablo)
+
+        # 13. Territory (parent tablo)
         for item in session.exec(select(Territory)).all():
             session.delete(item)
-        
-        # 13. Product'ları SİLME - Stok yönetimi için korunmalı!
+
+        # 14. Product'ları SİLME - Stok yönetimi için korunmalı!
         # StationInventory de korunur (foreign key CASCADE yok)
         
         session.commit()
