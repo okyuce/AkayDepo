@@ -144,9 +144,8 @@ async def get_dashboard_summary(
                     "loadsheet_ids": []
                 }
             station_data[station_id]["territory_count"] += 1
-            station_data[station_id]["total_carton"] += assignment.target_total_carton
 
-        # Her istasyon icin tamamlanan koli hesapla
+        # Her istasyon icin toplam ve tamamlanan koli hesapla (gercek fis verilerinden)
         for station_id, data in station_data.items():
             # Bu istasyonun assignment ID'lerini bul
             station_assignment_ids = [
@@ -157,20 +156,26 @@ async def get_dashboard_summary(
             station_loadsheets = [ls for ls in loadsheets if ls.assignment_id in station_assignment_ids]
             station_effective = get_effective_loadsheets(station_loadsheets, session)
 
+            # Gercek toplam ve tamamlanan kolileri hesapla (aktif fislerden)
+            total_carton = 0
             completed_carton = 0
             for dealer_data in station_effective.values():
                 active_ls = dealer_data['active']
-                if active_ls and active_ls.status == "loaded":
+                if active_ls:
                     # Loadsheet satirlarindan toplam koli hesapla
                     stmt = select(func.sum(LoadsheetLine.qty_carton)).where(
                         LoadsheetLine.loadsheet_id == active_ls.id
                     )
                     result = session.exec(stmt).first()
-                    completed_carton += result or 0
+                    carton = result or 0
+                    total_carton += carton
+                    if active_ls.status == "loaded":
+                        completed_carton += carton
 
+            data["total_carton"] = total_carton
             data["completed_carton"] = completed_carton
             data["progress_percent"] = round(
-                (completed_carton / data["total_carton"] * 100) if data["total_carton"] > 0 else 0,
+                (completed_carton / total_carton * 100) if total_carton > 0 else 0,
                 1
             )
 
