@@ -4,7 +4,8 @@
  */
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+// Production'da relative URL kullan, development'da localhost:8001
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:8001');
 
 export interface DashboardSummary {
   cycle: {
