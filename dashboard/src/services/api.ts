@@ -19,7 +19,7 @@ export interface DashboardSummary {
     total: number;
     completed: number;
     pending: number;
-    cancelled: number;
+    revision_cancelled: number;
     completion_percentage: number;
   };
   station_summary: Array<{
@@ -58,6 +58,9 @@ export interface StationDetail {
     status: string;
     total_carton: number;
     total_pack: number;
+    batch_number: number;
+    has_revision: boolean;
+    revision_count: number;
   }>;
 }
 
@@ -72,11 +75,24 @@ export interface TerritoryDetail {
     status: string;
     total_carton: number;
     total_pack: number;
+    has_revision: boolean;
+    revision_count: number;
     products: Array<{
       product_code: string;
       product_name: string;
       quantity_carton: number;
       quantity_pack: number;
+      change_carton: number | null;
+      change_pack: number | null;
+    }>;
+    loadsheets: Array<{
+      id: string;
+      batch_number: number;
+      status: string;
+      total_carton: number;
+      total_pack: number;
+      is_active: boolean;
+      is_revision: boolean;
     }>;
   }>;
 }

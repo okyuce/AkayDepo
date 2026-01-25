@@ -247,6 +247,13 @@ export default function TerritoryViewPage() {
                             )}
                           </div>
 
+                          {/* Revision Badge */}
+                          {dealer.has_revision && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                              Rev {dealer.revision_count}
+                            </span>
+                          )}
+
                           {getStatusBadge(dealer.status)}
 
                           {/* Expand/Collapse Icon */}
@@ -294,10 +301,28 @@ export default function TerritoryViewPage() {
                                   {dealer.products.map((product, idx) => (
                                     <tr key={idx} className="border-b border-gray-100 hover:bg-violet-50/50 transition-colors">
                                       <td className="py-3 px-4 text-gray-800">{product.product_name}</td>
-                                      <td className="py-3 px-4 text-right font-medium text-gray-800">{product.quantity_carton}</td>
+                                      <td className="py-3 px-4 text-right font-medium text-gray-800">
+                                        {product.quantity_carton}
+                                        {product.change_carton !== null && product.change_carton !== 0 && (
+                                          <sup className={`ml-1 text-xs font-bold ${
+                                            product.change_carton > 0 ? 'text-green-600' : 'text-red-600'
+                                          }`}>
+                                            {product.change_carton > 0 ? '+' : ''}{product.change_carton}
+                                          </sup>
+                                        )}
+                                      </td>
                                       <td className="py-3 px-4 text-right">
                                         {product.quantity_pack > 0 ? (
-                                          <span className="font-medium text-amber-600">{product.quantity_pack}</span>
+                                          <span className="font-medium text-amber-600">
+                                            {product.quantity_pack}
+                                            {product.change_pack !== null && product.change_pack !== 0 && (
+                                              <sup className={`ml-1 text-xs font-bold ${
+                                                product.change_pack > 0 ? 'text-green-600' : 'text-red-600'
+                                              }`}>
+                                                {product.change_pack > 0 ? '+' : ''}{product.change_pack}
+                                              </sup>
+                                            )}
+                                          </span>
                                         ) : (
                                           <span className="text-gray-400">-</span>
                                         )}

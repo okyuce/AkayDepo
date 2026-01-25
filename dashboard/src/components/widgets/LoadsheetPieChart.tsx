@@ -13,7 +13,7 @@ interface LoadsheetStats {
   total: number;
   completed: number;
   pending: number;
-  cancelled: number;
+  revision_cancelled: number;
   completion_percentage: number;
 }
 
@@ -22,32 +22,35 @@ interface Props {
 }
 
 export default function LoadsheetPieChart({ stats }: Props) {
-  const { completed, pending, cancelled } = stats;
+  const { completed, pending, revision_cancelled } = stats;
 
-  if (completed + pending + cancelled === 0) {
+  if (completed + pending === 0) {
     return null;
   }
 
+  // Sadece aktif fisleri goster (tamamlanan + bekleyen)
+  // Revizyon iptalleri pie chart'ta gosterilmez cunku bunlar aktif fisler degil
   const data = {
-    labels: ['Tamamlanan', 'Bekleyen', 'Iptal'],
+    labels: ['Tamamlanan', 'Bekleyen'],
     datasets: [
       {
-        data: [completed, pending, cancelled],
+        data: [completed, pending],
         backgroundColor: [
           'rgba(16, 185, 129, 0.9)',
           'rgba(245, 158, 11, 0.9)',
-          'rgba(239, 68, 68, 0.9)',
         ],
         borderColor: [
           'rgba(16, 185, 129, 1)',
           'rgba(245, 158, 11, 1)',
-          'rgba(239, 68, 68, 1)',
         ],
         borderWidth: 2,
         hoverOffset: 8,
       },
     ],
   };
+
+  // revision_cancelled kullanilmamis uyarisi icin
+  void revision_cancelled;
 
   const options = {
     responsive: true,

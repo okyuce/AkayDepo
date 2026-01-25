@@ -233,7 +233,14 @@ export default function StationDetailPage() {
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <div className="font-medium text-gray-800">{ls.dealer_name}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium text-gray-800">{ls.dealer_name}</div>
+                              {ls.has_revision && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                  Rev {ls.revision_count}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs text-gray-500">{ls.dealer_code}</div>
                           </td>
                           <td className="py-3 px-4 text-center">
