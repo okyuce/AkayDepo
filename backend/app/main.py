@@ -36,9 +36,10 @@ async def health_check():
     return {"status": "healthy"}
 
 # API routers
-from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users
+from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users, dashboard
 
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
+app.include_router(dashboard.router, prefix="/v1/dashboard", tags=["dashboard"])
 app.include_router(users.router, prefix="/v1/users", tags=["users"])
 app.include_router(cycles.router, prefix="/v1/cycles", tags=["cycles"])
 app.include_router(planning.router, prefix="/v1/cycles", tags=["planning"])
