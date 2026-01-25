@@ -4,7 +4,7 @@ from app.models.user import User
 
 # Generate correct password hash
 u = User(username='admin', role='admin')
-u.set_password('admin123')
+u.set_password('Akay1234')
 
 # Update database
 with engine.connect() as conn:
