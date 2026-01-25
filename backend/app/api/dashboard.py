@@ -94,10 +94,18 @@ async def get_dashboard_summary(
     last_import = None
 
     if cycle:
+        # Son tamamlanan fisin zamanini bul
+        stmt = select(func.max(Loadsheet.loaded_at)).where(
+            Loadsheet.cycle_id == cycle.id,
+            Loadsheet.status == "loaded"
+        )
+        last_loaded_at = session.exec(stmt).first()
+
         cycle_data = {
             "id": str(cycle.id),
             "cycle_no": cycle.cycle_no,
             "run_time": cycle.run_time,
+            "last_completion_time": last_loaded_at.isoformat() if last_loaded_at else None,
             "plan_date": str(cycle.plan_date),
             "status": cycle.status
         }

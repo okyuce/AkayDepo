@@ -14,6 +14,7 @@ export interface DashboardSummary {
     run_time: string;
     plan_date: string;
     status: string;
+    last_completion_time: string | null;
   } | null;
   loadsheet_stats: {
     total: number;

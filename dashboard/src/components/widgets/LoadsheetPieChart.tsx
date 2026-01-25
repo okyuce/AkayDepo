@@ -86,7 +86,7 @@ export default function LoadsheetPieChart({ stats }: Props) {
             const total = data.reduce((a, b) => a + b, 0);
             const value = context.raw as number;
             const percentage = ((value / total) * 100).toFixed(1);
-            return `${context.label}: ${value} fis (%${percentage})`;
+            return `${context.label}: ${value} fiş (%${percentage})`;
           },
         },
       },
@@ -103,8 +103,8 @@ export default function LoadsheetPieChart({ stats }: Props) {
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">Fis Dagilimi</h3>
-          <p className="text-sm text-gray-500">Duruma gore fis sayilari</p>
+          <h3 className="text-lg font-semibold text-gray-800">Fiş Dağılımı</h3>
+          <p className="text-sm text-gray-500">Duruma göre fiş sayıları</p>
         </div>
       </div>
       <div className="h-64">

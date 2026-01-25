@@ -60,13 +60,13 @@ export default function TerritoryViewPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'loaded':
-        return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">Tamamlandi</span>;
+        return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">Tamamlandı</span>;
       case 'pending':
         return <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Bekliyor</span>;
       case 'cancelled':
-        return <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">Iptal</span>;
+        return <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">İptal</span>;
       case 'bekliyor':
-        return <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full">Fis Yok</span>;
+        return <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full">Fiş Yok</span>;
       default:
         return <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">{status}</span>;
     }
@@ -94,9 +94,9 @@ export default function TerritoryViewPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">
-                  Bolge: {territoryCode}
+                  Bölge: {territoryCode}
                 </h1>
-                <p className="text-gray-500 mt-1">Bayi siparisleri ve durumu</p>
+                <p className="text-gray-500 mt-1">Bayi siparişleri ve durumu</p>
               </div>
             </div>
           </div>
@@ -174,13 +174,13 @@ export default function TerritoryViewPage() {
                       onClick={expandAll}
                       className="px-3 py-1.5 text-sm font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-colors"
                     >
-                      Tumunu Ac
+                      Tümünü Aç
                     </button>
                     <button
                       onClick={collapseAll}
                       className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
                     >
-                      Tumunu Kapat
+                      Tümünü Kapat
                     </button>
                   </div>
                 )}
@@ -195,7 +195,7 @@ export default function TerritoryViewPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
                 </div>
-                <p className="text-gray-500">Bu bolgede bayi bulunamadi</p>
+                <p className="text-gray-500">Bu bölgede bayi bulunamadı</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -232,7 +232,7 @@ export default function TerritoryViewPage() {
                           {/* Summary Stats */}
                           <div className="hidden sm:flex items-center gap-4">
                             <div className="text-right">
-                              <p className="text-xs text-gray-500">Urun</p>
+                              <p className="text-xs text-gray-500">Ürün</p>
                               <p className="font-semibold text-gray-800">{productCount}</p>
                             </div>
                             <div className="text-right">
@@ -268,7 +268,7 @@ export default function TerritoryViewPage() {
                       {/* Mobile Summary (visible when collapsed) */}
                       {!isExpanded && (
                         <div className="sm:hidden px-5 pb-4 flex items-center gap-4 text-sm">
-                          <span className="text-gray-500">{productCount} urun</span>
+                          <span className="text-gray-500">{productCount} ürün</span>
                           <span className="text-gray-300">|</span>
                           <span className="font-medium text-gray-800">{dealer.total_carton} krt</span>
                           {dealer.total_pack > 0 && (
@@ -292,7 +292,7 @@ export default function TerritoryViewPage() {
                               <table className="w-full">
                                 <thead>
                                   <tr className="border-b border-gray-200">
-                                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Urun Adi</th>
+                                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Ürün Adi</th>
                                     <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Krt</th>
                                     <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Pkt</th>
                                   </tr>
@@ -341,7 +341,7 @@ export default function TerritoryViewPage() {
                             </div>
                           ) : (
                             <div className="mt-4 p-4 bg-gray-50 rounded-xl text-center">
-                              <p className="text-sm text-gray-500 italic">Siparis bulunamadi</p>
+                              <p className="text-sm text-gray-500 italic">Sipariş bulunamadı</p>
                             </div>
                           )}
                         </div>

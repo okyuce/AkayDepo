@@ -31,7 +31,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-            <p className="text-gray-500 mt-1">Dongu ve fis durumu ozeti</p>
+            <p className="text-gray-500 mt-1">Döngü ve fiş durumu özeti</p>
           </div>
 
           <div className="flex items-center gap-4">

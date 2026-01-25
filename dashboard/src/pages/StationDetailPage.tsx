@@ -45,11 +45,11 @@ export default function StationDetailPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'loaded':
-        return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">Tamamlandi</span>;
+        return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">Tamamlandı</span>;
       case 'pending':
         return <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Bekliyor</span>;
       case 'cancelled':
-        return <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">Iptal</span>;
+        return <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">İptal</span>;
       default:
         return <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">{status}</span>;
     }
@@ -72,9 +72,9 @@ export default function StationDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">
-              {data?.station_name || 'Istasyon Detay'}
+              {data?.station_name || 'İstasyon Detay'}
             </h1>
-            <p className="text-gray-500 mt-1">Bolge ve rut detaylari</p>
+            <p className="text-gray-500 mt-1">Bölge ve rut detayları</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -137,13 +137,13 @@ export default function StationDetailPage() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Atanan Bolgeler</h2>
-                  <p className="text-sm text-gray-500">{data.territories.length} bolge</p>
+                  <h2 className="text-lg font-semibold text-gray-800">Atanan Bölgeler</h2>
+                  <p className="text-sm text-gray-500">{data.territories.length} bölge</p>
                 </div>
               </div>
 
               {data.territories.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Bu istasyona bolge atanmamis</p>
+                <p className="text-gray-500 text-center py-8">Bu istasyona bölge atanmamış</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {data.territories.map((territory, index) => (
@@ -209,7 +209,7 @@ export default function StationDetailPage() {
               </div>
 
               {data.loadsheets.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Bu istasyona rut atanmamis</p>
+                <p className="text-gray-500 text-center py-8">Bu istasyona rut atanmamış</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">

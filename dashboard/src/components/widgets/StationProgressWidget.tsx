@@ -33,8 +33,8 @@ export default function StationProgressWidget({ stations }: Props) {
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Istasyonlar</h3>
-            <p className="text-sm text-gray-500">Istasyon ilerleme durumu</p>
+            <h3 className="text-lg font-semibold text-gray-800">İstasyonlar</h3>
+            <p className="text-sm text-gray-500">İstasyon ilerleme durumu</p>
           </div>
         </div>
         <div className="text-center py-12">
@@ -44,7 +44,7 @@ export default function StationProgressWidget({ stations }: Props) {
             </svg>
           </div>
           <p className="text-gray-600 font-medium">Plan olusturulmamis</p>
-          <p className="text-sm text-gray-400 mt-1">Istasyon atamasi yapilmadi</p>
+          <p className="text-sm text-gray-400 mt-1">İstasyon ataması yapılmadı</p>
         </div>
       </div>
     );
@@ -59,7 +59,7 @@ export default function StationProgressWidget({ stations }: Props) {
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">Istasyonlar</h3>
+          <h3 className="text-lg font-semibold text-gray-800">İstasyonlar</h3>
           <p className="text-sm text-gray-500">{stations.length} istasyon aktif</p>
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function StationProgressWidget({ stations }: Props) {
                     <h4 className="font-semibold text-gray-800 group-hover:text-violet-600 transition-colors">
                       {station.station_name}
                     </h4>
-                    <p className="text-xs text-gray-500">{station.territory_count} bolge</p>
+                    <p className="text-xs text-gray-500">{station.territory_count} bölge</p>
                   </div>
                 </div>
                 <div className={`text-lg font-bold ${

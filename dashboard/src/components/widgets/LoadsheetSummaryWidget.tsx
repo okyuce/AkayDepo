@@ -22,8 +22,8 @@ export default function LoadsheetSummaryWidget({ stats }: Props) {
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">Fis Durumu</h3>
-          <p className="text-sm text-gray-500">Toplam {total} fis</p>
+          <h3 className="text-lg font-semibold text-gray-800">Fiş Durumu</h3>
+          <p className="text-sm text-gray-500">Toplam {total} fiş</p>
         </div>
       </div>
 
@@ -34,7 +34,7 @@ export default function LoadsheetSummaryWidget({ stats }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">Henuz fis olusturulmamis</p>
+          <p className="text-gray-600 font-medium">Henüz fiş oluşturulmamış</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -75,7 +75,7 @@ export default function LoadsheetSummaryWidget({ stats }: Props) {
             <div className="flex-1">
               <p className="text-sm text-gray-500 mb-2">Tamamlanma Orani</p>
               <p className="text-3xl font-bold text-gray-800">{completed}<span className="text-lg text-gray-400">/{total}</span></p>
-              <p className="text-sm text-gray-500 mt-1">fis tamamlandi</p>
+              <p className="text-sm text-gray-500 mt-1">fiş tamamlandı</p>
             </div>
           </div>
 
@@ -88,7 +88,7 @@ export default function LoadsheetSummaryWidget({ stats }: Props) {
                 </svg>
               </div>
               <p className="text-2xl font-bold text-emerald-600">{completed}</p>
-              <p className="text-xs text-emerald-600 font-medium">Tamamlandi</p>
+              <p className="text-xs text-emerald-600 font-medium">Tamamlandı</p>
             </div>
 
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-4 text-center">

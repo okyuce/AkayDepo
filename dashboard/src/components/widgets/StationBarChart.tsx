@@ -154,8 +154,8 @@ export default function StationBarChart({ stations }: Props) {
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">Istasyon Karton Durumu</h3>
-          <p className="text-sm text-gray-500">Istasyon bazinda karton dagilimi</p>
+          <h3 className="text-lg font-semibold text-gray-800">İstasyon Karton Durumu</h3>
+          <p className="text-sm text-gray-500">İstasyon bazında karton dağılımı</p>
         </div>
       </div>
       <div className="h-72">
