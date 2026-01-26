@@ -188,35 +188,24 @@ async def get_dashboard_summary(
                 }
             station_data[station_id]["territory_count"] += 1
 
-        # Territory bazinda toplam karton hesapla (OrderLine'dan - ana depo ile ayni)
-        territory_loads = calculate_territory_loads(cycle.id, session)
-
-        # Her istasyon icin toplam ve tamamlanan koli hesapla
+        # Her istasyon icin toplam ve tamamlanan koli hesapla (aktif fislerden)
         for station_id, data in station_data.items():
-            # Bu istasyonun territory'lerini bul
-            station_territory_ids = [
-                str(a.territory_id) for a in assignments if str(a.station_id) == station_id
-            ]
-
-            # Bu istasyonun assignment ID'lerini bul (completed hesabi icin)
+            # Bu istasyonun assignment ID'lerini bul
             station_assignment_ids = [
                 a.id for a in assignments if str(a.station_id) == station_id
             ]
 
-            # Toplam karton (OrderLine'dan)
-            total_carton = sum(
-                territory_loads.get(tid, 0) for tid in station_territory_ids
-            )
-
-            # Tamamlanan karton icin fisleri kontrol et (aktif fislerden)
+            # Bu istasyonun fislerini bul (assignment uzerinden)
             station_loadsheets = [ls for ls in loadsheets if ls.assignment_id in station_assignment_ids]
             station_effective = get_effective_loadsheets(station_loadsheets, session)
 
+            # Toplam ve tamamlanan karton (aktif fislerden - revizyon haric)
+            total_carton = 0
             completed_carton = 0
             for dealer_data in station_effective.values():
                 active_ls = dealer_data['active']
-                if active_ls and active_ls.status == "loaded":
-                    # Tamamlanan fisin koli miktari (LoadsheetLine'dan)
+                if active_ls:
+                    # Aktif fisin koli miktari (LoadsheetLine'dan)
                     stmt = select(
                         func.sum(LoadsheetLine.qty_carton),
                         func.sum(LoadsheetLine.qty_pack)
@@ -224,7 +213,10 @@ async def get_dashboard_summary(
                     result = session.exec(stmt).first()
                     carton = (result[0] or 0) if result else 0
                     pack = (result[1] or 0) if result else 0
-                    completed_carton += int(carton + (pack / 10))
+                    ls_total = int(carton + (pack / 10))
+                    total_carton += ls_total
+                    if active_ls.status == "loaded":
+                        completed_carton += ls_total
 
             data["total_carton"] = total_carton
             data["completed_carton"] = completed_carton
@@ -304,9 +296,6 @@ async def get_station_detail(
     # Bayi bazinda efektif fisleri hesapla
     effective = get_effective_loadsheets(all_loadsheets, session)
 
-    # Territory bazinda toplam karton hesapla (OrderLine'dan - ana depo ile ayni)
-    territory_loads = calculate_territory_loads(cycle.id, session)
-
     territories = []
     for assignment in assignments:
         territory = session.get(Territory, assignment.territory_id)
@@ -320,14 +309,12 @@ async def get_station_detail(
             total_ls = len(active_ls_list)
             completed_ls = len([ls for ls in active_ls_list if ls.status == "loaded"])
 
-            # Toplam koli (OrderLine'dan - ana depo ile ayni)
-            total_carton = territory_loads.get(str(assignment.territory_id), 0)
-
-            # Tamamlanan koli (LoadsheetLine'dan - aktif ve tamamlanmis fisler)
+            # Toplam ve tamamlanan koli (aktif fislerden - revizyon haric)
+            total_carton = 0
             completed_carton = 0
             for dealer_data in territory_effective.values():
                 active_ls = dealer_data['active']
-                if active_ls and active_ls.status == "loaded":
+                if active_ls:
                     stmt = select(
                         func.sum(LoadsheetLine.qty_carton),
                         func.sum(LoadsheetLine.qty_pack)
@@ -335,7 +322,10 @@ async def get_station_detail(
                     result = session.exec(stmt).first()
                     carton = (result[0] or 0) if result else 0
                     pack = (result[1] or 0) if result else 0
-                    completed_carton += int(carton + (pack / 10))
+                    ls_total = int(carton + (pack / 10))
+                    total_carton += ls_total
+                    if active_ls.status == "loaded":
+                        completed_carton += ls_total
 
             territories.append({
                 "territory_code": territory.code,
