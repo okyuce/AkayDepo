@@ -188,7 +188,7 @@ export default function StationDetailPage() {
                           </div>
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
                             <p className="text-gray-500 text-xs">Karton</p>
-                            <p className="font-semibold text-gray-800">{territory.completed_carton.toFixed(1)}/{territory.total_carton.toFixed(1)}</p>
+                            <p className="font-semibold text-gray-800">{territory.completed_carton}/{territory.total_carton}</p>
                           </div>
                         </div>
 

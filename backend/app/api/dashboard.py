@@ -13,7 +13,7 @@ from app.core.database import get_session
 from app.api.auth import get_current_user
 from app.models import (
     Cycle, Loadsheet, LoadsheetLine, Station, StationAssignment,
-    Territory, Dealer, CycleImport, Product
+    Territory, Dealer, CycleImport, Product, Order, OrderLine
 )
 
 router = APIRouter()
@@ -24,6 +24,41 @@ def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(403, "Bu endpoint sadece yoneticiler icin")
     return current_user
+
+
+def calculate_territory_loads(cycle_id, session: Session) -> dict:
+    """
+    Territory bazinda toplam karton hesapla (OrderLine'dan, ana depo ile ayni)
+    int() ile kesilir - ana depo'daki target_total_carton ile birebir ayni
+
+    Returns:
+        {territory_id: total_carton (int)}
+    """
+    # Dongudeki tum order'lari al
+    stmt = select(Order).where(Order.cycle_id == cycle_id)
+    orders = session.exec(stmt).all()
+
+    territory_loads = {}
+
+    for order in orders:
+        territory_id = str(order.territory_id)
+
+        # Order lines'i al
+        stmt = select(OrderLine).where(OrderLine.order_id == order.id)
+        lines = session.exec(stmt).all()
+
+        # Toplam karton hesapla (paket dahil: 10 paket = 1 karton)
+        total_carton = 0
+        for line in lines:
+            total_carton += line.qty_carton + (line.qty_pack / 10)
+
+        # Territory toplama ekle
+        if territory_id not in territory_loads:
+            territory_loads[territory_id] = 0
+        territory_loads[territory_id] += total_carton
+
+    # Her territory icin int() ile kes (ana depo ile ayni)
+    return {tid: int(val) for tid, val in territory_loads.items()}
 
 
 def get_effective_loadsheets(loadsheets: list, session: Session) -> dict:
@@ -153,25 +188,35 @@ async def get_dashboard_summary(
                 }
             station_data[station_id]["territory_count"] += 1
 
-        # Her istasyon icin toplam ve tamamlanan koli hesapla (gercek fis verilerinden)
+        # Territory bazinda toplam karton hesapla (OrderLine'dan - ana depo ile ayni)
+        territory_loads = calculate_territory_loads(cycle.id, session)
+
+        # Her istasyon icin toplam ve tamamlanan koli hesapla
         for station_id, data in station_data.items():
-            # Bu istasyonun assignment ID'lerini bul
+            # Bu istasyonun territory'lerini bul
+            station_territory_ids = [
+                str(a.territory_id) for a in assignments if str(a.station_id) == station_id
+            ]
+
+            # Bu istasyonun assignment ID'lerini bul (completed hesabi icin)
             station_assignment_ids = [
                 a.id for a in assignments if str(a.station_id) == station_id
             ]
 
-            # Bu istasyonun fislerini bul (assignment uzerinden)
+            # Toplam karton (OrderLine'dan)
+            total_carton = sum(
+                territory_loads.get(tid, 0) for tid in station_territory_ids
+            )
+
+            # Tamamlanan karton icin fisleri kontrol et (aktif fislerden)
             station_loadsheets = [ls for ls in loadsheets if ls.assignment_id in station_assignment_ids]
             station_effective = get_effective_loadsheets(station_loadsheets, session)
 
-            # Gercek toplam ve tamamlanan kolileri hesapla (aktif fislerden, pack dahil)
-            # Pack'i kartona ceviriyoruz: 10 pack = 1 karton
-            total_carton = 0
             completed_carton = 0
             for dealer_data in station_effective.values():
                 active_ls = dealer_data['active']
-                if active_ls:
-                    # Loadsheet satirlarindan toplam koli ve pack hesapla
+                if active_ls and active_ls.status == "loaded":
+                    # Tamamlanan fisin koli miktari (LoadsheetLine'dan)
                     stmt = select(
                         func.sum(LoadsheetLine.qty_carton),
                         func.sum(LoadsheetLine.qty_pack)
@@ -179,11 +224,7 @@ async def get_dashboard_summary(
                     result = session.exec(stmt).first()
                     carton = (result[0] or 0) if result else 0
                     pack = (result[1] or 0) if result else 0
-                    # Pack'i kartona cevir ve topla
-                    total = carton + (pack / 10)
-                    total_carton += total
-                    if active_ls.status == "loaded":
-                        completed_carton += total
+                    completed_carton += int(carton + (pack / 10))
 
             data["total_carton"] = total_carton
             data["completed_carton"] = completed_carton
@@ -263,6 +304,9 @@ async def get_station_detail(
     # Bayi bazinda efektif fisleri hesapla
     effective = get_effective_loadsheets(all_loadsheets, session)
 
+    # Territory bazinda toplam karton hesapla (OrderLine'dan - ana depo ile ayni)
+    territory_loads = calculate_territory_loads(cycle.id, session)
+
     territories = []
     for assignment in assignments:
         territory = session.get(Territory, assignment.territory_id)
@@ -276,13 +320,14 @@ async def get_station_detail(
             total_ls = len(active_ls_list)
             completed_ls = len([ls for ls in active_ls_list if ls.status == "loaded"])
 
-            # Toplam koli (sadece aktif fislerden, pack dahil)
-            # Pack'i kartona ceviriyoruz: 10 pack = 1 karton
-            total_carton = 0
+            # Toplam koli (OrderLine'dan - ana depo ile ayni)
+            total_carton = territory_loads.get(str(assignment.territory_id), 0)
+
+            # Tamamlanan koli (LoadsheetLine'dan - aktif ve tamamlanmis fisler)
             completed_carton = 0
             for dealer_data in territory_effective.values():
                 active_ls = dealer_data['active']
-                if active_ls:
+                if active_ls and active_ls.status == "loaded":
                     stmt = select(
                         func.sum(LoadsheetLine.qty_carton),
                         func.sum(LoadsheetLine.qty_pack)
@@ -290,11 +335,7 @@ async def get_station_detail(
                     result = session.exec(stmt).first()
                     carton = (result[0] or 0) if result else 0
                     pack = (result[1] or 0) if result else 0
-                    # Pack'i kartona cevir ve topla
-                    total = carton + (pack / 10)
-                    total_carton += total
-                    if active_ls.status == "loaded":
-                        completed_carton += total
+                    completed_carton += int(carton + (pack / 10))
 
             territories.append({
                 "territory_code": territory.code,
