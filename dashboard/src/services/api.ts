@@ -65,6 +65,38 @@ export interface StationDetail {
   }>;
 }
 
+export interface TerritoryTracking {
+  territory_id: string;
+  territory_display: string;
+  remaining_carton: number;
+  remaining_pack: number;
+  remaining_total: number;
+  prepared_carton: number;
+  prepared_pack: number;
+  prepared_total: number;
+}
+
+export interface ProductTracking {
+  product_code: string;
+  product_name: string;
+  stock_carton: number;
+  stock_pack: number;
+  stock_total: number;
+  territories: TerritoryTracking[];
+}
+
+export interface StationTracking {
+  station_id: string;
+  station_name: string;
+  territories: Array<{
+    id: string;
+    code: string;
+    display_number: string;
+    name: string;
+  }>;
+  products: ProductTracking[];
+}
+
 export interface TerritoryDetail {
   territory_code: string;
   territory_name: string;
@@ -211,6 +243,12 @@ class ApiService {
   // Territories
   async getTerritories() {
     const response = await this.client.get('/v1/territory-info/');
+    return response.data;
+  }
+
+  // Station Tracking (İstasyon Dağılımı)
+  async getStationTracking(stationId: string, cycleId: string): Promise<StationTracking> {
+    const response = await this.client.get(`/v1/stations/${stationId}/tracking/${cycleId}`);
     return response.data;
   }
 }

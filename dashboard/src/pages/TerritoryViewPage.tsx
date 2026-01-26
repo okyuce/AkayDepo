@@ -200,7 +200,19 @@ export default function TerritoryViewPage() {
             ) : (
               <div className="space-y-4">
                 {[...data.dealers]
-                  .sort((a, b) => (a.route_order || 999) - (b.route_order || 999))
+                  .sort((a, b) => {
+                    // 1. Önce bekleyenler (pending), sonra tamamlananlar (loaded)
+                    const statusOrder = (s: string) => s === 'pending' ? 0 : s === 'loaded' ? 1 : 2;
+                    const statusDiff = statusOrder(a.status) - statusOrder(b.status);
+                    if (statusDiff !== 0) return statusDiff;
+
+                    // 2. Aynı durumdaysa: revizyonlular önce
+                    const revDiff = (b.has_revision ? 1 : 0) - (a.has_revision ? 1 : 0);
+                    if (revDiff !== 0) return revDiff;
+
+                    // 3. Aynı grup içinde: rut sırasına göre
+                    return (a.route_order || 999) - (b.route_order || 999);
+                  })
                   .map((dealer) => {
                   const isExpanded = expandedDealers.has(dealer.dealer_code);
                   const productCount = dealer.products.length;

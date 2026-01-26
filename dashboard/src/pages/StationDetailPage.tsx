@@ -1,6 +1,6 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, Fragment } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { apiService, StationDetail } from '../services/api';
+import { apiService, StationDetail, StationTracking } from '../services/api';
 import { usePolling } from '../hooks/usePolling';
 
 const gradients = [
@@ -14,6 +14,8 @@ const gradients = [
 export default function StationDetailPage() {
   const { stationId } = useParams<{ stationId: string }>();
   const [cycleId, setCycleId] = useState<string | null>(null);
+  const [trackingData, setTrackingData] = useState<StationTracking | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   useEffect(() => {
     apiService.getActiveCycle().then((res) => {
@@ -34,6 +36,28 @@ export default function StationDetailPage() {
     enabled: !!stationId && !!cycleId,
   });
 
+  // Tracking verisini ayrı çek
+  useEffect(() => {
+    if (stationId && cycleId) {
+      setTrackingLoading(true);
+      apiService.getStationTracking(stationId, cycleId)
+        .then(setTrackingData)
+        .catch(console.error)
+        .finally(() => setTrackingLoading(false));
+    }
+  }, [stationId, cycleId]);
+
+  const handleRefresh = () => {
+    refresh();
+    if (stationId && cycleId) {
+      setTrackingLoading(true);
+      apiService.getStationTracking(stationId, cycleId)
+        .then(setTrackingData)
+        .catch(console.error)
+        .finally(() => setTrackingLoading(false));
+    }
+  };
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('tr-TR', {
       hour: '2-digit',
@@ -42,17 +66,8 @@ export default function StationDetailPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'loaded':
-        return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">Tamamlandı</span>;
-      case 'pending':
-        return <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Bekliyor</span>;
-      case 'cancelled':
-        return <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">İptal</span>;
-      default:
-        return <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">{status}</span>;
-    }
+  const formatNumber = (num: number) => {
+    return num.toFixed(1).replace(/\.0$/, '');
   };
 
   return (
@@ -64,7 +79,7 @@ export default function StationDetailPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Dashboard'a Don
+            Dashboard'a Dön
           </Link>
         </div>
 
@@ -74,7 +89,7 @@ export default function StationDetailPage() {
             <h1 className="text-3xl font-bold text-gray-800">
               {data?.station_name || 'İstasyon Detay'}
             </h1>
-            <p className="text-gray-500 mt-1">Bölge ve rut detayları</p>
+            <p className="text-gray-500 mt-1">Bölge ve ürün dağılımı</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -85,12 +100,12 @@ export default function StationDetailPage() {
               </div>
             )}
             <button
-              onClick={refresh}
-              disabled={isLoading}
+              onClick={handleRefresh}
+              disabled={isLoading || trackingLoading}
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:from-violet-400 disabled:to-purple-500 text-white rounded-xl shadow-lg shadow-violet-500/30 transition-all duration-200"
             >
               <svg
-                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
+                className={`w-4 h-4 ${isLoading || trackingLoading ? 'animate-spin' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -168,7 +183,7 @@ export default function StationDetailPage() {
 
                         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
-                            <p className="text-gray-500 text-xs">Fis</p>
+                            <p className="text-gray-500 text-xs">Fiş</p>
                             <p className="font-semibold text-gray-800">{territory.completed_loadsheets}/{territory.total_loadsheets}</p>
                           </div>
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
@@ -194,71 +209,137 @@ export default function StationDetailPage() {
               )}
             </div>
 
-            {/* Loadsheets Table */}
+            {/* İstasyon Dağılım Tablosu */}
             <div className="card p-6 animate-fade-in">
               <div className="flex items-center gap-4 mb-6">
                 <div className="stat-icon gradient-cyan">
                   <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Rutlar</h2>
-                  <p className="text-sm text-gray-500">{data.loadsheets.length} rut</p>
+                  <h2 className="text-lg font-semibold text-gray-800">Ürün Dağılımı</h2>
+                  <p className="text-sm text-gray-500">
+                    {trackingData ? `${trackingData.products.length} ürün • ${trackingData.territories.length} bölge` : 'Yükleniyor...'}
+                  </p>
                 </div>
               </div>
 
-              {data.loadsheets.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Bu istasyona rut atanmamış</p>
-              ) : (
+              {trackingLoading && !trackingData ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-cyan-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                </div>
+              ) : trackingData && trackingData.products.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-600 w-20">Rut No</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Bayi</th>
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-600">Krt</th>
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-600">Pkt</th>
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-600">Durum</th>
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th rowSpan={2} className="px-4 py-3 text-left text-sm font-bold text-gray-900 border border-gray-300">
+                          Ürün Kodu
+                        </th>
+                        <th rowSpan={2} className="px-4 py-3 text-center text-sm font-bold text-gray-900 border border-gray-300 bg-blue-50">
+                          Anlık Stok
+                        </th>
+                        {trackingData.territories.map((territory) => (
+                          <th key={territory.id} colSpan={2} className="px-4 py-2 text-center text-sm font-bold text-gray-900 border border-gray-300">
+                            {territory.code}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr>
+                        {trackingData.territories.map((territory) => (
+                          <Fragment key={territory.id}>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 border border-gray-300 bg-yellow-50">
+                              Kalan
+                            </th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 border border-gray-300 bg-green-50">
+                              Hazırlanan
+                            </th>
+                          </Fragment>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      {data.loadsheets
-                        .sort((a, b) => (a.route_number || 0) - (b.route_number || 0))
-                        .map((ls) => (
-                        <tr key={ls.id} className="border-b border-gray-100 hover:bg-violet-50/50 transition-colors">
-                          <td className="py-3 px-4 text-center">
-                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-lg shadow-md">
-                              {ls.route_number || '-'}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="font-medium text-gray-800">{ls.dealer_name}</div>
-                              {ls.has_revision && (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                                  Rev {ls.revision_count}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">{ls.dealer_code}</div>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className="font-semibold text-gray-800">{ls.total_carton}</span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {ls.total_pack > 0 ? (
-                              <span className="px-2 py-1 bg-amber-100 text-amber-700 text-sm font-medium rounded-lg">{ls.total_pack}</span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center">{getStatusBadge(ls.status)}</td>
-                        </tr>
-                      ))}
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {trackingData.products.map((product, idx) => {
+                        const totalRemaining = product.territories.reduce(
+                          (sum, t) => sum + t.remaining_total, 0
+                        );
+                        const isStockInsufficient = totalRemaining > product.stock_total;
+                        const stockDifference = product.stock_total - totalRemaining;
+
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900 border border-gray-300">
+                              <div className="flex justify-between items-center">
+                                <span>{product.product_code}</span>
+                                {stockDifference !== 0 && (
+                                  <span className={`text-xs font-bold ${
+                                    stockDifference < 0 ? 'text-red-600' : 'text-green-600'
+                                  }`}>
+                                    {stockDifference > 0 ? '+' : ''}{formatNumber(stockDifference)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className={`px-4 py-2 text-center text-sm font-semibold border border-gray-300 ${
+                              isStockInsufficient
+                                ? 'bg-red-600 text-white'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              {formatNumber(product.stock_total)}
+                            </td>
+                            {product.territories.map((tData) => (
+                              <Fragment key={tData.territory_id}>
+                                <td className="px-3 py-2 text-center text-sm border border-gray-300 bg-yellow-50">
+                                  {tData.remaining_total > 0 ? formatNumber(tData.remaining_total) : '0'}
+                                </td>
+                                <td className="px-3 py-2 text-center text-sm border border-gray-300 bg-green-50">
+                                  {tData.prepared_total > 0 ? formatNumber(tData.prepared_total) : '0'}
+                                </td>
+                              </Fragment>
+                            ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
+                    <tfoot className="bg-gray-200">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-bold text-gray-900 border border-gray-300">
+                          Toplam
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-blue-700 border border-gray-300 bg-blue-50">
+                          {formatNumber(trackingData.products.reduce((sum, p) => sum + p.stock_total, 0))}
+                        </td>
+                        {trackingData.territories.map((territory) => {
+                          const remainingTotal = trackingData.products.reduce((sum, product) => {
+                            const tData = product.territories.find(t => t.territory_id === territory.id);
+                            return sum + (tData?.remaining_total || 0);
+                          }, 0);
+                          const preparedTotal = trackingData.products.reduce((sum, product) => {
+                            const tData = product.territories.find(t => t.territory_id === territory.id);
+                            return sum + (tData?.prepared_total || 0);
+                          }, 0);
+                          return (
+                            <Fragment key={territory.id}>
+                              <td className="px-3 py-3 text-center text-sm font-bold text-gray-900 border border-gray-300 bg-yellow-50">
+                                {formatNumber(remainingTotal)}
+                              </td>
+                              <td className="px-3 py-3 text-center text-sm font-bold text-gray-900 border border-gray-300 bg-green-50">
+                                {formatNumber(preparedTotal)}
+                              </td>
+                            </Fragment>
+                          );
+                        })}
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">Ürün dağılım verisi bulunamadı</p>
               )}
             </div>
           </div>
