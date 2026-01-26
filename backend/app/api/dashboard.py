@@ -164,21 +164,26 @@ async def get_dashboard_summary(
             station_loadsheets = [ls for ls in loadsheets if ls.assignment_id in station_assignment_ids]
             station_effective = get_effective_loadsheets(station_loadsheets, session)
 
-            # Gercek toplam ve tamamlanan kolileri hesapla (aktif fislerden)
+            # Gercek toplam ve tamamlanan kolileri hesapla (aktif fislerden, pack dahil)
+            # Pack'i kartona ceviriyoruz: 10 pack = 1 karton
             total_carton = 0
             completed_carton = 0
             for dealer_data in station_effective.values():
                 active_ls = dealer_data['active']
                 if active_ls:
-                    # Loadsheet satirlarindan toplam koli hesapla
-                    stmt = select(func.sum(LoadsheetLine.qty_carton)).where(
-                        LoadsheetLine.loadsheet_id == active_ls.id
-                    )
+                    # Loadsheet satirlarindan toplam koli ve pack hesapla
+                    stmt = select(
+                        func.sum(LoadsheetLine.qty_carton),
+                        func.sum(LoadsheetLine.qty_pack)
+                    ).where(LoadsheetLine.loadsheet_id == active_ls.id)
                     result = session.exec(stmt).first()
-                    carton = result or 0
-                    total_carton += carton
+                    carton = (result[0] or 0) if result else 0
+                    pack = (result[1] or 0) if result else 0
+                    # Pack'i kartona cevir ve topla
+                    total = carton + (pack / 10)
+                    total_carton += total
                     if active_ls.status == "loaded":
-                        completed_carton += carton
+                        completed_carton += total
 
             data["total_carton"] = total_carton
             data["completed_carton"] = completed_carton
@@ -271,19 +276,25 @@ async def get_station_detail(
             total_ls = len(active_ls_list)
             completed_ls = len([ls for ls in active_ls_list if ls.status == "loaded"])
 
-            # Toplam koli (sadece aktif fislerden)
+            # Toplam koli (sadece aktif fislerden, pack dahil)
+            # Pack'i kartona ceviriyoruz: 10 pack = 1 karton
             total_carton = 0
             completed_carton = 0
             for dealer_data in territory_effective.values():
                 active_ls = dealer_data['active']
                 if active_ls:
-                    stmt = select(func.sum(LoadsheetLine.qty_carton)).where(
-                        LoadsheetLine.loadsheet_id == active_ls.id
-                    )
-                    carton = session.exec(stmt).first() or 0
-                    total_carton += carton
+                    stmt = select(
+                        func.sum(LoadsheetLine.qty_carton),
+                        func.sum(LoadsheetLine.qty_pack)
+                    ).where(LoadsheetLine.loadsheet_id == active_ls.id)
+                    result = session.exec(stmt).first()
+                    carton = (result[0] or 0) if result else 0
+                    pack = (result[1] or 0) if result else 0
+                    # Pack'i kartona cevir ve topla
+                    total = carton + (pack / 10)
+                    total_carton += total
                     if active_ls.status == "loaded":
-                        completed_carton += carton
+                        completed_carton += total
 
             territories.append({
                 "territory_code": territory.code,
