@@ -245,7 +245,7 @@ async def get_dashboard_summary(
         "loadsheet_stats": loadsheet_stats,
         "station_summary": station_summary,
         "last_import": last_import,
-        "last_updated": datetime.utcnow().isoformat() + "Z"
+        "last_updated": datetime.now().isoformat()
     }
 
 

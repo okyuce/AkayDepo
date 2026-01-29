@@ -11,7 +11,7 @@ class Cycle(SQLModel, table=True):
     cycle_no: int = Field(index=True)  # 1, 2, 3
     run_time: str = Field(index=True)  # "14:00", "16:00", "17:00"
     plan_date: date = Field(index=True)
-    imported_at: datetime = Field(default_factory=datetime.utcnow)
+    imported_at: datetime = Field(default_factory=datetime.now)
     status: str = Field(default="active")  # active, completed, archived
     completed_at: Optional[datetime] = None
     

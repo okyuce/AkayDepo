@@ -11,8 +11,8 @@ class Territory(SQLModel, table=True):
     code: str = Field(unique=True, index=True)  # TERR030707-Sille
     name: str  # Sille
     display_number: str = Field(index=True)  # T07 (paket numarası için)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     
     class Config:
         json_schema_extra = {

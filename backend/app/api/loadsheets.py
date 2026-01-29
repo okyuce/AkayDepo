@@ -394,8 +394,8 @@ async def complete_loadsheet(
 
     # Durumu güncelle
     loadsheet.status = "loaded"
-    loadsheet.loaded_at = datetime.utcnow()
-    loadsheet.completed_at = datetime.utcnow()
+    loadsheet.loaded_at = datetime.now()
+    loadsheet.completed_at = datetime.now()
     session.add(loadsheet)
     
     # STOK DÜŞÜRME: Pack-equivalent ile atomik düşüm (1 karton = 10 paket)
@@ -442,7 +442,7 @@ async def complete_loadsheet(
             # Normalize ederek geri yaz (karton, paket)
             inventory.quantity_carton = new_total // 10
             inventory.quantity_pack = new_total % 10
-            inventory.updated_at = datetime.utcnow()
+            inventory.updated_at = datetime.now()
             session.add(inventory)
 
             # Stok hareket logu kaydet

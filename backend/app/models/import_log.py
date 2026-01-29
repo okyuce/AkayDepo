@@ -13,4 +13,4 @@ class CycleImport(SQLModel, table=True):
     filename: str
     file_size: int
     file_hash: str  # sha256
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=datetime.now)

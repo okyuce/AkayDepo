@@ -121,7 +121,7 @@ class CycleManager:
             raise Exception("Döngü bulunamadı")
         
         cycle.status = "completed"
-        cycle.completed_at = datetime.utcnow()
+        cycle.completed_at = datetime.now()
         self.session.add(cycle)
         self.session.commit()
         self.session.refresh(cycle)

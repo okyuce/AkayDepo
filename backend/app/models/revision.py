@@ -17,7 +17,7 @@ class RevisionDiff(SQLModel, table=True):
     qty_new_carton: int  # Yeni miktar
     qty_change_carton: int  # new - old (pozitif=artış, negatif=azalış)
     change_type: str  # addition, reduction, new_product, removed_product
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
     
     class Config:
         json_schema_extra = {

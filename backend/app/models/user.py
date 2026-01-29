@@ -20,8 +20,8 @@ class User(SQLModel, table=True):
     role: str = Field(nullable=False)  # "admin" veya "tablet"
     station_id: Optional[UUID] = Field(default=None, foreign_key="stations.id")  # Tablet için dolu
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     
     @staticmethod
     def hash_password(password: str) -> str:
@@ -35,4 +35,4 @@ class User(SQLModel, table=True):
     def set_password(self, password: str):
         """Şifreyi değiştir"""
         self.password_hash = User.hash_password(password)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()

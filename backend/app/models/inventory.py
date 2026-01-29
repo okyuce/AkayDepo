@@ -15,7 +15,7 @@ class StationInventory(SQLModel, table=True):
     product_id: UUID = Field(foreign_key="products.id", nullable=False)
     quantity_carton: int = Field(default=0)
     quantity_pack: int = Field(default=0)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
     
     # Unique constraint: Bir istasyonda bir ürün için tek kayıt
     class Config:
@@ -51,5 +51,5 @@ class StockMovement(SQLModel, table=True):
     after_carton: int = Field(default=0)
     after_pack: int = Field(default=0)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=datetime.now, index=True)
     note: Optional[str] = Field(default=None)

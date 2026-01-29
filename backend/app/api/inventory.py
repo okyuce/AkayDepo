@@ -91,7 +91,7 @@ async def update_station_inventory(
             # Güncelle
             existing.quantity_carton = qty_carton
             existing.quantity_pack = qty_pack
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now()
             session.add(existing)
 
             # Stok hareket logu kaydet (sadece değişiklik varsa)
@@ -122,7 +122,7 @@ async def update_station_inventory(
                 quantity_carton=qty_carton,
                 quantity_pack=qty_pack
             )
-            new_inv.updated_at = datetime.utcnow()
+            new_inv.updated_at = datetime.now()
             session.add(new_inv)
 
             # İlk kayıt için hareket logu (sıfırdan ekleme)

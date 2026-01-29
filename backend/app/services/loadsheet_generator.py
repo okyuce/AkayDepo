@@ -433,7 +433,7 @@ class LoadsheetGenerator:
                 # Normalize ederek geri yaz
                 inventory.quantity_carton = new_total // 10
                 inventory.quantity_pack = new_total % 10
-                inventory.updated_at = datetime.utcnow()
+                inventory.updated_at = datetime.now()
                 self.session.add(inventory)
 
                 # Stok hareket logu kaydet (refund)

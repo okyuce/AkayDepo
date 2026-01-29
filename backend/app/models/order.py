@@ -42,7 +42,7 @@ class Order(SQLModel, table=True):
     import_batch: int = Field(default=1)  # 1, 2, 3... (hangi Excel import'u)
     is_revision: bool = Field(default=False)  # Bu sipariş revizyon mu?
     previous_order_id: Optional[UUID] = None  # Revizyon ise önceki sipariş
-    imported_at: datetime = Field(default_factory=datetime.utcnow)
+    imported_at: datetime = Field(default_factory=datetime.now)
 
 class OrderLine(SQLModel, table=True):
     """Sipariş satırı modeli"""

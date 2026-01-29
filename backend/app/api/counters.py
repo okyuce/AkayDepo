@@ -52,7 +52,7 @@ async def save_counter_reading(
             cycle_id=cycle.id,
             station_id=station_id,
             counter_value=reading.counter_value,
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now()
         )
         
         session.add(counter)
