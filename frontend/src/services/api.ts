@@ -123,10 +123,18 @@ class ApiService {
   }
 
   // Loadsheets
-  async getStationLoadsheets(stationId: string, cycleId?: string, importBatch?: number) {
-    const params: any = {};
+  async getStationLoadsheets(
+    stationId: string,
+    cycleId?: string,
+    importBatch?: number,
+    sku?: string[],
+    skuMatch?: 'or' | 'and'
+  ) {
+    const params: Record<string, string | number> = {};
     if (cycleId) params.cycle_id = cycleId;
     if (importBatch !== undefined && importBatch !== null) params.import_batch = importBatch;
+    if (sku && sku.length > 0) params.sku = sku.join(',');
+    if (skuMatch) params.sku_match = skuMatch;
     const response = await this.client.get(`/v1/loadsheets/station/${stationId}`, { params });
     return response.data;
   }

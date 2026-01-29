@@ -22,14 +22,18 @@ async def get_station_loadsheets(
     station_id: UUID,
     cycle_id: Optional[UUID] = None,
     import_batch: Optional[int] = None,
+    sku: Optional[str] = None,
+    sku_match: Optional[str] = "or",
     session: Session = Depends(get_session)
 ):
     """
     İstasyonun fişlerini getir (Tablet görünümü için)
-    
+
     Args:
         station_id: İstasyon ID
         cycle_id: Döngü ID (opsiyonel, yoksa son aktif döngü)
+        sku: Virgülle ayrılmış ürün kodları (opsiyonel)
+        sku_match: 'or' veya 'and' - SKU eşleşme modu (varsayılan: or)
     """
     try:
         # Cycle belirle
@@ -57,11 +61,17 @@ async def get_station_loadsheets(
                 "completed_carton": 0
             }
         
+        # SKU filtresi için ürün kodlarını parse et
+        sku_codes = []
+        if sku:
+            sku_codes = [s.strip().upper() for s in sku.split(',') if s.strip()]
+        sku_match_mode = sku_match.lower() if sku_match else "or"
+
         # Territory bazında fişleri grupla
         territories_data = []
         total_carton = 0
         completed_carton = 0
-        
+
         for assignment in assignments:
             territory = session.get(Territory, assignment.territory_id)
             
@@ -98,14 +108,33 @@ async def get_station_loadsheets(
             
             for ls in loadsheets:
                 dealer = session.get(Dealer, ls.dealer_id)
-                
+
                 # Toplam karton ve paket hesapla
                 stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == ls.id)
                 lines = session.exec(stmt).all()
+
+                # SKU filtresi uygula
+                if sku_codes:
+                    # Bu loadsheet'teki ürün kodlarını al
+                    line_product_codes = set()
+                    for line in lines:
+                        product = session.get(Product, line.product_id)
+                        if product:
+                            line_product_codes.add(product.code.upper())
+
+                    if sku_match_mode == "and":
+                        # AND: Seçilen TÜM SKU'lar bu loadsheet'te olmalı
+                        if not all(sku_code in line_product_codes for sku_code in sku_codes):
+                            continue  # Bu loadsheet'i atla
+                    else:
+                        # OR: Seçilen SKU'lardan en az biri olmalı
+                        if not any(sku_code in line_product_codes for sku_code in sku_codes):
+                            continue  # Bu loadsheet'i atla
+
                 ls_total_carton = sum(line.qty_carton for line in lines)
                 ls_total_pack = sum(line.qty_pack for line in lines)
                 ls_total_carton_equiv = sum(line.qty_carton + (line.qty_pack / 10) for line in lines)
-                
+
                 loadsheet_data.append({
                     "id": str(ls.id),
                     "package_number": ls.package_number,

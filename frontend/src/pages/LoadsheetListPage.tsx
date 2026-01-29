@@ -2,7 +2,7 @@
  * Loadsheet List Page
  * İstasyon bazında fiş listesi ve detay görünümü
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
@@ -50,6 +50,12 @@ interface DealerGroup {
   cardColor: 'gray' | 'green' | 'orange';
 }
 
+interface Product {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export default function LoadsheetListPage() {
   const { user } = useAuthStore();
   const [stations, setStations] = useState<Station[]>([]);
@@ -64,9 +70,40 @@ export default function LoadsheetListPage() {
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [expandedDealerCode, setExpandedDealerCode] = useState<string | null>(null);
 
+  // SKU filtresi state'leri
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  const [skuDropdownOpen, setSkuDropdownOpen] = useState(false);
+  const skuDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadActiveCycle();
+    loadProducts();
   }, []);
+
+  // SKU dropdown dışına tıklandığında kapat
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (skuDropdownRef.current && !skuDropdownRef.current.contains(event.target as Node)) {
+        setSkuDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const productList = await apiService.getProductOrder();
+      setProducts(productList.map((p: { id: string; code: string; name: string }) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name
+      })));
+    } catch (err) {
+      console.error('Ürünler yüklenemedi:', err);
+    }
+  };
 
   const loadActiveCycle = async () => {
     try {
@@ -112,14 +149,26 @@ export default function LoadsheetListPage() {
     }
   };
 
-  const loadLoadsheets = async (stationId: string, batchOverride?: string, territoryOverride?: string) => {
+  const loadLoadsheets = async (
+    stationId: string,
+    batchOverride?: string,
+    territoryOverride?: string,
+    skuOverride?: string[]
+  ) => {
     if (!cycleId) return;
-    
+
     setIsLoading(true);
     try {
       const batchNum = batchOverride !== undefined ? (batchOverride ? parseInt(batchOverride, 10) : undefined)
         : (selectedBatch ? parseInt(selectedBatch, 10) : undefined);
-      const data = await apiService.getStationLoadsheets(stationId, cycleId, batchNum);
+      const skuList = skuOverride !== undefined ? skuOverride : selectedSkus;
+      const data = await apiService.getStationLoadsheets(
+        stationId,
+        cycleId,
+        batchNum,
+        skuList.length > 0 ? skuList : undefined,
+        skuList.length > 0 ? 'and' : undefined
+      );
       // territories içindeki tüm loadsheet'leri düzleştir ve territory bilgisini ekle
       const allLoadsheets: Loadsheet[] = [];
       if (data.territories) {
@@ -230,13 +279,14 @@ export default function LoadsheetListPage() {
     // Filtreleri sıfırla
     setSelectedTerritoryCode('');
     setSelectedBatch('');
+    setSelectedSkus([]);
     // Eski verileri temizle (UI yanılmasın)
     setDealerGroups([]);
     setAvailableTerritories([]);
     setLoadsheets([]);
     // Yeni istasyon için batch'i "Tümü" (override) olarak zorla yükle
     if (stationId) {
-      loadLoadsheets(stationId, '', '');
+      loadLoadsheets(stationId, '', '', []);
     }
   };
 
@@ -359,7 +409,7 @@ export default function LoadsheetListPage() {
                     </div>
 
                     {selectedStationId && (
-                      <div className="flex gap-6">
+                      <div className="flex gap-4 flex-wrap">
                         {availableTerritories.length > 0 && (
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -368,7 +418,7 @@ export default function LoadsheetListPage() {
                             <select
                           value={selectedTerritoryCode}
                           onChange={(e) => handleTerritoryChange(e.target.value)}
-                          className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="">Tüm Territory'ler</option>
                           {availableTerritories.map((territory) => (
@@ -385,7 +435,7 @@ export default function LoadsheetListPage() {
                           <select
                             value={selectedBatch}
                             onChange={(e) => { const v = e.target.value; setSelectedBatch(v); if (selectedStationId) loadLoadsheets(selectedStationId, v); }}
-                            className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">Tümü</option>
                             {imports.map(imp => (
@@ -394,6 +444,62 @@ export default function LoadsheetListPage() {
                               </option>
                             ))}
                           </select>
+                        </div>
+                        {/* SKU Filtresi */}
+                        <div className="relative" ref={skuDropdownRef}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">SKU Filtresi</label>
+                          <button
+                            type="button"
+                            onClick={() => setSkuDropdownOpen(!skuDropdownOpen)}
+                            className="w-48 border border-gray-300 rounded-md px-4 py-2 text-left bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center"
+                          >
+                            <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                              {selectedSkus.length === 0 ? 'Seçiniz...' : `${selectedSkus.length} ürün`}
+                            </span>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          {skuDropdownOpen && (
+                            <div className="absolute z-50 mt-1 w-72 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+                                <span className="text-xs text-gray-500">{selectedSkus.length} seçili</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSkus([]);
+                                    if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, []);
+                                  }}
+                                  className="text-xs text-blue-600 hover:text-blue-800"
+                                >
+                                  Temizle
+                                </button>
+                              </div>
+                              {products.map((p) => (
+                                <label
+                                  key={p.id}
+                                  className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSkus.includes(p.code)}
+                                    onChange={(e) => {
+                                      const newSkus = e.target.checked
+                                        ? [...selectedSkus, p.code]
+                                        : selectedSkus.filter(s => s !== p.code);
+                                      setSelectedSkus(newSkus);
+                                      if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, newSkus);
+                                    }}
+                                    className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="text-sm">
+                                    <span className="font-medium">{p.code}</span>
+                                    <span className="text-gray-500 ml-1">- {p.name}</span>
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
