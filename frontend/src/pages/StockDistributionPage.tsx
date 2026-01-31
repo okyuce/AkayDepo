@@ -343,6 +343,20 @@ export default function StockDistributionPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot className="bg-blue-50 border-t-2 border-blue-200">
+                    <tr>
+                      <td className="px-4 py-3 text-sm font-bold text-gray-900" colSpan={2}>
+                        TOPLAM
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-blue-700">
+                        {products.reduce((sum, p) => sum + p.quantity_carton, 0)} Karton
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-blue-700">
+                        {products.reduce((sum, p) => sum + p.quantity_pack, 0)} Paket
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500"></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
