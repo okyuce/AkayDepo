@@ -86,9 +86,9 @@ class ExcelParser:
         self.df['Paket'] = self.df['Paket'].fillna(0).astype(int)
         self.df['Karton'] = self.df['Karton'].fillna(0).astype(int)
         
-        # Tarihleri parse et
-        self.df['SiparişTarihi'] = pd.to_datetime(self.df['SiparişTarihi'])
-        self.df['TeslimatTarihi'] = pd.to_datetime(self.df['TeslimatTarihi'])
+        # Tarihleri parse et (dayfirst=True: Türk tarih formatı DD.MM.YYYY)
+        self.df['SiparişTarihi'] = pd.to_datetime(self.df['SiparişTarihi'], dayfirst=True)
+        self.df['TeslimatTarihi'] = pd.to_datetime(self.df['TeslimatTarihi'], dayfirst=True)
         
         # String kolonları temizle (trim)
         string_columns = ['Territory', 'SiparişKodu', 'BayiKodu', 'BayiAdı', 
