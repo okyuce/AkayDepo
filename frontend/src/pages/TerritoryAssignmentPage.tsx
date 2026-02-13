@@ -182,10 +182,10 @@ export default function TerritoryAssignmentPage() {
     }
   };
 
-  if (loading) return (<div className="min-h-screen bg-gray-100"><Navbar /><div className="p-6">Yükleniyor...</div></div>);
+  if (loading) return (<div className="min-h-screen bg-gray-100 dark:bg-gray-900"><Navbar /><div className="p-6 text-gray-900 dark:text-gray-100">Yükleniyor...</div></div>);
 
   return (
-    <div className="min-h-screen bg-gray-100" onDragOver={(e) => e.preventDefault()}>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900" onDragOver={(e) => e.preventDefault()}>
       <Navbar />
       
       {/* Toast Notification */}
@@ -217,11 +217,11 @@ export default function TerritoryAssignmentPage() {
       
       <div className="p-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Territory Atama</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Territory Atama</h1>
           <div className="flex items-center space-x-4">
             {/* Toggle Switch for Auto/Manual Mode */}
             <div className="flex items-center space-x-3">
-              <span className={`text-sm font-medium ${!autoPlanning ? 'text-blue-600' : 'text-gray-500'}`}>Manuel</span>
+              <span className={`text-sm font-medium ${!autoPlanning ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>Manuel</span>
               <button
                 onClick={() => {
                   // Aktif döngü varsa her iki yönde de mod değiştirmeyi engelle
@@ -246,7 +246,7 @@ export default function TerritoryAssignmentPage() {
                   }`}
                 />
               </button>
-              <span className={`text-sm font-medium ${autoPlanning ? 'text-blue-600' : 'text-gray-500'}`}>Otomatik</span>
+              <span className={`text-sm font-medium ${autoPlanning ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>Otomatik</span>
             </div>
             <button
               disabled={saving}
@@ -259,27 +259,27 @@ export default function TerritoryAssignmentPage() {
 
         {/* Info Message */}
         {autoPlanning && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <p className="text-blue-800 text-sm">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4">
+            <p className="text-blue-800 dark:text-blue-300 text-sm">
               <strong>Otomatik Mod:</strong> İstasyon atamaları devre dışı. Plan oluşturulduğunda sistem otomatik olarak territory\'leri istasyonlara dağıtacak.
             </p>
           </div>
         )}
 
         {/* Pool */}
-        <div className={`bg-white rounded-lg shadow p-4 mb-6 ${autoPlanning ? 'opacity-50' : ''}`} onDrop={autoPlanning ? undefined : onDropToPool}>
-          <h2 className="font-semibold mb-3">Territory</h2>
+        <div className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 ${autoPlanning ? 'opacity-50' : ''}`} onDrop={autoPlanning ? undefined : onDropToPool}>
+          <h2 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Territory</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {poolTerritories.map(t => (
               <div key={t.code}
                    draggable={!autoPlanning}
                    onDragStart={(e) => onDragStart(e, t.code)}
-                   className="px-3 py-1 rounded border text-sm bg-gray-100 cursor-move text-gray-800">
+                   className="px-3 py-1 rounded border text-sm bg-gray-100 dark:bg-gray-700 cursor-move text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600">
                 {t.display_number} {t.name}
               </div>
             ))}
             {poolTerritories.length === 0 && (
-              <div className="text-gray-500 text-sm">Havuz boş</div>
+              <div className="text-gray-500 dark:text-gray-400 text-sm">Havuz boş</div>
             )}
           </div>
         </div>
@@ -300,7 +300,7 @@ export default function TerritoryAssignmentPage() {
         {/* Stations */}
         <div className="space-y-4">
           {stations.map((s, idx) => (
-            <div key={s.id} className="bg-white rounded-lg shadow">
+            <div key={s.id} className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <div className="flex items-center justify-between px-4 py-2 rounded-t" style={{ backgroundColor: STATION_COLORS[idx % STATION_COLORS.length], color: '#fff' }}>
                 <div className="font-bold">{s.name}</div>
                 <div className="flex items-center space-x-3">
@@ -325,14 +325,14 @@ export default function TerritoryAssignmentPage() {
                     <div key={t.code}
                          draggable={!autoPlanning}
                          onDragStart={(e) => onDragStart(e, t.code)}
-                         className="px-3 py-1 rounded border text-sm cursor-move"
-                         style={{ backgroundColor: STATION_COLORS[idx % STATION_COLORS.length] + '33', borderColor: STATION_COLORS[idx % STATION_COLORS.length], color: '#333' }}
+                         className="px-3 py-1 rounded border text-sm cursor-move text-gray-900 dark:text-gray-100"
+                         style={{ backgroundColor: STATION_COLORS[idx % STATION_COLORS.length] + '33', borderColor: STATION_COLORS[idx % STATION_COLORS.length] }}
                     >
                       {t.display_number} {t.name}
                     </div>
                   ))}
                   {(!byStation[s.id] || byStation[s.id].length === 0) && (
-                    <div className="text-gray-400 text-sm">Sürükleyip bırakın…</div>
+                    <div className="text-gray-400 dark:text-gray-500 text-sm">Sürükleyip bırakın…</div>
                   )}
                 </div>
               </div>

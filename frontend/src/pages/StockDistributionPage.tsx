@@ -171,7 +171,7 @@ export default function StockDistributionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
 
       {/* Toast */}
@@ -184,17 +184,17 @@ export default function StockDistributionPage() {
       )}
 
       <div className="p-6 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Stok Dağılımı</h1>
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">Stok Dağılımı</h1>
 
         {/* İstasyon Seçimi */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             İstasyon Seçin
           </label>
           <select
             value={selectedStationId}
             onChange={(e) => setSelectedStationId(e.target.value)}
-            className="w-full md:w-96 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full md:w-96 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           >
             <option value="">-- İstasyon Seçin --</option>
             {stations.map(s => (
@@ -207,9 +207,9 @@ export default function StockDistributionPage() {
 
         {/* Stok Tablosu */}
         {selectedStationId && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 {stationName} - Ürün Stokları
               </h2>
               <div className="flex space-x-3">
@@ -241,7 +241,7 @@ export default function StockDistributionPage() {
 
             {/* Mod Seçimi */}
             <div className="mb-4 flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">Mod:</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Mod:</span>
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="radio"
@@ -251,7 +251,7 @@ export default function StockDistributionPage() {
                   onChange={(e) => setMode(e.target.value as StockMode)}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="text-sm text-gray-700">Set (Normal)</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Set (Normal)</span>
               </label>
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -262,7 +262,7 @@ export default function StockDistributionPage() {
                   onChange={(e) => setMode(e.target.value as StockMode)}
                   className="w-4 h-4 text-green-600"
                 />
-                <span className="text-sm text-gray-700">Ekleme (+)</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Ekleme (+)</span>
               </label>
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -273,50 +273,50 @@ export default function StockDistributionPage() {
                   onChange={(e) => setMode(e.target.value as StockMode)}
                   className="w-4 h-4 text-red-600"
                 />
-                <span className="text-sm text-gray-700">Eksiltme (-)</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Eksiltme (-)</span>
               </label>
             </div>
 
             {/* Mod Açıklaması */}
-            <div className="mb-4 text-sm text-gray-600 bg-gray-50 p-3 rounded">
+            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-3 rounded">
               {mode === 'set' && '❏ Normal mod: Girdiğiniz değer direkt stoğa set edilir.'}
               {mode === 'add' && '➕ Ekleme modu: Girdiğiniz değer mevcut stoğa eklenir.'}
               {mode === 'subtract' && '➖ Eksiltme modu: Girdiğiniz değer mevcut stoktan çıkarılır.'}
             </div>
 
             {loading ? (
-              <div className="text-center py-8 text-gray-500">Yükleniyor...</div>
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">Yükleniyor...</div>
             ) : products.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">Henüz ürün yok</div>
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">Henüz ürün yok</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Ürün Kodu
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Ürün Adı
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Karton
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Paket
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Son Güncelleme
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                     {products.map((product) => (
-                      <tr key={product.product_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      <tr key={product.product_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                           {product.product_code}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {product.product_name}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -325,7 +325,7 @@ export default function StockDistributionPage() {
                             min="0"
                             value={product.quantity_carton}
                             onChange={(e) => handleQuantityChange(product.product_id, 'quantity_carton', e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           />
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -334,27 +334,27 @@ export default function StockDistributionPage() {
                             min="0"
                             value={product.quantity_pack}
                             onChange={(e) => handleQuantityChange(product.product_id, 'quantity_pack', e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           />
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                           {product.updated_at ? new Date(product.updated_at).toLocaleString('tr-TR') : '-'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-blue-50 border-t-2 border-blue-200">
+                  <tfoot className="bg-blue-50 dark:bg-blue-900/30 border-t-2 border-blue-200 dark:border-blue-700">
                     <tr>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900" colSpan={2}>
+                      <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100" colSpan={2}>
                         TOPLAM
                       </td>
-                      <td className="px-4 py-3 text-sm font-bold text-blue-700">
+                      <td className="px-4 py-3 text-sm font-bold text-blue-700 dark:text-blue-300">
                         {products.reduce((sum, p) => sum + p.quantity_carton, 0)} Karton
                       </td>
-                      <td className="px-4 py-3 text-sm font-bold text-blue-700">
+                      <td className="px-4 py-3 text-sm font-bold text-blue-700 dark:text-blue-300">
                         {products.reduce((sum, p) => sum + p.quantity_pack, 0)} Paket
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500"></td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400"></td>
                     </tr>
                   </tfoot>
                 </table>

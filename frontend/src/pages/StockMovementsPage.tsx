@@ -277,14 +277,14 @@ export default function StockMovementsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
       <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Stok Hareketleri</h1>
-          <p className="text-gray-600">{cycleName}</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Stok Hareketleri</h1>
+          <p className="text-gray-600 dark:text-gray-400">{cycleName}</p>
         </div>
         <button
           onClick={handleExport}
@@ -299,17 +299,17 @@ export default function StockMovementsPage() {
       </div>
 
       {/* Filtreler */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           {/* SKU Filtresi - Çoktan Seçmeli */}
           <div className="relative" ref={skuDropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SKU</label>
             <button
               type="button"
               onClick={() => setSkuDropdownOpen(!skuDropdownOpen)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-left bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex justify-between items-center"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex justify-between items-center"
             >
-              <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+              <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'}>
                 {selectedSkus.length === 0 ? 'Seçiniz...' : `${selectedSkus.length} ürün seçili`}
               </span>
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,12 +317,12 @@ export default function StockMovementsPage() {
               </svg>
             </button>
             {skuDropdownOpen && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-                <div className="p-2 border-b border-gray-200">
+              <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="p-2 border-b border-gray-200 dark:border-gray-600">
                   <button
                     type="button"
                     onClick={() => { setSelectedSkus([]); setPage(0); }}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                   >
                     Temizle
                   </button>
@@ -330,7 +330,7 @@ export default function StockMovementsPage() {
                 {products.map((p) => (
                   <label
                     key={p.id}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -343,11 +343,11 @@ export default function StockMovementsPage() {
                         }
                         setPage(0);
                       }}
-                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="mr-2 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
                     />
                     <span className="text-sm">
-                      <span className="font-medium">{p.code}</span>
-                      <span className="text-gray-500 ml-1">- {p.name}</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{p.code}</span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">- {p.name}</span>
                     </span>
                   </label>
                 ))}
@@ -357,11 +357,11 @@ export default function StockMovementsPage() {
 
           {/* İstasyon Filtresi */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">İstasyon</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">İstasyon</label>
             <select
               value={stationFilter}
               onChange={(e) => handleFilterChange(setStationFilter, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Tümü</option>
               {stations.map((s) => (
@@ -372,11 +372,11 @@ export default function StockMovementsPage() {
 
           {/* Territory Filtresi */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Territory</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Territory</label>
             <select
               value={territoryFilter}
               onChange={(e) => handleFilterChange(setTerritoryFilter, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Tümü</option>
               {territories.map((t) => (
@@ -387,11 +387,11 @@ export default function StockMovementsPage() {
 
           {/* Bayi Filtresi */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bayi</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bayi</label>
             <select
               value={dealerFilter}
               onChange={(e) => handleFilterChange(setDealerFilter, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Tümü</option>
               {dealers.map((d) => (
@@ -402,11 +402,11 @@ export default function StockMovementsPage() {
 
           {/* Hareket Tipi Filtresi */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hareket Tipi</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hareket Tipi</label>
             <select
               value={typeFilter}
               onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">Tümü</option>
               <option value="deduction">Düşüm</option>
@@ -418,56 +418,56 @@ export default function StockMovementsPage() {
 
           {/* Toplam */}
           <div className="flex items-end">
-            <div className="text-sm text-gray-600">
-              Toplam: <span className="font-semibold text-gray-800">{total}</span> hareket
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Toplam: <span className="font-semibold text-gray-800 dark:text-gray-200">{total}</span> hareket
             </div>
           </div>
         </div>
       </div>
 
       {/* Tablo */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Yükleniyor...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Yükleniyor...</div>
         ) : movements.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Hareket bulunamadı</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Hareket bulunamadı</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İstasyon</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Territory</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ürün</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fiş No</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tip</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Miktar</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Önceki</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Sonraki</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tarih</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">İstasyon</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Territory</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ürün</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fiş No</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tip</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Miktar</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Önceki</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sonraki</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                 {movements.map((m) => {
-                  const typeInfo = MOVEMENT_TYPE_LABELS[m.movement_type] || { label: m.movement_type, color: 'bg-gray-100 text-gray-800' };
+                  const typeInfo = MOVEMENT_TYPE_LABELS[m.movement_type] || { label: m.movement_type, color: 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200' };
                   const isPositive = m.movement_type === 'refund' || m.movement_type === 'manual_add';
 
                   return (
-                    <tr key={m.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {formatDate(m.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
                         {m.station_name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {m.territory_name}
                       </td>
                       <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{m.product_code}</div>
-                        <div className="text-gray-500 text-xs">{m.product_name}</div>
+                        <div className="font-medium text-gray-900 dark:text-gray-100">{m.product_code}</div>
+                        <div className="text-gray-500 dark:text-gray-400 text-xs">{m.product_name}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {m.package_number || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -475,14 +475,14 @@ export default function StockMovementsPage() {
                           {typeInfo.label}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 text-sm text-right font-medium whitespace-nowrap ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                      <td className={`px-4 py-3 text-sm text-right font-medium whitespace-nowrap ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                         {isPositive ? '+' : '-'}{m.quantity_carton} krt
                         {m.quantity_pack > 0 && <span className="text-gray-400 ml-1">/ {m.quantity_pack} pkt</span>}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-500 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {m.before_carton} / {m.before_pack}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100 font-medium whitespace-nowrap">
                         {m.after_carton} / {m.after_pack}
                       </td>
                     </tr>
@@ -495,22 +495,22 @@ export default function StockMovementsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
+          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Sayfa {page + 1} / {totalPages}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setPage(Math.max(0, page - 1))}
                 disabled={page === 0}
-                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
               >
                 Önceki
               </button>
               <button
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
               >
                 Sonraki
               </button>

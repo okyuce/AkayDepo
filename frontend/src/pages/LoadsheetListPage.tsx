@@ -357,47 +357,47 @@ export default function LoadsheetListPage() {
   const getCardColorClass = (cardColor: 'gray' | 'green' | 'orange') => {
     switch (cardColor) {
       case 'green':
-        return 'bg-green-100 border-green-400';
+        return 'bg-green-100 dark:bg-green-900/30 border-green-400 dark:border-green-700';
       case 'orange':
-        return 'bg-orange-100 border-orange-400';
+        return 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 dark:border-orange-700';
       default:
-        return 'bg-gray-100 border-gray-300';
+        return 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Yükleme Fişleri</h1>
+          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">Yükleme Fişleri</h1>
 
           {!cycleId ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <p className="text-yellow-800 dark:text-yellow-300">
                 Aktif döngü bulunamadı. Lütfen önce Excel yükleyip plan oluşturun.
               </p>
             </div>
           ) : stations.length === 0 ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <p className="text-yellow-800 dark:text-yellow-300">
                 Plan bulunamadı. Lütfen planlama oluşturun.
               </p>
             </div>
           ) : (
             <>
               {/* İstasyon ve Territory Seçimi */}
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
                 <div className="flex justify-between items-center">
                   <div className="flex-1 flex gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         İstasyon Seçin
                       </label>
                       <select
                         value={selectedStationId}
                         onChange={(e) => handleStationChange(e.target.value)}
-                        className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full md:w-64 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">İstasyon Seçiniz...</option>
                         {stations.map((station) => (
@@ -412,13 +412,13 @@ export default function LoadsheetListPage() {
                       <div className="flex gap-4 flex-wrap">
                         {availableTerritories.length > 0 && (
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                               Territory Filtrele (Opsiyonel)
                             </label>
                             <select
                           value={selectedTerritoryCode}
                           onChange={(e) => handleTerritoryChange(e.target.value)}
-                          className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full md:w-48 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         >
                           <option value="">Tüm Territory'ler</option>
                           {availableTerritories.map((territory) => (
@@ -431,11 +431,11 @@ export default function LoadsheetListPage() {
                         )}
                         {/* Excel (Batch) Filtresi */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Excel (Batch)</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Excel (Batch)</label>
                           <select
                             value={selectedBatch}
                             onChange={(e) => { const v = e.target.value; setSelectedBatch(v); if (selectedStationId) loadLoadsheets(selectedStationId, v); }}
-                            className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full md:w-48 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           >
                             <option value="">Tümü</option>
                             {imports.map(imp => (
@@ -447,13 +447,13 @@ export default function LoadsheetListPage() {
                         </div>
                         {/* SKU Filtresi */}
                         <div className="relative" ref={skuDropdownRef}>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">SKU Filtresi</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SKU Filtresi</label>
                           <button
                             type="button"
                             onClick={() => setSkuDropdownOpen(!skuDropdownOpen)}
-                            className="w-48 border border-gray-300 rounded-md px-4 py-2 text-left bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center"
+                            className="w-48 border border-gray-300 dark:border-gray-600 rounded-md px-4 py-2 text-left bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center"
                           >
-                            <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                            <span className={selectedSkus.length === 0 ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'}>
                               {selectedSkus.length === 0 ? 'Seçiniz...' : `${selectedSkus.length} ürün`}
                             </span>
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,16 +461,16 @@ export default function LoadsheetListPage() {
                             </svg>
                           </button>
                           {skuDropdownOpen && (
-                            <div className="absolute z-50 mt-1 w-72 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-                              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
-                                <span className="text-xs text-gray-500">{selectedSkus.length} seçili</span>
+                            <div className="absolute z-50 mt-1 w-72 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+                              <div className="p-2 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{selectedSkus.length} seçili</span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setSelectedSkus([]);
                                     if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, []);
                                   }}
-                                  className="text-xs text-blue-600 hover:text-blue-800"
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                                 >
                                   Temizle
                                 </button>
@@ -478,7 +478,7 @@ export default function LoadsheetListPage() {
                               {products.map((p) => (
                                 <label
                                   key={p.id}
-                                  className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                                  className="flex items-center px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -490,11 +490,11 @@ export default function LoadsheetListPage() {
                                       setSelectedSkus(newSkus);
                                       if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, newSkus);
                                     }}
-                                    className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    className="mr-2 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
                                   />
                                   <span className="text-sm">
-                                    <span className="font-medium">{p.code}</span>
-                                    <span className="text-gray-500 ml-1">- {p.name}</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">{p.code}</span>
+                                    <span className="text-gray-500 dark:text-gray-400 ml-1">- {p.name}</span>
                                   </span>
                                 </label>
                               ))}
@@ -516,18 +516,18 @@ export default function LoadsheetListPage() {
 
               {/* Fiş Listesi */}
               {!selectedStationId ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <p className="text-center text-blue-800">
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
+                  <p className="text-center text-blue-800 dark:text-blue-300">
                     Lütfen yukarıdaki listeden bir istasyon seçin.
                   </p>
                 </div>
               ) : isLoading ? (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <p className="text-center text-gray-500">Yüklüyor...</p>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                  <p className="text-center text-gray-500 dark:text-gray-400">Yüklüyor...</p>
                 </div>
               ) : dealerGroups.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <p className="text-center text-gray-500">Fiş bulunamadı</p>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                  <p className="text-center text-gray-500 dark:text-gray-400">Fiş bulunamadı</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -561,42 +561,42 @@ const sortedLoadsheets = [...group.loadsheets]
                         >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-4">
-                              <span className="text-3xl font-bold text-gray-900 bg-white px-3 py-1 rounded">
+                              <span className="text-3xl font-bold text-gray-900 bg-white dark:bg-gray-200 px-3 py-1 rounded">
                                 {group.route_order}
                               </span>
                               <div>
-                                <h3 className="font-bold text-xl text-gray-900">
+                                <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">
                                   {group.dealer_name}
                                 </h3>
-                                <p className="text-sm text-gray-600 mt-1">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                   {group.dealer_code}
                                 </p>
                                 <div className="flex items-center gap-3 mt-2">
                                   <span className={`text-xs px-2 py-1 rounded font-semibold ${
                                     group.loadsheets.length > 1
                                       ? 'bg-orange-500 text-white'
-                                      : 'bg-white text-gray-800'
+                                      : 'bg-white dark:bg-gray-200 text-gray-800'
                                   }`}>
                                     {group.loadsheets.length} Fiş
                                   </span>
-                                  <span className="text-xs px-2 py-1 rounded font-semibold bg-blue-100 text-blue-800">
+                                  <span className="text-xs px-2 py-1 rounded font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
                                     {group.loadsheets.reduce((sum, ls) => sum + (ls.total_carton || 0), 0)} Krt
                                   </span>
                                   {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0) > 0 && (
-                                    <span className="text-xs px-2 py-1 rounded font-semibold bg-purple-100 text-purple-800">
+                                    <span className="text-xs px-2 py-1 rounded font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200">
                                       {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0)} Pkt
                                     </span>
                                   )}
                                   {group.cardColor === 'green' && (
-                                    <span className="text-xs text-green-700 font-semibold">✓ Tamam</span>
+                                    <span className="text-xs text-green-700 dark:text-green-300 font-semibold">✓ Tamam</span>
                                   )}
                                   {group.cardColor === 'orange' && (
-                                    <span className="text-xs text-orange-700 font-semibold">⚠ Ek Fiş</span>
+                                    <span className="text-xs text-orange-700 dark:text-orange-300 font-semibold">⚠ Ek Fiş</span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <span className="text-2xl text-gray-600">
+                            <span className="text-2xl text-gray-600 dark:text-gray-400">
                               {isExpanded ? '▲' : '▼'}
                             </span>
                           </div>
@@ -604,7 +604,7 @@ const sortedLoadsheets = [...group.loadsheets]
 
                         {/* Expanded: Tüm fişler */}
                         {isExpanded && (
-                          <div className="bg-white border-t-2 border-gray-300 p-4 space-y-6">
+                          <div className="bg-white dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600 p-4 space-y-6">
                             {sortedLoadsheets
                               .sort((a, b) => {
                                 // Batch filtresi aktifse: parent (included_as_parent) önce, sonra batch ASC, sonra tamamlanmayan üstte
@@ -630,23 +630,23 @@ const sortedLoadsheets = [...group.loadsheets]
 
                                 return (
                                 <div key={loadsheet.id} className={`border-2 rounded ${
-                                  isCancelled ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                  isCancelled ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : 'border-gray-200 dark:border-gray-600'
                                 }`}>
                                   {/* Fiş Başlık */}
                                   <div className={`p-3 flex justify-between items-center ${
-                                    isCancelled ? 'bg-red-100' : 'bg-gray-50'
+                                    isCancelled ? 'bg-red-100 dark:bg-red-900/40' : 'bg-gray-50 dark:bg-gray-700'
                                   }`}>
                                     <div className="flex items-center gap-2">
                                       <span className={`font-bold text-lg px-2 py-0.5 rounded ${
-                                        isCancelled 
-                                          ? 'bg-red-200 text-red-900' 
-                                          : loadsheetNumber >= 2 
-                                            ? 'bg-orange-100 text-orange-800' 
-                                            : ''
+                                        isCancelled
+                                          ? 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100'
+                                          : loadsheetNumber >= 2
+                                            ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200'
+                                            : 'text-gray-900 dark:text-gray-100'
                                       }`}>
                                         FIŞ-{loadsheetNumber}
                                       </span>
-                                      <span className="text-sm text-gray-600 ml-1">{loadsheet.package_number}</span>
+                                      <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">{loadsheet.package_number}</span>
                                       {isCancelled && (
                                         <span className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded ml-2">
                                           ❌ İPTAL
@@ -670,11 +670,11 @@ const sortedLoadsheets = [...group.loadsheets]
                                   {/* Fiş Detay Tablosu */}
                                   {loadsheet.lines && (
                                     <table className="w-full table-fixed">
-                                      <thead className="bg-gray-100">
+                                      <thead className="bg-gray-100 dark:bg-gray-700">
                                         <tr>
-                                          <th className="text-left p-3 font-bold border-b-2 border-gray-300 w-3/5">Rut Sırası</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-1/5">Krt</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 w-1/5">Pkt</th>
+                                          <th className="text-left p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-3/5 text-gray-900 dark:text-gray-100">Rut Sırası</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Krt</th>
+                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Pkt</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -683,8 +683,8 @@ const sortedLoadsheets = [...group.loadsheets]
                                           <td className="p-2 text-center">{totalCartons}</td>
                                           <td className="p-2 text-center">{totalPacks || ''}</td>
                                         </tr>
-                                        <tr>
-                                          <td className="p-2" colSpan={3}>{loadsheet.dealer_code}</td>
+                                        <tr className="bg-white dark:bg-gray-800">
+                                          <td className="p-2 text-gray-900 dark:text-gray-100" colSpan={3}>{loadsheet.dealer_code}</td>
                                         </tr>
                                         <tr className="bg-black text-white">
                                           <td className="p-2" colSpan={3}>
@@ -692,25 +692,25 @@ const sortedLoadsheets = [...group.loadsheets]
                                           </td>
                                         </tr>
                                         {loadsheet.lines.map((line, idx) => (
-                                          <tr key={idx} className={`border-b border-gray-200 ${
-                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'
+                                          <tr key={idx} className={`border-b border-gray-200 dark:border-gray-600 ${
+                                            idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700'
                                           }`}>
-                                            <td className="p-2 text-lg font-bold truncate">{line.product_name}</td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative">
+                                            <td className="p-2 text-lg font-bold truncate text-gray-900 dark:text-gray-100">{line.product_name}</td>
+                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative text-gray-900 dark:text-gray-100">
                                               {line.qty_carton}
                                               {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
                                                 <sup className={`ml-1 text-xs font-bold ${
-                                                  line.qty_change_carton > 0 ? 'text-green-600' : 'text-red-600'
+                                                  line.qty_change_carton > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                                 }`}>
                                                   {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
                                                 </sup>
                                               )}
                                             </td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative">
+                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative text-gray-900 dark:text-gray-100">
                                               {line.qty_pack || ''}
                                               {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
                                                 <sup className={`ml-1 text-xs font-bold ${
-                                                  line.qty_change_pack > 0 ? 'text-green-600' : 'text-red-600'
+                                                  line.qty_change_pack > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                                                 }`}>
                                                   {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
                                                 </sup>
@@ -718,10 +718,10 @@ const sortedLoadsheets = [...group.loadsheets]
                                             </td>
                                           </tr>
                                         ))}
-                                        <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                                          <td className="p-3">Toplam</td>
-                                          <td className="p-3 text-center">{totalCartons}</td>
-                                          <td className="p-3 text-center">{totalPacks || ''}</td>
+                                        <tr className="bg-gray-100 dark:bg-gray-700 font-bold border-t-2 border-gray-300 dark:border-gray-600">
+                                          <td className="p-3 text-gray-900 dark:text-gray-100">Toplam</td>
+                                          <td className="p-3 text-center text-gray-900 dark:text-gray-100">{totalCartons}</td>
+                                          <td className="p-3 text-center text-gray-900 dark:text-gray-100">{totalPacks || ''}</td>
                                         </tr>
                                       </tbody>
                                     </table>

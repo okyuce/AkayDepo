@@ -2,10 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light mode (default) */
+:root {
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f9fafb;
+  --color-surface-tertiary: #f3f4f6;
+  --color-content-primary: #111827;
+  --color-content-secondary: #374151;
+  --color-content-tertiary: #6b7280;
+  --color-border: #d1d5db;
+}
+
+/* Dark mode */
+.dark {
+  --color-surface: #1f2937;
+  --color-surface-secondary: #111827;
+  --color-surface-tertiary: #111827;
+  --color-content-primary: #f9fafb;
+  --color-content-secondary: #e5e7eb;
+  --color-content-tertiary: #9ca3af;
+  --color-border: #4b5563;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode body background */
+.dark body,
+html.dark body {
+  background-color: #111827;
 }

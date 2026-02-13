@@ -108,7 +108,7 @@ export default function ProductOrderPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
       
       {/* Toast */}
@@ -124,8 +124,8 @@ export default function ProductOrderPage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold">Ürün Sıralaması</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Ürün Sıralaması</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Ürünleri sürükleyerek yükleme fişlerindeki sıralamayı değiştirin
               </p>
             </div>
@@ -149,20 +149,20 @@ export default function ProductOrderPage() {
           </div>
 
           {isLoading ? (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <p className="text-center text-gray-500">Yükleniyor...</p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <p className="text-center text-gray-500 dark:text-gray-400">Yükleniyor...</p>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 bg-gray-50 border-b">
-                <div className="grid grid-cols-12 gap-4 font-semibold text-sm text-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
+                <div className="grid grid-cols-12 gap-4 font-semibold text-sm text-gray-700 dark:text-gray-300">
                   <div className="col-span-1 text-center">Sıra</div>
                   <div className="col-span-4">Ürün Kodu (SKU)</div>
                   <div className="col-span-7">Ürün Adı</div>
                 </div>
               </div>
-              
-              <div className="divide-y divide-gray-200">
+
+              <div className="divide-y divide-gray-200 dark:divide-gray-600">
                 {products.map((product, index) => (
                   <div
                     key={product.id}
@@ -170,36 +170,36 @@ export default function ProductOrderPage() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`grid grid-cols-12 gap-4 p-4 cursor-move hover:bg-gray-50 transition ${
-                      draggedIndex === index ? 'opacity-50 bg-blue-50' : ''
+                    className={`grid grid-cols-12 gap-4 p-4 cursor-move hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
+                      draggedIndex === index ? 'opacity-50 bg-blue-50 dark:bg-blue-900/30' : ''
                     }`}
                   >
                     <div className="col-span-1 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-bold text-sm">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 font-bold text-sm">
                         {product.display_order}
                       </span>
                     </div>
-                    <div className="col-span-4 font-medium text-gray-900">
+                    <div className="col-span-4 font-medium text-gray-900 dark:text-gray-100">
                       {product.code}
                     </div>
-                    <div className="col-span-7 text-gray-600">
+                    <div className="col-span-7 text-gray-600 dark:text-gray-400">
                       {product.name}
                     </div>
                   </div>
                 ))}
               </div>
-              
+
               {products.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   Gösterilecek ürün yok
                 </div>
               )}
             </div>
           )}
-          
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>İpucu:</strong> Ürünleri sürükleyerek sıralamayı değiştirebilirsiniz. 
+
+          <div className="mt-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              <strong>İpucu:</strong> Ürünleri sürükleyerek sıralamayı değiştirebilirsiniz.
               Değişiklikleri kaydetmek için "Kaydet" butonuna basın.
             </p>
           </div>

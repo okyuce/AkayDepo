@@ -2,16 +2,65 @@
  * Navbar Component
  * Üst menü - kullanıcı bilgisi ve logout
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import { APP_VERSION } from '../config/version';
+
+// Theme Icons
+const SunIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  </svg>
+);
+
+const MonitorIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+);
 
 export default function Navbar() {
   const { user, logout } = useAuthStore();
+  const { theme, setTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const themeDropdownRef = useRef<HTMLDivElement>(null);
+  const definitionsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Dropdown dışına tıklama ile kapatma
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
+        setIsThemeOpen(false);
+      }
+      if (definitionsDropdownRef.current && !definitionsDropdownRef.current.contains(event.target as Node)) {
+        setIsDefinitionsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'light':
+        return <SunIcon />;
+      case 'dark':
+        return <MoonIcon />;
+      default:
+        return <MonitorIcon />;
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -23,7 +72,7 @@ export default function Navbar() {
     (active ? 'bg-blue-700 text-white' : 'text-blue-100 hover:bg-blue-500');
 
   return (
-    <nav className="bg-blue-600 text-white shadow-lg">
+    <nav className="bg-blue-600 dark:bg-gray-800 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
@@ -92,7 +141,7 @@ export default function Navbar() {
               <>
                 {/* Tanımlar Dropdown - SAĞDA */}
                 {user.role === 'admin' && (
-                  <div className="relative">
+                  <div className="relative" ref={definitionsDropdownRef}>
                     <button
                       onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
                       className={
@@ -112,32 +161,32 @@ export default function Navbar() {
                     </button>
                     
                     {isDefinitionsOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10">
                         <Link
                           to="/territories"
                           onClick={() => setIsDefinitionsOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
                         >
                           Territory Tanımları
                         </Link>
                         <Link
                           to="/product-order"
                           onClick={() => setIsDefinitionsOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
                         >
                           Ürün Sıralaması
                         </Link>
                         <Link
                           to="/users"
                           onClick={() => setIsDefinitionsOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
                         >
                           Kullanıcı Yönetimi
                         </Link>
                         <Link
                           to="/change-password"
                           onClick={() => setIsDefinitionsOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md"
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
                         >
                           🔒 Şifremi Değiştir
                         </Link>
@@ -159,6 +208,44 @@ export default function Navbar() {
                 <span className="text-sm">
                   👤 {user.username}
                 </span>
+
+                {/* Theme Toggle */}
+                <div className="relative" ref={themeDropdownRef}>
+                  <button
+                    onClick={() => setIsThemeOpen(!isThemeOpen)}
+                    className="p-2 rounded-md hover:bg-blue-500 dark:hover:bg-gray-700 transition"
+                    title={`Tema: ${theme === 'light' ? 'Açık' : theme === 'dark' ? 'Koyu' : 'Sistem'}`}
+                  >
+                    {getThemeIcon()}
+                  </button>
+
+                  {isThemeOpen && (
+                    <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-700 rounded-md shadow-lg z-50">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setTheme('light'); setIsThemeOpen(false); }}
+                        className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-t-md cursor-pointer ${theme === 'light' ? 'bg-blue-50 dark:bg-gray-600' : ''}`}
+                      >
+                        <SunIcon /> <span className="ml-2">Açık</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setTheme('dark'); setIsThemeOpen(false); }}
+                        className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 cursor-pointer ${theme === 'dark' ? 'bg-blue-50 dark:bg-gray-600' : ''}`}
+                      >
+                        <MoonIcon /> <span className="ml-2">Koyu</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setTheme('system'); setIsThemeOpen(false); }}
+                        className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-b-md cursor-pointer ${theme === 'system' ? 'bg-blue-50 dark:bg-gray-600' : ''}`}
+                      >
+                        <MonitorIcon /> <span className="ml-2">Sistem</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleLogout}
                   className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md text-sm font-medium transition"

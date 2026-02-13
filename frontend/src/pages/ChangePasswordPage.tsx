@@ -60,22 +60,22 @@ const ChangePasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">Şifre Değiştir</h1>
-            <p className="text-gray-600 mt-2">Güvenliğiniz için güçlü bir şifre seçin</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Şifre Değiştir</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Güvenliğiniz için güçlü bir şifre seçin</p>
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded mb-4">
               Şifreniz başarıyla değiştirildi! Ana sayfaya yönlendiriliyorsunuz...
             </div>
           )}
@@ -83,7 +83,7 @@ const ChangePasswordPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Mevcut Şifre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Mevcut Şifre
               </label>
               <div className="relative">
@@ -91,7 +91,7 @@ const ChangePasswordPage: React.FC = () => {
                   type={showCurrentPassword ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   disabled={loading || success}
                 />
                 <button
@@ -107,7 +107,7 @@ const ChangePasswordPage: React.FC = () => {
 
             {/* Yeni Şifre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Yeni Şifre (min. 6 karakter)
               </label>
               <div className="relative">
@@ -115,7 +115,7 @@ const ChangePasswordPage: React.FC = () => {
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   disabled={loading || success}
                 />
                 <button
@@ -131,7 +131,7 @@ const ChangePasswordPage: React.FC = () => {
 
             {/* Yeni Şifre Tekrar */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Yeni Şifre (Tekrar)
               </label>
               <div className="relative">
@@ -139,7 +139,7 @@ const ChangePasswordPage: React.FC = () => {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   disabled={loading || success}
                 />
                 <button
@@ -158,7 +158,7 @@ const ChangePasswordPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50"
                 disabled={loading || success}
               >
                 İptal

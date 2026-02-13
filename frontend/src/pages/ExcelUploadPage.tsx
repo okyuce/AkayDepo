@@ -270,7 +270,7 @@ export default function ExcelUploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
       
       {/* Toast Notification */}
@@ -285,7 +285,7 @@ export default function ExcelUploadPage() {
       <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Excel Yükleme ve Planlama</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Excel Yükleme ve Planlama</h1>
           
           {cycleId && (
             <button
@@ -299,27 +299,27 @@ export default function ExcelUploadPage() {
 
         {/* Mevcut Durum Bilgisi */}
         {cycleId && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h2 className="font-semibold text-blue-900 mb-2">ℹ️ Mevcut Döngü</h2>
-            <p className="text-sm text-blue-800">
-              Bugünkü aktif döngü yüklü. 
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+            <h2 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">ℹ️ Mevcut Döngü</h2>
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              Bugünkü aktif döngü yüklü.
               {planResult ? ' Plan oluşturulmuş ve görüntüleniyor.' : ' Planlama oluşturmak için aşağıdaki butona basın.'}
             </p>
-            <p className="text-xs text-blue-600 mt-1">
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
               Yeni döngü başlatmak için sağ üstteki "Yeni Döngü Başlat" butonuna basın.
             </p>
           </div>
         )}
 
         {/* Excel Upload + Yükleme Geçmişi */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">1. Excel Dosyası Yükle</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">1. Excel Dosyası Yükle</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Upload Form */}
             <div className="md:col-span-2 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Excel Dosyası Seç (PMI ISMS)
                 </label>
                 <input
@@ -351,7 +351,7 @@ export default function ExcelUploadPage() {
               </button>
 
               {cycleId && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded">
                   ✓ Döngü oluşturuldu: {cycleId}
                 </div>
               )}
@@ -359,12 +359,12 @@ export default function ExcelUploadPage() {
 
             {/* Import History */}
             <div>
-              <h3 className="font-semibold mb-2">Yükleme Geçmişi</h3>
-              <div className="max-h-56 overflow-y-auto border rounded">
+              <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Yükleme Geçmişi</h3>
+              <div className="max-h-56 overflow-y-auto border dark:border-gray-600 rounded">
                 {imports.length === 0 ? (
-                  <div className="p-3 text-sm text-gray-500">Henüz yükleme yok</div>
+                  <div className="p-3 text-sm text-gray-500 dark:text-gray-400">Henüz yükleme yok</div>
                 ) : (
-                  <ul className="divide-y">
+                  <ul className="divide-y dark:divide-gray-600">
                     {imports.map((it) => {
                       // Tarih-saat formatı oluştur
                       let dateInfo = '';
@@ -381,9 +381,9 @@ export default function ExcelUploadPage() {
                       
                       return (
                         <li key={it.id} className="p-3 text-sm">
-                          <p className="font-medium truncate" title={it.filename}>{it.filename}</p>
+                          <p className="font-medium truncate text-gray-900 dark:text-gray-100" title={it.filename}>{it.filename}</p>
                           {dateInfo && (
-                            <p className="text-gray-600 text-xs mt-1">{dateInfo}</p>
+                            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">{dateInfo}</p>
                           )}
                         </li>
                       );
@@ -396,14 +396,14 @@ export default function ExcelUploadPage() {
         </div>
 
         {/* Create Plan */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">2. Planlama Oluştur</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">2. Planlama Oluştur</h2>
 
           <div className="space-y-4">
             {/* İstasyon sayısı sadece otomatik modda görünsün */}
             {isAutoPlanning ? (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   İstasyon Sayısı
                 </label>
                 <input
@@ -413,15 +413,15 @@ export default function ExcelUploadPage() {
                   value={numStations}
                   onChange={(e) => setNumStations(parseInt(e.target.value))}
                   disabled={isPlanLocked}
-                  className={`w-32 px-3 py-2 border rounded-md ${isPlanLocked ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`}
+                  className={`w-32 px-3 py-2 border rounded-md ${isPlanLocked ? 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}
                 />
                 {isPlanLocked && (
-                  <p className="text-xs text-gray-500 mt-1">🔒 İstasyon sayısı ilk plandan sonra kilitlendi. Yeni Excel yükleyip Planlama'yı tekrar çalıştırabilirsiniz.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">🔒 İstasyon sayısı ilk plandan sonra kilitlendi. Yeni Excel yükleyip Planlama'yı tekrar çalıştırabilirsiniz.</p>
                 )}
               </div>
             ) : (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
                   <strong>📌 Manuel Mod:</strong> İstasyon atamaları "Territory Atama" sayfasından yönetiliyor.
                 </p>
               </div>
@@ -436,19 +436,19 @@ export default function ExcelUploadPage() {
             </button>
             
             {isPlanButtonDisabled && (
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 ℹ️ Plan oluşturuldu. Yeni Excel yükledikten sonra planlamayı tekrar çalıştırabilirsiniz.
               </p>
             )}
-            
+
             {isPlanLocked && (
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 🔒 İstasyon sayısı kilitli. Yeni Excel yükledikten sonra bu butonla planlamayı tekrar çalıştırabilirsiniz.
               </p>
             )}
-            
+
             {!isPlanLocked && planResult && (
-              <p className="text-sm text-blue-600 mt-2">
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
                 ℹ️ İstasyon sayısını belirledikten sonra tekrar değiştirilebilir. İlk planlamadan sonra kilitlenecektir.
               </p>
             )}
@@ -457,33 +457,33 @@ export default function ExcelUploadPage() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-6">
             {error}
           </div>
         )}
 
         {/* Plan Result */}
         {planResult && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Planlama Sonucu</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Planlama Sonucu</h2>
               {/* Kilitleme butonu kaldırıldı - revizyon sistemi için */}
             </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Toplam Territory</p>
-                  <p className="text-2xl font-bold">{planResult.total_territories}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Territory</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{planResult.total_territories}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">İstasyon Sayısı</p>
-                  <p className="text-2xl font-bold">{planResult.num_stations}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">İstasyon Sayısı</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{planResult.num_stations}</p>
                 </div>
               </div>
 
               {planResult.unbalanced_territories?.length > 0 && (
-                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+                <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded">
                   <p className="font-semibold">⚠ Dengesiz Territory'ler:</p>
                   <ul className="list-disc list-inside mt-2">
                     {planResult.unbalanced_territories.map((t: any) => (
@@ -497,13 +497,13 @@ export default function ExcelUploadPage() {
               )}
 
               <div className="mt-4">
-                <h3 className="font-semibold mb-2">İstasyon Atamaları:</h3>
+                <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">İstasyon Atamaları:</h3>
                 <div className="space-y-2">
                   {planResult.assignments?.map((assignment: any) => (
-                    <div key={assignment.station_name} className="border rounded p-3">
-                      <p className="font-medium">{assignment.station_name}</p>
-                      <p className="text-sm text-gray-600">
-                        {assignment.territories.join(', ')} - 
+                    <div key={assignment.station_name} className="border dark:border-gray-600 rounded p-3">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{assignment.station_name}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {assignment.territories.join(', ')} -
                         <span className="font-semibold ml-1">{assignment.total_carton} karton</span>
                       </p>
                     </div>
