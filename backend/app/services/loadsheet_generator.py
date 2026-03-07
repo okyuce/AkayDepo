@@ -20,13 +20,15 @@ class LoadsheetGenerator:
         self.session = session
         self._main_stock_station = None
         self._main_stock_assignments = {}  # territory_id -> assignment cache
+        self._depot_id = None
 
     def _get_main_stock_station(self) -> Optional[Station]:
         """AnaStok istasyonunu al (cache)"""
         if self._main_stock_station is None:
-            self._main_stock_station = self.session.exec(
-                select(Station).where(Station.is_main_stock == True)
-            ).first()
+            stmt = select(Station).where(Station.is_main_stock == True)
+            if self._depot_id:
+                stmt = stmt.where(Station.depot_id == self._depot_id)
+            self._main_stock_station = self.session.exec(stmt).first()
         return self._main_stock_station
 
     def _get_dealer_total_cartons(self, cycle_id: UUID, dealer_id: UUID) -> float:
@@ -78,7 +80,8 @@ class LoadsheetGenerator:
                 territory_id=territory_id,
                 load_rank=1,
                 target_total_carton=0,
-                target_total_pack=0
+                target_total_pack=0,
+                depot_id=self._depot_id
             )
             self.session.add(assignment)
             self.session.flush()
@@ -86,7 +89,7 @@ class LoadsheetGenerator:
         self._main_stock_assignments[cache_key] = assignment
         return assignment
 
-    def generate_loadsheets_for_cycle(self, cycle_id: UUID, only_batch: Optional[int] = None) -> int:
+    def generate_loadsheets_for_cycle(self, cycle_id: UUID, only_batch: Optional[int] = None, depot_id: str = None) -> int:
         """
         Bir döngü için tüm fişleri oluştur (multi-batch desteği ile)
 
@@ -96,6 +99,7 @@ class LoadsheetGenerator:
         Returns:
             int: Oluşturulan fiş sayısı
         """
+        self._depot_id = depot_id
         from app.models import Cycle
 
         # Döngü bilgisini al (plan_date için)
@@ -254,6 +258,7 @@ class LoadsheetGenerator:
             status="pending",
             loadsheet_type=loadsheet_type,
             revision_diff=revision_diff,
+            depot_id=self._depot_id,
             is_revision=is_revision
         )
         self.session.add(loadsheet)

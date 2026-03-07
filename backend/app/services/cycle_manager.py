@@ -18,12 +18,14 @@ class CycleManager:
     
     def __init__(self, session: Session):
         self.session = session
-    
+        self._depot_id = None
+
     def create_cycle(
-        self, 
-        run_time: str, 
+        self,
+        run_time: str,
         plan_date: date,
-        excel_content: bytes
+        excel_content: bytes,
+        depot_id: str = None
     ) -> tuple[Cycle, int]:
         """
         Yeni döngü oluştur veya mevcut döngüye append et
@@ -36,11 +38,15 @@ class CycleManager:
         Returns:
             Cycle: Oluşturulan veya mevcut döngü
         """
+        self._depot_id = depot_id
+
         # Aynı gün için aktif döngü var mı kontrol et
         stmt = select(Cycle).where(
             Cycle.plan_date == plan_date,
             Cycle.status == "active"
         )
+        if depot_id:
+            stmt = stmt.where(Cycle.depot_id == depot_id)
         existing_cycle = self.session.exec(stmt).first()
         
         if existing_cycle:
@@ -55,7 +61,8 @@ class CycleManager:
                 cycle_no=cycle_no,
                 run_time=run_time,
                 plan_date=plan_date,
-                status="active"
+                status="active",
+                depot_id=depot_id
             )
             self.session.add(cycle)
             self.session.commit()
@@ -197,24 +204,54 @@ class CycleManager:
         print(f"INFO: AnaStok envanteri sıfırlandı ({len(inventory_items)} kayıt)")
 
     def _import_territories(self, df: pd.DataFrame):
-        """Territory'leri import et (upsert)"""
+        """Territory'leri import et (upsert) + TerritoryInfo auto-sync"""
+        from app.models import TerritoryInfo
         unique_territories = df['Territory'].unique()
-        
+
         for territory_code in unique_territories:
             # Zaten var mı kontrol et
             stmt = select(Territory).where(Territory.code == territory_code)
+            if self._depot_id:
+                stmt = stmt.where(Territory.depot_id == self._depot_id)
             existing = self.session.exec(stmt).first()
-            
+
             if not existing:
                 # Yeni territory oluştur
                 display_number, name = extract_territory_info(territory_code)
                 territory = Territory(
                     code=territory_code,
                     name=name,
-                    display_number=display_number
+                    display_number=display_number,
+                    depot_id=self._depot_id
                 )
                 self.session.add(territory)
-        
+
+            # TerritoryInfo auto-sync: yoksa oluştur
+            ti_stmt = select(TerritoryInfo).where(TerritoryInfo.code == territory_code)
+            if self._depot_id:
+                ti_stmt = ti_stmt.where(TerritoryInfo.depot_id == self._depot_id)
+            ti_existing = self.session.exec(ti_stmt).first()
+
+            if not ti_existing:
+                display_number, name = extract_territory_info(territory_code)
+                # sort_order: mevcut en büyük + 1
+                max_order_stmt = select(TerritoryInfo.sort_order).order_by(TerritoryInfo.sort_order.desc())
+                if self._depot_id:
+                    max_order_stmt = max_order_stmt.where(TerritoryInfo.depot_id == self._depot_id)
+                max_order = self.session.exec(max_order_stmt).first()
+                next_order = (max_order or 0) + 1
+
+                ti = TerritoryInfo(
+                    code=territory_code,
+                    name=name,
+                    display_number=display_number,
+                    sort_order=next_order,
+                    is_active=True,
+                    depot_id=self._depot_id
+                )
+                self.session.add(ti)
+                print(f"INFO: TerritoryInfo otomatik oluşturuldu: {territory_code}")
+
         self.session.commit()
     
     def _import_dealers(self, df: pd.DataFrame):
@@ -225,21 +262,26 @@ class CycleManager:
         for _, row in dealers_df.iterrows():
             # Territory id bul
             stmt = select(Territory).where(Territory.code == row['Territory'])
+            if self._depot_id:
+                stmt = stmt.where(Territory.depot_id == self._depot_id)
             territory = self.session.exec(stmt).first()
             if not territory:
                 continue
-            
+
             # Dealer var mı kontrol et
             stmt = select(Dealer).where(Dealer.code == row['BayiKodu'])
+            if self._depot_id:
+                stmt = stmt.where(Dealer.depot_id == self._depot_id)
             existing = self.session.exec(stmt).first()
-            
+
             if not existing:
                 dealer = Dealer(
                     code=row['BayiKodu'],
                     name=row['BayiAdı'],
                     position_code=row['Pozisyon'],
                     route_order=int(row['BayiRutSırası']),
-                    territory_id=territory.id
+                    territory_id=territory.id,
+                    depot_id=self._depot_id
                 )
                 self.session.add(dealer)
         
@@ -291,9 +333,13 @@ class CycleManager:
             
             # Territory ve Dealer id'lerini bul
             stmt = select(Territory).where(Territory.code == first_row['Territory'])
+            if self._depot_id:
+                stmt = stmt.where(Territory.depot_id == self._depot_id)
             territory = self.session.exec(stmt).first()
-            
+
             stmt = select(Dealer).where(Dealer.code == first_row['BayiKodu'])
+            if self._depot_id:
+                stmt = stmt.where(Dealer.depot_id == self._depot_id)
             dealer = self.session.exec(stmt).first()
             
             if not territory or not dealer:
@@ -328,7 +374,8 @@ class CycleManager:
                 previous_order_id=previous_order.id if previous_order else None,
                 revision_group_id=uuid4(),  # İlk versiyon için yeni ID
                 revision_no=1,
-                source_sheet='Recipe2'
+                source_sheet='Recipe2',
+                depot_id=self._depot_id
             )
             self.session.add(order)
             self.session.flush()  # Order ID'si için

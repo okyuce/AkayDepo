@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/authStore';
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
+import MultiDepotOverviewPage from './pages/MultiDepotOverviewPage';
+import DepotDashboardPage from './pages/DepotDashboardPage';
 import StationDetailPage from './pages/StationDetailPage';
 import TerritoryViewPage from './pages/TerritoryViewPage';
 import Navbar from './components/Navbar';
@@ -46,7 +47,15 @@ function App() {
           path="/"
           element={
             <PrivateRoute>
-              <DashboardPage />
+              <MultiDepotOverviewPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/depot/:depotCode"
+          element={
+            <PrivateRoute>
+              <DepotDashboardPage />
             </PrivateRoute>
           }
         />

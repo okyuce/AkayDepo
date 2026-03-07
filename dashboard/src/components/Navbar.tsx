@@ -6,6 +6,8 @@ export default function Navbar() {
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
+  const isDepotPage = location.pathname.startsWith('/depot/');
+  const depotCode = isDepotPage ? location.pathname.split('/')[2] : null;
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-b border-gray-200 z-50">
@@ -38,9 +40,20 @@ export default function Navbar() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-                Ana Sayfa
+                Genel Gorunum
               </span>
             </Link>
+
+            {isDepotPage && depotCode && (
+              <>
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium">
+                  {depotCode}
+                </span>
+              </>
+            )}
 
             {/* Divider */}
             <div className="w-px h-8 bg-gray-200 mx-2" />

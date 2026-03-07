@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 class Cycle(SQLModel, table=True):
     """Döngü modeli - Her Excel yüklemesi bir döngü"""
     __tablename__ = "cycles"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     cycle_no: int = Field(index=True)  # 1, 2, 3
     run_time: str = Field(index=True)  # "14:00", "16:00", "17:00"
@@ -14,6 +14,7 @@ class Cycle(SQLModel, table=True):
     imported_at: datetime = Field(default_factory=datetime.now)
     status: str = Field(default="active")  # active, completed, archived
     completed_at: Optional[datetime] = None
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
     
     class Config:
         json_schema_extra = {

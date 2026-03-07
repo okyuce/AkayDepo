@@ -1,3 +1,4 @@
+from app.models.depot import Depot
 from app.models.cycle import Cycle
 from app.models.territory import Territory
 from app.models.territory_info import TerritoryInfo
@@ -10,6 +11,7 @@ from app.models.inventory import StationInventory, StockMovement
 from app.models.user import User
 
 __all__ = [
+    "Depot",
     "Cycle",
     "Territory",
     "TerritoryInfo",

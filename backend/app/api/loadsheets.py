@@ -10,6 +10,7 @@ from datetime import datetime
 
 from app.core.database import get_session
 from app.core.websocket import manager
+from app.api.auth import get_current_user
 from app.models import (
     Loadsheet, LoadsheetLine, Station, StationAssignment, 
     Territory, Dealer, Product, LoadCounter
@@ -24,6 +25,7 @@ async def get_station_loadsheets(
     import_batch: Optional[int] = None,
     sku: Optional[str] = None,
     sku_match: Optional[str] = "or",
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
@@ -39,7 +41,11 @@ async def get_station_loadsheets(
         # Cycle belirle
         if not cycle_id:
             from app.models import Cycle
-            stmt = select(Cycle).where(Cycle.status == "active").order_by(Cycle.imported_at.desc())
+            depot_id = current_user.get("depot_id")
+            stmt = select(Cycle).where(Cycle.status == "active")
+            if depot_id:
+                stmt = stmt.where(Cycle.depot_id == depot_id)
+            stmt = stmt.order_by(Cycle.imported_at.desc())
             cycle = session.exec(stmt).first()
             if not cycle:
                 raise HTTPException(404, "Aktif döngü bulunamadı")
@@ -205,6 +211,7 @@ async def get_station_loadsheets(
 @router.get("/{loadsheet_id}")
 async def get_loadsheet_detail(
     loadsheet_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Fiş detayı"""
@@ -368,12 +375,16 @@ async def get_loadsheet_detail(
 @router.post("/{loadsheet_id}/complete")
 async def complete_loadsheet(
     loadsheet_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Fişi tamamla (Yükleme Tamamlandı) ve stoktan düş"""
     from app.models import StationInventory, StockMovement
     
-    loadsheet = session.get(Loadsheet, loadsheet_id)
+    # SELECT FOR UPDATE - Race condition önleme
+    loadsheet = session.exec(
+        select(Loadsheet).where(Loadsheet.id == loadsheet_id).with_for_update()
+    ).first()
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")
 
@@ -470,11 +481,13 @@ async def complete_loadsheet(
     territory_completed = all(ls.status == "loaded" for ls in all_loadsheets)
     
     # WebSocket bildirimi gönder
+    depot_id = current_user.get("depot_id") or "default"
     await manager.notify_loadsheet_completed(
         station_id=assignment.station_id,
         loadsheet_id=loadsheet_id,
         package_number=loadsheet.package_number,
-        territory_completed=territory_completed
+        territory_completed=territory_completed,
+        depot_id=str(depot_id)
     )
     
     return {

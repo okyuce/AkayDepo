@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
-VERSION = "1.0.18"
+VERSION = "2.0.01"
 
 app = FastAPI(
     title="AkayDepo API",
@@ -36,7 +36,7 @@ async def health_check():
     return {"status": "healthy"}
 
 # API routers
-from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users, dashboard
+from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users, dashboard, depots, superadmin
 
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(dashboard.router, prefix="/v1/dashboard", tags=["dashboard"])
@@ -50,4 +50,6 @@ app.include_router(territory_info.router, prefix="/v1/territory-info", tags=["te
 app.include_router(assignments.router, prefix="/v1/assignments", tags=["assignments"])
 app.include_router(inventory.router, prefix="/v1/inventory", tags=["inventory"])
 app.include_router(product_order.router, prefix="/v1/product-order", tags=["product_order"])
+app.include_router(depots.router, prefix="/v1/depots", tags=["depots"])
+app.include_router(superadmin.router, prefix="/v1/superadmin", tags=["superadmin"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])

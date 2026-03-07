@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await apiService.getMe();
 
       // Admin kontrolu
-      if (user.role !== 'admin') {
+      if (!['admin', 'superadmin'].includes(user.role)) {
         localStorage.removeItem('dashboard_token');
         set({
           error: 'Bu panele sadece yoneticiler girebilir',
@@ -93,7 +93,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await apiService.getMe();
 
       // Admin kontrolu
-      if (user.role !== 'admin') {
+      if (!['admin', 'superadmin'].includes(user.role)) {
         localStorage.removeItem('dashboard_token');
         set({
           user: null,

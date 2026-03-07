@@ -11,6 +11,10 @@ interface User {
   station_id?: string | null;
   full_name?: string | null;
   user_id?: string;
+  depot_id?: string | null;
+  depot_code?: string | null;
+  depot_name?: string | null;
+  depot_city?: string | null;
 }
 
 interface AuthState {
@@ -19,8 +23,10 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  depotCode: string | null;
+  depotName: string | null;
 
-  login: (username: string, password: string) => Promise<User>;
+  login: (username: string, password: string, depotCode?: string) => Promise<User>;
   logout: () => void;
   checkAuth: () => Promise<void>;
 }
@@ -31,25 +37,37 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!localStorage.getItem('auth_token'),
   isLoading: false,
   error: null,
+  depotCode: localStorage.getItem('selected_depot_code'),
+  depotName: localStorage.getItem('selected_depot_name'),
 
-  login: async (username: string, password: string) => {
+  login: async (username: string, password: string, depotCode?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiService.login(username, password);
+      const response = await apiService.login(username, password, depotCode);
       const { access_token } = response;
 
       localStorage.setItem('auth_token', access_token);
+      if (depotCode) {
+        localStorage.setItem('selected_depot_code', depotCode);
+      }
 
       // Kullanıcı bilgilerini al
       const user = await apiService.getMe();
+
+      // Depo bilgisini sakla
+      if (user.depot_name) {
+        localStorage.setItem('selected_depot_name', user.depot_name);
+      }
 
       set({
         user,
         token: access_token,
         isAuthenticated: true,
         isLoading: false,
+        depotCode: user.depot_code || depotCode || null,
+        depotName: user.depot_name || null,
       });
-      
+
       return user;
     } catch (error: any) {
       set({
@@ -67,6 +85,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       token: null,
       isAuthenticated: false,
       error: null,
+      depotCode: localStorage.getItem('selected_depot_code'),
+      depotName: null,
     });
   },
 
@@ -79,10 +99,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       const user = await apiService.getMe();
+      if (user.depot_name) {
+        localStorage.setItem('selected_depot_name', user.depot_name);
+      }
       set({
         user,
         token,
         isAuthenticated: true,
+        depotCode: user.depot_code || null,
+        depotName: user.depot_name || null,
       });
     } catch (error) {
       localStorage.removeItem('auth_token');

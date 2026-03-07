@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     
     # CORS - Accept either string or list
-    CORS_ORIGINS: Union[str, List[str]] = Field(default="http://localhost:8000,http://localhost:3000")
+    CORS_ORIGINS: Union[str, List[str]] = Field(default="http://localhost:8000,http://localhost:8100")
     
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod

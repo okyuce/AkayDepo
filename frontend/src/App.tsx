@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { initTheme } from './stores/themeStore';
-// import { useVersionCheck } from './hooks/useVersionCheck';
 import LoginPage from './pages/LoginPage';
 import ExcelUploadPage from './pages/ExcelUploadPage';
 import TabletPage from './pages/TabletPage';
@@ -23,24 +22,21 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
-  
+
   // Tablet kullanıcıları Yükleme Fişleri'ne yönlendir
   if (user?.role === 'tablet') {
     return <Navigate to="/loadsheets" />;
   }
-  
+
   return <>{children}</>;
 }
 
 function App() {
   const { checkAuth } = useAuthStore();
-
-  // Otomatik versiyon kontrolü - devre dışı
-  // useVersionCheck();
 
   useEffect(() => {
     initTheme();

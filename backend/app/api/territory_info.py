@@ -9,6 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import get_session
+from app.api.auth import get_current_user
 from app.models import TerritoryInfo
 
 
@@ -32,14 +33,19 @@ router = APIRouter()
 @router.get("/")
 async def list_territories(
     include_inactive: bool = False,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Territory listesi"""
     stmt = select(TerritoryInfo)
-    
+
     if not include_inactive:
         stmt = stmt.where(TerritoryInfo.is_active == True)
-    
+
+    depot_id = current_user.get("depot_id")
+    if depot_id:
+        stmt = stmt.where(TerritoryInfo.depot_id == depot_id)
+
     stmt = stmt.order_by(TerritoryInfo.sort_order, TerritoryInfo.display_number)
     territories = session.exec(stmt).all()
     
@@ -60,6 +66,7 @@ async def list_territories(
 @router.get("/{territory_id}")
 async def get_territory(
     territory_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Territory detayı"""
@@ -81,27 +88,35 @@ async def get_territory(
 @router.post("/")
 async def create_territory(
     data: TerritoryCreate,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Yeni territory ekle"""
     # Code unique kontrolü
+    depot_id = current_user.get("depot_id")
     stmt = select(TerritoryInfo).where(TerritoryInfo.code == data.code)
+    if depot_id:
+        stmt = stmt.where(TerritoryInfo.depot_id == depot_id)
     existing = session.exec(stmt).first()
     if existing:
         raise HTTPException(400, "Bu territory kodu zaten mevcut")
-    
+
     # Son sort_order'ı bul
-    stmt = select(TerritoryInfo).order_by(TerritoryInfo.sort_order.desc())
+    stmt = select(TerritoryInfo)
+    if depot_id:
+        stmt = stmt.where(TerritoryInfo.depot_id == depot_id)
+    stmt = stmt.order_by(TerritoryInfo.sort_order.desc())
     last = session.exec(stmt).first()
     next_sort_order = (last.sort_order + 1) if last else 1
-    
+
     territory = TerritoryInfo(
         code=data.code,
         name=data.name,
         display_number=data.display_number,
         is_active=data.is_active,
         color=data.color,
-        sort_order=next_sort_order
+        sort_order=next_sort_order,
+        depot_id=current_user.get("depot_id")
     )
     
     session.add(territory)
@@ -123,16 +138,20 @@ async def create_territory(
 async def update_territory(
     territory_id: UUID,
     data: TerritoryUpdate,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Territory güncelle"""
     territory = session.get(TerritoryInfo, territory_id)
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
-    
+
     # Code unique kontrolü (eğer değiştirildiyse)
     if data.code is not None and data.code != territory.code:
+        depot_id = current_user.get("depot_id")
         stmt = select(TerritoryInfo).where(TerritoryInfo.code == data.code)
+        if depot_id:
+            stmt = stmt.where(TerritoryInfo.depot_id == depot_id)
         existing = session.exec(stmt).first()
         if existing:
             raise HTTPException(400, "Bu territory kodu zaten mevcut")
@@ -165,6 +184,7 @@ async def update_territory(
 @router.delete("/{territory_id}")
 async def delete_territory(
     territory_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Territory sil"""
@@ -184,6 +204,7 @@ async def delete_territory(
 @router.post("/reorder")
 async def reorder_territories(
     territory_ids: List[str],
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Territory sıralamasını güncelle"""

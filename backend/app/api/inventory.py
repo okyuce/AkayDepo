@@ -9,6 +9,7 @@ from uuid import UUID
 from datetime import datetime
 
 from app.core.database import get_session
+from app.api.auth import get_current_user
 from app.models import StationInventory, StockMovement, Station, Product, Loadsheet, Territory, StationAssignment, Dealer
 
 router = APIRouter()
@@ -16,6 +17,7 @@ router = APIRouter()
 @router.get("/station/{station_id}")
 async def get_station_inventory(
     station_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """İstasyonun tüm ürün stoklarını getir"""
@@ -60,6 +62,7 @@ async def get_station_inventory(
 async def update_station_inventory(
     station_id: UUID,
     payload: Dict,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """İstasyon stoklarını güncelle"""
@@ -154,6 +157,7 @@ async def get_stock_movements(
     loadsheet_id: UUID = None,
     movement_type: str = None,
     limit: int = 100,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
@@ -222,6 +226,7 @@ async def get_stock_movements(
 @router.get("/movements/loadsheet/{loadsheet_id}")
 async def get_movements_by_loadsheet(
     loadsheet_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Belirli bir fişe ait tüm stok hareketlerini getir"""
@@ -268,6 +273,7 @@ async def get_movements_by_loadsheet(
 @router.get("/territories/cycle/{cycle_id}")
 async def get_territories_by_cycle(
     cycle_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
@@ -304,6 +310,7 @@ async def get_movements_by_cycle(
     sku: str = None,
     limit: int = 500,
     offset: int = 0,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """

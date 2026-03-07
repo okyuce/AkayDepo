@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 8000",
+    "dev:superadmin": "vite --config vite.superadmin.config.ts",
     "build": "tsc && vite build",
+    "build:superadmin": "tsc && vite build --config vite.superadmin.config.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

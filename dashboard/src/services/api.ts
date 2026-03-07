@@ -130,6 +130,33 @@ export interface TerritoryDetail {
   }>;
 }
 
+export interface DepotSummaryItem {
+  depot_code: string;
+  depot_name: string;
+  depot_city: string;
+  has_active_cycle: boolean;
+  cycle_no: number | null;
+  run_time: string | null;
+  loadsheet_stats: {
+    total: number;
+    completed: number;
+    pending: number;
+    revision_cancelled: number;
+    completion_percentage: number;
+  };
+  last_completion_time: string | null;
+}
+
+export interface MultiDepotSummary {
+  depots: DepotSummaryItem[];
+  last_updated: string;
+}
+
+export interface DepotDashboardSummary extends DashboardSummary {
+  depot_code: string;
+  depot_name: string;
+}
+
 class ApiService {
   private client: AxiosInstance;
 
@@ -183,6 +210,18 @@ class ApiService {
   // Dashboard Summary
   async getDashboardSummary(): Promise<DashboardSummary> {
     const response = await this.client.get('/v1/dashboard/summary');
+    return response.data;
+  }
+
+  // Multi-Depot Summary
+  async getMultiDepotSummary(): Promise<MultiDepotSummary> {
+    const response = await this.client.get('/v1/dashboard/multi-depot/summary');
+    return response.data;
+  }
+
+  // Depot Summary
+  async getDepotSummary(depotCode: string): Promise<DepotDashboardSummary> {
+    const response = await this.client.get(`/v1/dashboard/depot/${depotCode}/summary`);
     return response.data;
   }
 

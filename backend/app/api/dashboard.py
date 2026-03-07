@@ -12,7 +12,7 @@ import json
 from app.core.database import get_session
 from app.api.auth import get_current_user
 from app.models import (
-    Cycle, Loadsheet, LoadsheetLine, Station, StationAssignment,
+    Depot, Cycle, Loadsheet, LoadsheetLine, Station, StationAssignment,
     Territory, Dealer, CycleImport, Product, Order, OrderLine
 )
 
@@ -21,7 +21,7 @@ router = APIRouter()
 
 def require_admin(current_user: dict = Depends(get_current_user)):
     """Admin yetkisi kontrolu"""
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(403, "Bu endpoint sadece yoneticiler icin")
     return current_user
 
@@ -97,6 +97,233 @@ def get_effective_loadsheets(loadsheets: list, session: Session) -> dict:
     return result
 
 
+@router.get("/multi-depot/summary")
+async def get_multi_depot_summary(
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Tum aktif depolarin yukleme fisi ozeti.
+    Multi-depot genel gorunum icin.
+    """
+    # Aktif depolari al
+    stmt = select(Depot).where(Depot.is_active == True).order_by(Depot.code)
+    depots = session.exec(stmt).all()
+
+    depot_list = []
+    for depot in depots:
+        # Bu deponun aktif dongusunu bul
+        stmt = select(Cycle).where(
+            Cycle.status == "active",
+            Cycle.depot_id == depot.id
+        ).order_by(Cycle.imported_at.desc())
+        cycle = session.exec(stmt).first()
+
+        depot_info = {
+            "depot_code": depot.code,
+            "depot_name": depot.name,
+            "depot_city": depot.city,
+            "has_active_cycle": cycle is not None,
+            "cycle_no": None,
+            "run_time": None,
+            "loadsheet_stats": {
+                "total": 0,
+                "completed": 0,
+                "pending": 0,
+                "revision_cancelled": 0,
+                "completion_percentage": 0
+            },
+            "last_completion_time": None
+        }
+
+        if cycle:
+            depot_info["cycle_no"] = cycle.cycle_no
+            depot_info["run_time"] = cycle.run_time
+
+            # Fis istatistikleri
+            stmt = select(Loadsheet).where(Loadsheet.cycle_id == cycle.id)
+            loadsheets = session.exec(stmt).all()
+
+            effective = get_effective_loadsheets(loadsheets, session)
+            active_loadsheets = [e['active'] for e in effective.values() if e['active']]
+
+            total = len(active_loadsheets)
+            completed = len([ls for ls in active_loadsheets if ls.status == "loaded"])
+            pending = len([ls for ls in active_loadsheets if ls.status == "pending"])
+
+            revision_count = sum(len(e['revisions']) for e in effective.values())
+
+            depot_info["loadsheet_stats"] = {
+                "total": total,
+                "completed": completed,
+                "pending": pending,
+                "revision_cancelled": revision_count,
+                "completion_percentage": round((completed / total * 100) if total > 0 else 0, 1)
+            }
+
+            # Son tamamlanan fisin zamani
+            stmt = select(func.max(Loadsheet.loaded_at)).where(
+                Loadsheet.cycle_id == cycle.id,
+                Loadsheet.status == "loaded"
+            )
+            last_loaded_at = session.exec(stmt).first()
+            depot_info["last_completion_time"] = last_loaded_at.isoformat() if last_loaded_at else None
+
+        depot_list.append(depot_info)
+
+    return {
+        "depots": depot_list,
+        "last_updated": datetime.now().isoformat()
+    }
+
+
+@router.get("/depot/{depot_code}/summary")
+async def get_depot_summary(
+    depot_code: str,
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Belirli bir deponun detay ozeti.
+    Mevcut /summary endpoint'inin depot_code parametreli versiyonu.
+    """
+    # Depoyu bul
+    stmt = select(Depot).where(Depot.code == depot_code)
+    depot = session.exec(stmt).first()
+    if not depot:
+        raise HTTPException(404, "Depo bulunamadi")
+
+    # Aktif donguyu bul (bu depo icin)
+    stmt = select(Cycle).where(
+        Cycle.status == "active",
+        Cycle.depot_id == depot.id
+    ).order_by(Cycle.imported_at.desc())
+    cycle = session.exec(stmt).first()
+
+    cycle_data = None
+    loadsheet_stats = {
+        "total": 0,
+        "completed": 0,
+        "pending": 0,
+        "revision_cancelled": 0,
+        "completion_percentage": 0
+    }
+    station_summary = []
+    last_import = None
+
+    if cycle:
+        # Son tamamlanan fisin zamanini bul
+        stmt = select(func.max(Loadsheet.loaded_at)).where(
+            Loadsheet.cycle_id == cycle.id,
+            Loadsheet.status == "loaded"
+        )
+        last_loaded_at = session.exec(stmt).first()
+
+        cycle_data = {
+            "id": str(cycle.id),
+            "cycle_no": cycle.cycle_no,
+            "run_time": cycle.run_time,
+            "last_completion_time": last_loaded_at.isoformat() if last_loaded_at else None,
+            "plan_date": str(cycle.plan_date),
+            "status": cycle.status
+        }
+
+        # Fis istatistikleri
+        stmt = select(Loadsheet).where(Loadsheet.cycle_id == cycle.id)
+        loadsheets = session.exec(stmt).all()
+
+        effective = get_effective_loadsheets(loadsheets, session)
+        active_loadsheets = [e['active'] for e in effective.values() if e['active']]
+        revision_count = sum(len(e['revisions']) for e in effective.values())
+
+        total = len(active_loadsheets)
+        completed = len([ls for ls in active_loadsheets if ls.status == "loaded"])
+        pending = len([ls for ls in active_loadsheets if ls.status == "pending"])
+
+        loadsheet_stats = {
+            "total": total,
+            "completed": completed,
+            "pending": pending,
+            "revision_cancelled": revision_count,
+            "completion_percentage": round((completed / total * 100) if total > 0 else 0, 1)
+        }
+
+        # Istasyon ozeti
+        stmt = select(StationAssignment).where(StationAssignment.cycle_id == cycle.id)
+        assignments = session.exec(stmt).all()
+
+        station_data = {}
+        for assignment in assignments:
+            station_id = str(assignment.station_id)
+            if station_id not in station_data:
+                station = session.get(Station, assignment.station_id)
+                station_data[station_id] = {
+                    "station_id": station_id,
+                    "station_name": station.name if station else f"Istasyon-{assignment.load_rank}",
+                    "territory_count": 0,
+                    "total_carton": 0,
+                    "completed_carton": 0,
+                    "loadsheet_ids": []
+                }
+            station_data[station_id]["territory_count"] += 1
+
+        for station_id, data in station_data.items():
+            station_assignment_ids = [
+                a.id for a in assignments if str(a.station_id) == station_id
+            ]
+            station_loadsheets = [ls for ls in loadsheets if ls.assignment_id in station_assignment_ids]
+            station_effective = get_effective_loadsheets(station_loadsheets, session)
+
+            total_carton = 0
+            completed_carton = 0
+            for dealer_data in station_effective.values():
+                active_ls = dealer_data['active']
+                if active_ls:
+                    stmt = select(
+                        func.sum(LoadsheetLine.qty_carton),
+                        func.sum(LoadsheetLine.qty_pack)
+                    ).where(LoadsheetLine.loadsheet_id == active_ls.id)
+                    result = session.exec(stmt).first()
+                    carton = (result[0] or 0) if result else 0
+                    pack = (result[1] or 0) if result else 0
+                    ls_total = int(carton + (pack / 10))
+                    total_carton += ls_total
+                    if active_ls.status == "loaded":
+                        completed_carton += ls_total
+
+            data["total_carton"] = total_carton
+            data["completed_carton"] = completed_carton
+            data["progress_percent"] = round(
+                (completed_carton / total_carton * 100) if total_carton > 0 else 0,
+                1
+            )
+
+        station_summary = sorted(station_data.values(), key=lambda x: x["station_name"])
+
+        # Son import
+        stmt = select(CycleImport).where(
+            CycleImport.cycle_id == cycle.id
+        ).order_by(CycleImport.uploaded_at.desc())
+        last_ci = session.exec(stmt).first()
+
+        if last_ci:
+            last_import = {
+                "filename": last_ci.filename,
+                "uploaded_at": last_ci.uploaded_at.isoformat(),
+                "batch_number": last_ci.batch_number
+            }
+
+    return {
+        "depot_code": depot.code,
+        "depot_name": depot.name,
+        "cycle": cycle_data,
+        "loadsheet_stats": loadsheet_stats,
+        "station_summary": station_summary,
+        "last_import": last_import,
+        "last_updated": datetime.now().isoformat()
+    }
+
+
 @router.get("/summary")
 async def get_dashboard_summary(
     session: Session = Depends(get_session),
@@ -112,9 +339,13 @@ async def get_dashboard_summary(
         - Son import bilgisi
     """
     # Aktif donguyu bul
+    depot_id = current_user.get("depot_id")
     stmt = select(Cycle).where(
         Cycle.status == "active"
-    ).order_by(Cycle.imported_at.desc())
+    )
+    if depot_id:
+        stmt = stmt.where(Cycle.depot_id == depot_id)
+    stmt = stmt.order_by(Cycle.imported_at.desc())
     cycle = session.exec(stmt).first()
 
     cycle_data = None
@@ -272,7 +503,11 @@ async def get_station_detail(
     if cycle_id:
         cycle = session.get(Cycle, cycle_id)
     else:
-        stmt = select(Cycle).where(Cycle.status == "active").order_by(Cycle.imported_at.desc())
+        depot_id = current_user.get("depot_id")
+        stmt = select(Cycle).where(Cycle.status == "active")
+        if depot_id:
+            stmt = stmt.where(Cycle.depot_id == depot_id)
+        stmt = stmt.order_by(Cycle.imported_at.desc())
         cycle = session.exec(stmt).first()
 
     if not cycle:
@@ -410,7 +645,11 @@ async def get_territory_detail(
     if cycle_id:
         cycle = session.get(Cycle, cycle_id)
     else:
-        stmt = select(Cycle).where(Cycle.status == "active").order_by(Cycle.imported_at.desc())
+        depot_id = current_user.get("depot_id")
+        stmt = select(Cycle).where(Cycle.status == "active")
+        if depot_id:
+            stmt = stmt.where(Cycle.depot_id == depot_id)
+        stmt = stmt.order_by(Cycle.imported_at.desc())
         cycle = session.exec(stmt).first()
 
     if not cycle:

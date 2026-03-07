@@ -9,6 +9,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.core.database import get_session
+from app.api.auth import get_current_user
 from app.services.station_planner import StationPlanner
 from app.services.loadsheet_generator import LoadsheetGenerator
 
@@ -23,6 +24,7 @@ class PlanRequest(BaseModel):
 async def create_plan(
     cycle_id: UUID,
     request: PlanRequest,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
@@ -61,6 +63,7 @@ async def create_plan(
 @router.get("/{cycle_id}/plan")
 async def get_plan(
     cycle_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Mevcut planı getir"""

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_session
 from app.core.websocket import manager
+from app.api.auth import get_current_user
 from app.models import LoadCounter, Cycle, Station
 
 router = APIRouter()
@@ -24,19 +25,24 @@ class CounterReading(BaseModel):
 @router.post("/")
 async def save_counter_reading(
     reading: CounterReading,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
     Sayaç okuma kaydet
-    
+
     Args:
         reading: station_id ve counter_value
     """
     try:
         station_id = UUID(reading.station_id)
-        
+
         # Aktif döngü bul
-        stmt = select(Cycle).where(Cycle.status == "active").order_by(Cycle.imported_at.desc())
+        depot_id = current_user.get("depot_id")
+        stmt = select(Cycle).where(Cycle.status == "active")
+        if depot_id:
+            stmt = stmt.where(Cycle.depot_id == depot_id)
+        stmt = stmt.order_by(Cycle.imported_at.desc())
         cycle = session.exec(stmt).first()
         
         if not cycle:
@@ -62,7 +68,8 @@ async def save_counter_reading(
         # WebSocket bildirimi gönder
         await manager.notify_counter_reading(
             station_id=station_id,
-            counter_value=reading.counter_value
+            counter_value=reading.counter_value,
+            depot_id=str(depot_id) if depot_id else "default"
         )
         
         return {
@@ -84,6 +91,7 @@ async def save_counter_reading(
 @router.get("/cycle/{cycle_id}")
 async def get_cycle_counters(
     cycle_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Döngünün tüm sayaç okumalarını getir"""
@@ -107,6 +115,7 @@ async def get_cycle_counters(
 @router.get("/station/{station_id}/latest")
 async def get_latest_counter(
     station_id: UUID,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """İstasyonun son sayaç okumasını getir"""

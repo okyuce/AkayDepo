@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 import re
 
+from app.api.auth import get_current_user
 from app.core.database import get_session
 from app.models import (
     StationAssignment, Territory, Order, OrderLine, 
@@ -24,10 +25,12 @@ class CreateStationRequest(BaseModel):
     pass  # İsim parametresi yok, otomatik oluşturulacak
 
 
-def get_next_station_number(session: Session) -> int:
+def get_next_station_number(session: Session, depot_id: str = None) -> int:
     """Sonraki istasyon numarasını bul (boşlukları doldur, yoksa sıradan devam et)"""
     # Tüm istasyonları al
     stmt = select(Station).order_by(Station.name)
+    if depot_id:
+        stmt = stmt.where(Station.depot_id == depot_id)
     stations = session.exec(stmt).all()
     
     if not stations:
@@ -56,26 +59,27 @@ def get_next_station_number(session: Session) -> int:
     return numbers[-1] + 1
 
 
-def create_tablet_user(station_number: int, station_id: UUID, session: Session) -> User:
+def create_tablet_user(station_number: int, station_id: UUID, session: Session, depot_id: str = None) -> User:
     """İstasyon için tablet kullanıcısı oluştur"""
     username = f"tablet{station_number}"
-    
+
     # Kullanıcı zaten var mı kontrol et
     stmt = select(User).where(User.username == username)
     existing_user = session.exec(stmt).first()
-    
+
     if existing_user:
         # Mevcut kullanıcıyı güncelle
         existing_user.station_id = station_id
         existing_user.is_active = True
         session.add(existing_user)
         return existing_user
-    
+
     # Yeni kullanıcı oluştur
     user = User(
         username=username,
         role="tablet",
         station_id=station_id,
+        depot_id=depot_id,
         is_active=True
     )
     user.set_password("tablet123")  # Default şifre
@@ -83,8 +87,15 @@ def create_tablet_user(station_number: int, station_id: UUID, session: Session) 
     return user
 
 @router.get("/")
-async def list_stations(session: Session = Depends(get_session)):
-    stations = session.exec(select(Station)).all()
+async def list_stations(
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(get_current_user)
+):
+    depot_id = current_user.get("depot_id")
+    stmt = select(Station)
+    if depot_id:
+        stmt = stmt.where(Station.depot_id == depot_id)
+    stations = session.exec(stmt).all()
     return [
         {
             "id": str(s.id),
@@ -96,27 +107,34 @@ async def list_stations(session: Session = Depends(get_session)):
     ]
 
 @router.post("/")
-async def create_station(session: Session = Depends(get_session)):
+async def create_station(
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Yeni istasyon oluştur (otomatik isimlendirme)
     İstasyon adı: İstasyon-1, İstasyon-2, ...
     Her istasyon için tablet kullanıcısı otomatik oluşturulur: tablet1, tablet2, ...
     """
+    depot_id = current_user.get("depot_id")
+    if not depot_id:
+        raise HTTPException(403, "Bu işlem için bir depoya atanmış olmanız gerekir")
+
     # Sonraki istasyon numarasını bul
-    station_number = get_next_station_number(session)
+    station_number = get_next_station_number(session, depot_id)
     station_name = f"İstasyon-{station_number}"
-    
+
     # İstasyon oluştur
-    station = Station(name=station_name, active=True)
+    station = Station(name=station_name, active=True, depot_id=depot_id)
     session.add(station)
     session.flush()  # ID'yi almak için flush
-    
+
     # Tablet kullanıcısı oluştur
-    tablet_user = create_tablet_user(station_number, station.id, session)
-    
+    tablet_user = create_tablet_user(station_number, station.id, session, depot_id=depot_id)
+
     session.commit()
     session.refresh(station)
-    
+
     return {
         "id": str(station.id),
         "name": station.name,
@@ -125,7 +143,7 @@ async def create_station(session: Session = Depends(get_session)):
     }
 
 @router.delete("/{station_id}")
-async def delete_station(station_id: UUID, session: Session = Depends(get_session)):
+async def delete_station(station_id: UUID, session: Session = Depends(get_session), current_user: dict = Depends(get_current_user)):
     """
     İstasyon sil
     İlgili tablet kullanıcısı da silinir
@@ -154,7 +172,7 @@ async def delete_station(station_id: UUID, session: Session = Depends(get_sessio
     }
 
 @router.put("/{station_id}")
-async def update_station(station_id: UUID, payload: Dict, session: Session = Depends(get_session)):
+async def update_station(station_id: UUID, payload: Dict, session: Session = Depends(get_session), current_user: dict = Depends(get_current_user)):
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
@@ -172,7 +190,8 @@ async def update_station(station_id: UUID, payload: Dict, session: Session = Dep
 async def get_station_distribution(
     station_id: UUID,
     cycle_id: UUID,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     İstasyon bazında detaylı ürün dağılımı (Excel formatı)
@@ -384,7 +403,8 @@ async def get_station_distribution(
 async def get_station_tracking(
     station_id: UUID,
     cycle_id: UUID,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     İstasyon bazlı ürün takip tablosu:

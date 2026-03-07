@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, UniqueConstraint
 from datetime import datetime, date
 from typing import Optional
 from uuid import UUID, uuid4
@@ -6,13 +6,17 @@ from uuid import UUID, uuid4
 class Dealer(SQLModel, table=True):
     """Bayi modeli"""
     __tablename__ = "dealers"
-    
+    __table_args__ = (
+        UniqueConstraint("code", "depot_id", name="uq_dealer_code_depot"),
+    )
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    code: str = Field(unique=True, index=True)  # BayiKodu
+    code: str = Field(index=True)  # BayiKodu
     name: str  # BayiAdı
     position_code: str  # Pozisyon
     route_order: int  # BayiRutSırası
     territory_id: UUID = Field(foreign_key="territories.id")
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class Product(SQLModel, table=True):
     """Ürün modeli"""
@@ -27,7 +31,7 @@ class Product(SQLModel, table=True):
 class Order(SQLModel, table=True):
     """Sipariş modeli"""
     __tablename__ = "orders"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     cycle_id: UUID = Field(foreign_key="cycles.id", index=True)
     external_order_code: str = Field(index=True)  # SiparişKodu
@@ -43,6 +47,7 @@ class Order(SQLModel, table=True):
     is_revision: bool = Field(default=False)  # Bu sipariş revizyon mu?
     previous_order_id: Optional[UUID] = None  # Revizyon ise önceki sipariş
     imported_at: datetime = Field(default_factory=datetime.now)
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class OrderLine(SQLModel, table=True):
     """Sipariş satırı modeli"""

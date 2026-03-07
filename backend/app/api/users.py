@@ -53,15 +53,17 @@ async def list_users(
     """
     Tüm kullanıcıları listele (sadece admin)
     """
-    # Sadece admin yetkisi kontrolü
-    if current_user["role"] != "admin":
+    # Sadece admin veya superadmin yetkisi kontrolü
+    if current_user["role"] not in ("admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bu işlem için yetkiniz yok"
         )
-    
+
     # Tüm kullanıcıları getir
     statement = select(User).order_by(User.created_at)
+    if current_user["role"] != "superadmin" and current_user.get("depot_id"):
+        statement = statement.where(User.depot_id == current_user["depot_id"])
     users = session.exec(statement).all()
     
     return [
@@ -120,8 +122,8 @@ async def reset_password(
     """
     Kullanıcının şifresini sıfırla (sadece admin)
     """
-    # Sadece admin yetkisi kontrolü
-    if current_user["role"] != "admin":
+    # Sadece admin veya superadmin yetkisi kontrolü
+    if current_user["role"] not in ("admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bu işlem için yetkiniz yok"
@@ -153,8 +155,8 @@ async def update_user(
     """
     Kullanıcı bilgilerini güncelle (sadece admin)
     """
-    # Sadece admin yetkisi kontrolü
-    if current_user["role"] != "admin":
+    # Sadece admin veya superadmin yetkisi kontrolü
+    if current_user["role"] not in ("admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bu işlem için yetkiniz yok"

@@ -12,11 +12,12 @@ class Station(SQLModel, table=True):
     active: bool = Field(default=True)
     worker_id: Optional[UUID] = None  # Depo görevlisi (opsiyonel)
     is_main_stock: bool = Field(default=False)  # AnaStok istasyonu mu?
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class StationAssignment(SQLModel, table=True):
     """İstasyon atama - territory'yi istasyona bağlar"""
     __tablename__ = "station_assignments"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     cycle_id: UUID = Field(foreign_key="cycles.id", index=True)
     plan_date: date
@@ -25,11 +26,12 @@ class StationAssignment(SQLModel, table=True):
     load_rank: int  # Sayım sırası (1..k)
     target_total_carton: int
     target_total_pack: int
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class Loadsheet(SQLModel, table=True):
     """Yükleme fişi"""
     __tablename__ = "loadsheets"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     cycle_id: UUID = Field(foreign_key="cycles.id", index=True)
     assignment_id: UUID = Field(foreign_key="station_assignments.id")
@@ -45,11 +47,12 @@ class Loadsheet(SQLModel, table=True):
     printed_at: Optional[datetime] = None
     loaded_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None  # Tamamlandığı zaman
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class LoadsheetLine(SQLModel, table=True):
     """Fiş satırı - ürünler"""
     __tablename__ = "loadsheet_lines"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     loadsheet_id: UUID = Field(foreign_key="loadsheets.id")
     product_id: UUID = Field(foreign_key="products.id")
@@ -59,10 +62,11 @@ class LoadsheetLine(SQLModel, table=True):
 class LoadCounter(SQLModel, table=True):
     """Sayım döngüsü - C1, C2, C3..."""
     __tablename__ = "load_counters"
-    
+
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     assignment_id: UUID = Field(foreign_key="station_assignments.id")
     count_index: int  # C1..Ck
     remaining_carton: int
     remaining_pack: int
     note: Optional[str] = None
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)

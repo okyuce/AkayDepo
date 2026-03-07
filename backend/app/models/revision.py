@@ -17,6 +17,7 @@ class RevisionDiff(SQLModel, table=True):
     qty_new_carton: int  # Yeni miktar
     qty_change_carton: int  # new - old (pozitif=artış, negatif=azalış)
     change_type: str  # addition, reduction, new_product, removed_product
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
     created_at: datetime = Field(default_factory=datetime.now)
     
     class Config:

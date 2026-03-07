@@ -43,12 +43,18 @@ class ApiService {
   }
 
   // Auth
-  async login(username: string, password: string) {
+  async login(username: string, password: string, depotCode?: string) {
     const response = await this.client.post('/v1/auth/login', {
       username,
       password,
+      depot_code: depotCode || undefined,
     });
     return response.data;
+  }
+
+  async getPublicDepots() {
+    const response = await this.client.get('/v1/auth/depots/public');
+    return response.data as Array<{ code: string; name: string; city: string }>;
   }
 
   async logout() {
@@ -331,6 +337,89 @@ class ApiService {
     const response = await this.client.post('/v1/users/change-password', {
       current_password: currentPassword,
       new_password: newPassword,
+    });
+    return response.data;
+  }
+
+  // Depots (SuperAdmin)
+  async getDepots() {
+    const response = await this.client.get('/v1/depots/');
+    return response.data as Array<{
+      id: string;
+      code: string;
+      name: string;
+      city: string;
+      is_active: boolean;
+      user_count: number;
+      station_count: number;
+      has_active_cycle: boolean;
+      active_cycle_date: string | null;
+      created_at: string;
+    }>;
+  }
+
+  async createDepot(data: { code: string; name: string; city: string }) {
+    const response = await this.client.post('/v1/depots/', data);
+    return response.data;
+  }
+
+  async updateDepot(depotId: string, data: { name?: string; city?: string; is_active?: boolean }) {
+    const response = await this.client.put(`/v1/depots/${depotId}`, data);
+    return response.data;
+  }
+
+  // SuperAdmin Users
+  async getSuperadminUsers(depotId?: string) {
+    const params: Record<string, string> = {};
+    if (depotId) params.depot_id = depotId;
+    const response = await this.client.get('/v1/superadmin/users', { params });
+    return response.data as Array<{
+      id: string;
+      username: string;
+      full_name: string | null;
+      role: string;
+      is_active: boolean;
+      depot_id: string | null;
+      depot_code: string | null;
+      depot_name: string | null;
+      station_id: string | null;
+      station_name: string | null;
+      created_at: string;
+    }>;
+  }
+
+  async createSuperadminUser(data: {
+    username: string;
+    password: string;
+    full_name?: string;
+    role: string;
+    depot_id?: string;
+    station_id?: string;
+  }) {
+    const response = await this.client.post('/v1/superadmin/users', data);
+    return response.data;
+  }
+
+  async updateSuperadminUser(userId: string, data: {
+    full_name?: string;
+    role?: string;
+    depot_id?: string;
+    station_id?: string;
+    is_active?: boolean;
+    new_password?: string;
+  }) {
+    const response = await this.client.put(`/v1/superadmin/users/${userId}`, data);
+    return response.data;
+  }
+
+  async deactivateSuperadminUser(userId: string) {
+    const response = await this.client.delete(`/v1/superadmin/users/${userId}`);
+    return response.data;
+  }
+
+  async initDepot(depotId: string, workerCount: number) {
+    const response = await this.client.post(`/v1/superadmin/depots/${depotId}/init`, {
+      worker_count: workerCount,
     });
     return response.data;
   }

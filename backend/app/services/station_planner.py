@@ -13,13 +13,15 @@ class StationPlanner:
     
     def __init__(self, session: Session):
         self.session = session
-    
+        self._depot_id = None
+
     def create_plan(
         self,
         cycle_id: UUID,
         worker_count: int,
         force_station_count: Optional[int] = None,
-        method: str = "greedy"
+        method: str = "greedy",
+        depot_id: str = None
     ) -> Dict:
         """
         İstasyon planı oluştur
@@ -33,6 +35,8 @@ class StationPlanner:
         Returns:
             Plan detayları ve uyarılar
         """
+        self._depot_id = depot_id
+
         # Cycle bilgisi al
         cycle = self.session.get(Cycle, cycle_id)
         if not cycle:
@@ -86,7 +90,7 @@ class StationPlanner:
 
 # Manuel planlama açık mı?
         from app.models import PlanningConfig, StationTerritoryMap, TerritoryInfo
-        cfg = self.session.exec(select(PlanningConfig)).first()
+        cfg = self.session.exec(select(PlanningConfig).where(PlanningConfig.depot_id == self._depot_id)).first() if self._depot_id else self.session.exec(select(PlanningConfig)).first()
         manual_mode = bool(cfg and not cfg.auto_planning_enabled)
 
         existing_assignments = self.session.exec(
@@ -99,7 +103,7 @@ class StationPlanner:
             
             mappings = self.session.exec(select(StationTerritoryMap)).all()
             # Aktif istasyon seti
-            active_station_ids = {s.id for s in self.session.exec(select(Station).where(Station.active == True)).all()}
+            active_station_ids = {s.id for s in self.session.exec(select(Station).where(Station.active == True, Station.depot_id == self._depot_id)).all()} if self._depot_id else {s.id for s in self.session.exec(select(Station).where(Station.active == True)).all()}
 
             by_station: Dict[UUID, List[str]] = {}
             for m in mappings:
@@ -343,7 +347,7 @@ class StationPlanner:
             stmt = select(Station).where(Station.name == station_name)
             station = self.session.exec(stmt).first()
             if not station:
-                station = Station(name=station_name, active=True)
+                station = Station(name=station_name, active=True, depot_id=self._depot_id)
                 self.session.add(station)
                 self.session.flush()
         
@@ -371,7 +375,8 @@ class StationPlanner:
                     territory_id=territory.id,
                     load_rank=rank,
                     target_total_carton=int(total_carton),
-                    target_total_pack=0
+                    target_total_pack=0,
+                    depot_id=self._depot_id
                 )
                 self.session.add(assignment)
         self.session.commit()

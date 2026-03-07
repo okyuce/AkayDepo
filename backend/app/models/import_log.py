@@ -13,4 +13,5 @@ class CycleImport(SQLModel, table=True):
     filename: str
     file_size: int
     file_hash: str  # sha256
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
     uploaded_at: datetime = Field(default_factory=datetime.now)

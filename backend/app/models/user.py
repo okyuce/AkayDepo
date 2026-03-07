@@ -19,6 +19,7 @@ class User(SQLModel, table=True):
     full_name: Optional[str] = Field(default=None)  # İsim soyisim (opsiyonel)
     role: str = Field(nullable=False)  # "admin" veya "tablet"
     station_id: Optional[UUID] = Field(default=None, foreign_key="stations.id")  # Tablet için dolu
+    depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)  # Superadmin için None
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

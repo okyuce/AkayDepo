@@ -77,10 +77,13 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
             <Link to="/" className="flex items-center space-x-2 text-xl font-bold hover:text-blue-200 transition">
+              {user?.depot_city && (
+                <span className="text-yellow-300">{user.depot_city.toUpperCase()}</span>
+              )}
               <span>AkayDepo</span>
               <span className="text-sm text-blue-200 font-normal">v{APP_VERSION}</span>
             </Link>
-            
+
             {user && (
               <nav className="flex space-x-4">
                 {/* Admin kullanıcılar için menü */}
@@ -106,7 +109,7 @@ export default function Navbar() {
                     </Link>
                   </>
                 )}
-                
+
                 {/* Tüm kullanıcılar için İstasyon Dağılımı */}
                 <Link
                   to="/distribution"
@@ -114,7 +117,7 @@ export default function Navbar() {
                 >
                   İstasyon Dağılımı
                 </Link>
-                
+
                 {/* Tüm kullanıcılar için Yükleme Fişleri */}
                 <Link
                   to="/loadsheets"
@@ -123,7 +126,7 @@ export default function Navbar() {
                   Yükleme Fişleri
                 </Link>
 
-                {/* Admin kullanıcılar için Stok Hareketleri - en sonda */}
+                {/* Admin kullanıcılar için Stok Hareketleri */}
                 {user.role === 'admin' && (
                   <Link
                     to="/stock-movements"
@@ -139,7 +142,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             {user && (
               <>
-                {/* Tanımlar Dropdown - SAĞDA */}
+                {/* Tanımlar Dropdown - SAĞDA (sadece admin) */}
                 {user.role === 'admin' && (
                   <div className="relative" ref={definitionsDropdownRef}>
                     <button
