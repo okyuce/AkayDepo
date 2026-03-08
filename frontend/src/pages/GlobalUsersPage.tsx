@@ -111,11 +111,7 @@ export default function GlobalUsersPage({ navbarOverride }: { navbarOverride?: R
 
   const handleToggleActive = async (user: SuperUser) => {
     try {
-      if (user.is_active) {
-        await apiService.deactivateSuperadminUser(user.id);
-      } else {
-        await apiService.updateSuperadminUser(user.id, { is_active: true });
-      }
+      await apiService.updateSuperadminUser(user.id, { is_active: !user.is_active });
       loadUsers();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'İşlem başarısız');

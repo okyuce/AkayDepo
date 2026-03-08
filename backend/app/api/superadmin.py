@@ -184,34 +184,24 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}")
-async def deactivate_user(
+async def delete_user(
     user_id: UUID,
     session: Session = Depends(get_session),
     current_user: dict = Depends(require_superadmin)
 ):
-    """Kullanıcıyı pasifleştir"""
+    """Kullanıcıyı kalıcı olarak sil"""
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(404, "Kullanıcı bulunamadı")
 
     if user.role == "superadmin":
-        # Başka aktif superadmin var mı kontrol et
-        other_superadmins = session.exec(
-            select(User).where(
-                User.role == "superadmin",
-                User.is_active == True,
-                User.id != user_id
-            )
-        ).all()
-        if not other_superadmins:
-            raise HTTPException(400, "Son superadmin pasifleştirilemez")
+        raise HTTPException(400, "SuperAdmin kullanıcı silinemez")
 
-    user.is_active = False
-    user.updated_at = datetime.now()
-    session.add(user)
+    username = user.username
+    session.delete(user)
     session.commit()
 
-    return {"success": True, "message": f"{user.username} pasifleştirildi"}
+    return {"success": True, "message": f"{username} silindi"}
 
 
 # --- Depo Başlatma ---
