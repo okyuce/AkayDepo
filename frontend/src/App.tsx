@@ -126,6 +126,7 @@ function App() {
             </AdminRoute>
           }
         />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   );
