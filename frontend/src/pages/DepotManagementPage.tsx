@@ -263,7 +263,10 @@ export default function DepotManagementPage({ navbarOverride }: { navbarOverride
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => setInitDepotId(depot.id)}
+                        onClick={() => {
+                          setInitDepotId(depot.id);
+                          setWorkerCount(depot.station_count > 1 ? depot.station_count - 1 : 5);
+                        }}
                         className={`text-white text-xs px-3 py-1 rounded ${
                           depot.user_count === 0
                             ? 'bg-orange-500 hover:bg-orange-600'
