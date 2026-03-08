@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.06"
+VERSION = "2.0.07"
 
 
 @asynccontextmanager
@@ -17,21 +17,37 @@ async def lifespan(app: FastAPI):
 
     try:
         with Session(engine) as session:
-            # depot_id'si NULL olan istasyonları sil (eski sistemden kalma)
-            result = session.exec(text("DELETE FROM stations WHERE depot_id IS NULL"))
-            if result.rowcount > 0:
-                logger.info(f"Startup: {result.rowcount} orphan istasyon silindi (depot_id NULL)")
+            # Aktif döngüsü olan depoyu bul (orphan verileri bu depoya ata)
+            row = session.exec(text(
+                "SELECT DISTINCT depot_id FROM cycles WHERE depot_id IS NOT NULL LIMIT 1"
+            )).first()
 
-            # depot_id'si NULL olan kullanıcıları temizle (superadmin ve dashboard hariç)
-            result = session.exec(text(
-                "DELETE FROM users WHERE depot_id IS NULL AND role NOT IN ('superadmin', 'admin')"
-            ))
-            if result.rowcount > 0:
-                logger.info(f"Startup: {result.rowcount} orphan kullanıcı silindi (depot_id NULL)")
+            if row:
+                target_depot_id = row[0]
+                # depot_id NULL olan tüm tabloları güncelle
+                tables = [
+                    "stations", "station_assignments", "station_territory_map",
+                    "station_inventory", "stock_movements", "orders",
+                    "territories", "territory_info", "loadsheets",
+                    "dealers", "load_counters", "revision_diffs", "planning_config",
+                ]
+                for table in tables:
+                    result = session.exec(text(
+                        f"UPDATE {table} SET depot_id = :depot_id WHERE depot_id IS NULL"
+                    ), {"depot_id": str(target_depot_id)})
+                    if result.rowcount > 0:
+                        logger.info(f"Startup: {table} tablosunda {result.rowcount} kayıt depot_id atandı")
 
-            session.commit()
+                # Kullanıcılar — superadmin ve admin hariç
+                result = session.exec(text(
+                    "UPDATE users SET depot_id = :depot_id WHERE depot_id IS NULL AND role NOT IN ('superadmin', 'admin')"
+                ), {"depot_id": str(target_depot_id)})
+                if result.rowcount > 0:
+                    logger.info(f"Startup: users tablosunda {result.rowcount} kayıt depot_id atandı")
+
+                session.commit()
     except Exception as e:
-        logger.warning(f"Startup orphan temizleme hatası: {e}")
+        logger.warning(f"Startup orphan düzeltme hatası: {e}")
 
     yield
 
