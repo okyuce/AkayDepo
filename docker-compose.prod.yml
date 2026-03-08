@@ -116,8 +116,7 @@ services:
       - "8100:8100"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/letsencrypt/live/depo.akaitech.com.tr/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
-      - /etc/letsencrypt/live/depo.akaitech.com.tr/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - api
       - web
