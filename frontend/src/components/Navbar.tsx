@@ -76,10 +76,10 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
+            {user?.depot_city && (
+              <span className="text-yellow-300 text-2xl font-extrabold tracking-wide mr-1">{user.depot_city.toUpperCase()}</span>
+            )}
             <Link to="/" className="flex items-center space-x-2 text-xl font-bold hover:text-blue-200 transition">
-              {user?.depot_city && (
-                <span className="text-yellow-300">{user.depot_city.toUpperCase()}</span>
-              )}
               <span>AkayDepo</span>
               <span className="text-sm text-blue-200 font-normal">v{APP_VERSION}</span>
             </Link>
