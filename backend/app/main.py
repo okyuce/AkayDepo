@@ -1,13 +1,46 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+import logging
 
-VERSION = "2.0.05"
+logger = logging.getLogger(__name__)
+
+VERSION = "2.0.06"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: orphan verileri temizle (depot_id NULL olan kayıtlar)"""
+    from app.core.database import engine
+    from sqlmodel import Session, text
+
+    try:
+        with Session(engine) as session:
+            # depot_id'si NULL olan istasyonları sil (eski sistemden kalma)
+            result = session.exec(text("DELETE FROM stations WHERE depot_id IS NULL"))
+            if result.rowcount > 0:
+                logger.info(f"Startup: {result.rowcount} orphan istasyon silindi (depot_id NULL)")
+
+            # depot_id'si NULL olan kullanıcıları temizle (superadmin ve dashboard hariç)
+            result = session.exec(text(
+                "DELETE FROM users WHERE depot_id IS NULL AND role NOT IN ('superadmin', 'admin')"
+            ))
+            if result.rowcount > 0:
+                logger.info(f"Startup: {result.rowcount} orphan kullanıcı silindi (depot_id NULL)")
+
+            session.commit()
+    except Exception as e:
+        logger.warning(f"Startup orphan temizleme hatası: {e}")
+
+    yield
+
 
 app = FastAPI(
     title="AkayDepo API",
     description="Depo Transfer Yönetim Sistemi",
-    version=VERSION
+    version=VERSION,
+    lifespan=lifespan,
 )
 
 # CORS
