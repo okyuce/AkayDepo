@@ -32,6 +32,7 @@ DEPOTS = [
     ("CIH", "Cihanbeyli Deposu", "Cihanbeyli"),
     ("KON", "Konya Deposu", "Konya"),
 ]
+# NOT: Akhisar ve Sivas depoları kaldırıldı
 
 # depot_id eklenecek tablolar
 TABLES_WITH_DEPOT = [

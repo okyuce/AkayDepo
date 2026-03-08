@@ -47,6 +47,16 @@ export default function GlobalUsersPage({ navbarOverride }: { navbarOverride?: R
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState('');
 
+  // Düzenleme
+  const [editUser, setEditUser] = useState<SuperUser | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editRole, setEditRole] = useState('');
+  const [editDepotId, setEditDepotId] = useState('');
+
+  // Silme onay
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteUsername, setDeleteUsername] = useState('');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -121,6 +131,42 @@ export default function GlobalUsersPage({ navbarOverride }: { navbarOverride?: R
       setSuccess('Şifre sıfırlandı');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Şifre sıfırlanamadı');
+    }
+  };
+
+  const openEditDialog = (user: SuperUser) => {
+    setEditUser(user);
+    setEditFullName(user.full_name || '');
+    setEditRole(user.role);
+    setEditDepotId(user.depot_id || '');
+  };
+
+  const handleEditUser = async () => {
+    if (!editUser) return;
+    try {
+      await apiService.updateSuperadminUser(editUser.id, {
+        full_name: editFullName || undefined,
+        role: editRole,
+        depot_id: editDepotId || undefined,
+      });
+      setEditUser(null);
+      setSuccess('Kullanıcı güncellendi');
+      loadUsers();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Güncelleme başarısız');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
+    try {
+      await apiService.deactivateSuperadminUser(deleteUserId);
+      setDeleteUserId(null);
+      setDeleteUsername('');
+      setSuccess('Kullanıcı silindi');
+      loadUsers();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Silme başarısız');
     }
   };
 
@@ -308,6 +354,94 @@ export default function GlobalUsersPage({ navbarOverride }: { navbarOverride?: R
           </div>
         )}
 
+        {/* Düzenleme Dialog */}
+        {editUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Kullanıcı Düzenle: <span className="font-mono text-blue-600 dark:text-blue-400">{editUser.username}</span>
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ad Soyad</label>
+                  <input
+                    type="text"
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="admin">Yönetici</option>
+                    <option value="tablet">Tablet</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Depo</label>
+                  <select
+                    value={editDepotId}
+                    onChange={(e) => setEditDepotId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="">-- Depo Seçin --</option>
+                    {depots.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex space-x-3 mt-4">
+                <button
+                  onClick={handleEditUser}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 text-sm"
+                >
+                  Kaydet
+                </button>
+                <button
+                  onClick={() => setEditUser(null)}
+                  className="flex-1 bg-gray-400 text-white py-2 rounded-md hover:bg-gray-500 text-sm"
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Silme Onay Dialog */}
+        {deleteUserId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Kullanıcı Sil</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <span className="font-mono font-bold text-red-600 dark:text-red-400">{deleteUsername}</span> kullanıcısını silmek istediğinize emin misiniz?
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleDeleteUser}
+                  className="flex-1 bg-red-600 text-white py-2 rounded-md hover:bg-red-700 text-sm"
+                >
+                  Sil
+                </button>
+                <button
+                  onClick={() => { setDeleteUserId(null); setDeleteUsername(''); }}
+                  className="flex-1 bg-gray-400 text-white py-2 rounded-md hover:bg-gray-500 text-sm"
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Kullanıcı Tablosu */}
         {loading ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">Yükleniyor...</div>
@@ -352,12 +486,28 @@ export default function GlobalUsersPage({ navbarOverride }: { navbarOverride?: R
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => setResetUserId(user.id)}
-                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
-                      >
-                        Şifre Sıfırla
-                      </button>
+                      <div className="flex items-center justify-center space-x-2">
+                        <button
+                          onClick={() => openEditDialog(user)}
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          onClick={() => setResetUserId(user.id)}
+                          className="text-yellow-600 dark:text-yellow-400 hover:underline text-xs"
+                        >
+                          Şifre Sıfırla
+                        </button>
+                        {user.role !== 'superadmin' && (
+                          <button
+                            onClick={() => { setDeleteUserId(user.id); setDeleteUsername(user.username); }}
+                            className="text-red-600 dark:text-red-400 hover:underline text-xs"
+                          >
+                            Sil
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
