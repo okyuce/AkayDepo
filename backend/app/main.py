@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.07"
+VERSION = "2.0.08"
 
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     try:
         with Session(engine) as session:
             # Aktif döngüsü olan depoyu bul (orphan verileri bu depoya ata)
-            row = session.exec(text(
+            row = session.execute(text(
                 "SELECT DISTINCT depot_id FROM cycles WHERE depot_id IS NOT NULL LIMIT 1"
             )).first()
 
@@ -32,14 +32,14 @@ async def lifespan(app: FastAPI):
                     "dealers", "load_counters", "revision_diffs", "planning_config",
                 ]
                 for table in tables:
-                    result = session.exec(text(
+                    result = session.execute(text(
                         f"UPDATE {table} SET depot_id = :depot_id WHERE depot_id IS NULL"
                     ), {"depot_id": str(target_depot_id)})
                     if result.rowcount > 0:
                         logger.info(f"Startup: {table} tablosunda {result.rowcount} kayıt depot_id atandı")
 
                 # Kullanıcılar — superadmin ve admin hariç
-                result = session.exec(text(
+                result = session.execute(text(
                     "UPDATE users SET depot_id = :depot_id WHERE depot_id IS NULL AND role NOT IN ('superadmin', 'admin')"
                 ), {"depot_id": str(target_depot_id)})
                 if result.rowcount > 0:
