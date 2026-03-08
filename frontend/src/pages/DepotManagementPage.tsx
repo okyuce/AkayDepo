@@ -31,7 +31,7 @@ export default function DepotManagementPage({ navbarOverride }: { navbarOverride
 
   // Başlatma dialog
   const [initDepotId, setInitDepotId] = useState<string | null>(null);
-  const [workerCount, setWorkerCount] = useState(1);
+  const [workerCount, setWorkerCount] = useState(5);
   const [initLoading, setInitLoading] = useState(false);
 
   useEffect(() => {
@@ -191,16 +191,19 @@ export default function DepotManagementPage({ navbarOverride }: { navbarOverride
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Depoculu Sayısı
+                  Depocu (Tablet) Sayısı
                 </label>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
                   value={workerCount}
                   onChange={(e) => setWorkerCount(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                >
-                  <option value={1}>1 Depoculu</option>
-                  <option value={2}>2 Depoculu</option>
-                </select>
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Her depocu için 1 tablet kullanıcısı ve 1 istasyon oluşturulur.
+                </p>
               </div>
               <div className="flex space-x-3">
                 <button
