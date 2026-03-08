@@ -82,13 +82,20 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(401, "Kullanıcı bulunamadı veya aktif değil")
 
-    # Depo bilgisini al
-    depot_id = str(user.depot_id) if user.depot_id else None
+    # Depo bilgisini al (superadmin için token'daki depot_id kullanılır)
+    effective_depot_id = user.depot_id
+    if user.role == "superadmin" and not user.depot_id:
+        token_depot_id = payload.get("depot_id")
+        if token_depot_id:
+            from uuid import UUID
+            effective_depot_id = UUID(token_depot_id)
+
+    depot_id = str(effective_depot_id) if effective_depot_id else None
     depot_code = None
     depot_name = None
     depot_city = None
-    if user.depot_id:
-        depot = session.get(Depot, user.depot_id)
+    if effective_depot_id:
+        depot = session.get(Depot, effective_depot_id)
         if depot:
             depot_code = depot.code
             depot_name = depot.name
@@ -206,6 +213,15 @@ async def login(request: LoginRequest, session: Session = Depends(get_session)):
                 detail="Bu depoya erişim yetkiniz yok",
             )
 
+    # Superadmin depo seçtiyse, seçilen depo bilgisini token'a yaz
+    token_depot_id = str(user.depot_id) if user.depot_id else None
+    if user.role == "superadmin" and request.depot_code:
+        selected_depot = session.exec(
+            select(Depot).where(Depot.code == request.depot_code, Depot.is_active == True)
+        ).first()
+        if selected_depot:
+            token_depot_id = str(selected_depot.id)
+
     # Token oluştur
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -213,7 +229,7 @@ async def login(request: LoginRequest, session: Session = Depends(get_session)):
             "sub": user.username,
             "user_id": str(user.id),
             "role": user.role,
-            "depot_id": str(user.depot_id) if user.depot_id else None,
+            "depot_id": token_depot_id,
         },
         expires_delta=access_token_expires
     )

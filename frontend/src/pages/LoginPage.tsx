@@ -47,10 +47,7 @@ export default function LoginPage() {
     try {
       const user = await login(username, password, depotCode || undefined);
 
-      // Superadmin ise superadmin paneline yönlendir
-      if (user?.role === 'superadmin') {
-        navigate('/superadmin');
-      } else if (user?.role === 'tablet') {
+      if (user?.role === 'tablet') {
         navigate('/loadsheets');
       } else {
         navigate('/');

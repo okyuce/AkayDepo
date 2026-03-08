@@ -87,7 +87,7 @@ export default function Navbar() {
             {user && (
               <nav className="flex space-x-4">
                 {/* Admin kullanıcılar için menü */}
-                {user.role === 'admin' && (
+                {['admin', 'superadmin'].includes(user.role) && (
                   <>
                     <Link
                       to="/territory-assignment"
@@ -127,7 +127,7 @@ export default function Navbar() {
                 </Link>
 
                 {/* Admin kullanıcılar için Stok Hareketleri */}
-                {user.role === 'admin' && (
+                {['admin', 'superadmin'].includes(user.role) && (
                   <Link
                     to="/stock-movements"
                     className={linkClasses(location.pathname === '/stock-movements')}
@@ -143,7 +143,7 @@ export default function Navbar() {
             {user && (
               <>
                 {/* Tanımlar Dropdown - SAĞDA (sadece admin) */}
-                {user.role === 'admin' && (
+                {['admin', 'superadmin'].includes(user.role) && (
                   <div className="relative" ref={definitionsDropdownRef}>
                     <button
                       onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
