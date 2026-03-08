@@ -43,6 +43,11 @@ async def list_depots(
             select(User).where(User.depot_id == depot.id, User.is_active == True)
         ).all())
 
+        # Tablet kullanıcı sayısı
+        tablet_count = len(session.exec(
+            select(User).where(User.depot_id == depot.id, User.role == "tablet", User.is_active == True)
+        ).all())
+
         # İstasyon sayısı
         station_count = len(session.exec(
             select(Station).where(Station.depot_id == depot.id)
@@ -55,6 +60,7 @@ async def list_depots(
             "city": depot.city,
             "is_active": depot.is_active,
             "user_count": user_count,
+            "tablet_count": tablet_count,
             "station_count": station_count,
         })
 

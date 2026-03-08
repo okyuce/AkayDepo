@@ -351,6 +351,7 @@ class ApiService {
       city: string;
       is_active: boolean;
       user_count: number;
+      tablet_count: number;
       station_count: number;
       has_active_cycle: boolean;
       active_cycle_date: string | null;

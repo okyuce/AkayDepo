@@ -14,6 +14,7 @@ interface Depot {
   city: string;
   is_active: boolean;
   user_count: number;
+  tablet_count: number;
   station_count: number;
 }
 
@@ -265,7 +266,7 @@ export default function DepotManagementPage({ navbarOverride }: { navbarOverride
                       <button
                         onClick={() => {
                           setInitDepotId(depot.id);
-                          setWorkerCount(depot.station_count > 1 ? depot.station_count - 1 : 5);
+                          setWorkerCount(depot.tablet_count > 0 ? depot.tablet_count : 5);
                         }}
                         className={`text-white text-xs px-3 py-1 rounded ${
                           depot.user_count === 0
