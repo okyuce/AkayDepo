@@ -192,70 +192,56 @@ async def cancel_pending(
     if not depot_id:
         raise HTTPException(403, "Bu işlem için bir depoya atanmış olmanız gerekir")
 
-    from app.models import (
-        Territory, Dealer, Product, Order, OrderLine,
-        Loadsheet, LoadsheetLine, Station, StationAssignment,
-        LoadCounter, RevisionDiff, CycleImport
-    )
-    from app.models.inventory import StockMovement
-
     try:
+        from sqlmodel import text
+
         # TÜM verileri sil - SADECE BU DEPOYA AİT
-        # Sıralama önemli: önce bağımlı tablolar, sonra parent tablolar
+        # SQL DELETE ile doğrudan sil (autoflush sorununu önler)
+        # Sıralama: önce child tablolar, sonra parent tablolar
+
+        depot_id_str = str(depot_id)
 
         # 1. StockMovement
-        for item in session.exec(select(StockMovement).where(StockMovement.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM stock_movements WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 2. LoadsheetLine (Loadsheet üzerinden depot filtresi)
-        depot_loadsheets = session.exec(select(Loadsheet).where(Loadsheet.depot_id == depot_id)).all()
-        depot_loadsheet_ids = [ls.id for ls in depot_loadsheets]
-        if depot_loadsheet_ids:
-            for item in session.exec(select(LoadsheetLine).where(LoadsheetLine.loadsheet_id.in_(depot_loadsheet_ids))).all():
-                session.delete(item)
+        # 2. LoadsheetLine (loadsheet üzerinden)
+        session.execute(text(
+            "DELETE FROM loadsheet_lines WHERE loadsheet_id IN "
+            "(SELECT id FROM loadsheets WHERE depot_id = :did)"
+        ), {"did": depot_id_str})
 
         # 3. Loadsheet
-        for item in depot_loadsheets:
-            session.delete(item)
+        session.execute(text("DELETE FROM loadsheets WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 4. StationAssignment
-        for item in session.exec(select(StationAssignment).where(StationAssignment.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM station_assignments WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 5. OrderLine (Order üzerinden depot filtresi)
-        depot_orders = session.exec(select(Order).where(Order.depot_id == depot_id)).all()
-        depot_order_ids = [o.id for o in depot_orders]
-        if depot_order_ids:
-            for item in session.exec(select(OrderLine).where(OrderLine.order_id.in_(depot_order_ids))).all():
-                session.delete(item)
+        # 5. OrderLine (order üzerinden)
+        session.execute(text(
+            "DELETE FROM order_lines WHERE order_id IN "
+            "(SELECT id FROM orders WHERE depot_id = :did)"
+        ), {"did": depot_id_str})
 
         # 6. Order
-        for item in depot_orders:
-            session.delete(item)
+        session.execute(text("DELETE FROM orders WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 7. LoadCounter
-        for item in session.exec(select(LoadCounter).where(LoadCounter.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM load_counters WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 8. RevisionDiff
-        for item in session.exec(select(RevisionDiff).where(RevisionDiff.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM revision_diffs WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 9. CycleImport
-        for item in session.exec(select(CycleImport).where(CycleImport.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM cycle_imports WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 10. Cycle
-        for item in session.exec(select(Cycle).where(Cycle.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM cycles WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 11. Dealer
-        for item in session.exec(select(Dealer).where(Dealer.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM dealers WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 12. Territory
-        for item in session.exec(select(Territory).where(Territory.depot_id == depot_id)).all():
-            session.delete(item)
+        session.execute(text("DELETE FROM territories WHERE depot_id = :did"), {"did": depot_id_str})
 
         session.commit()
 
