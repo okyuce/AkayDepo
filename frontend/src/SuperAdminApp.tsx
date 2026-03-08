@@ -101,13 +101,19 @@ function SuperAdminNavbar() {
 }
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, isLoading } = useAuthStore();
+
+  // checkAuth henüz tamamlanmadıysa bekle
+  if (!user && isAuthenticated && !isLoading) {
+    // Token var ama user henüz yüklenmedi — checkAuth devam ediyor olabilir
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
-  if (user?.role !== 'superadmin') {
+  if (user && user.role !== 'superadmin') {
     useAuthStore.getState().logout();
     return <Navigate to="/login" />;
   }

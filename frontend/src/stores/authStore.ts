@@ -93,10 +93,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: async () => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-      set({ isAuthenticated: false, user: null });
+      set({ isAuthenticated: false, user: null, isLoading: false });
       return;
     }
 
+    set({ isLoading: true });
     try {
       const user = await apiService.getMe();
       if (user.depot_name) {
@@ -106,6 +107,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         user,
         token,
         isAuthenticated: true,
+        isLoading: false,
         depotCode: user.depot_code || null,
         depotName: user.depot_name || null,
       });
@@ -115,6 +117,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: null,
         token: null,
         isAuthenticated: false,
+        isLoading: false,
       });
     }
   },
