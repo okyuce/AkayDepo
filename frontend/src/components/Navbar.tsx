@@ -149,9 +149,8 @@ export default function Navbar() {
                       onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
                       className={
                         'px-3 py-2 rounded-md text-sm font-medium transition flex items-center ' +
-                        (location.pathname.startsWith('/territories') || 
+                        (location.pathname.startsWith('/territories') ||
                          location.pathname.startsWith('/product-order') ||
-                         location.pathname.startsWith('/users') ||
                          location.pathname.startsWith('/change-password')
                           ? 'bg-blue-700 text-white'
                           : 'text-blue-100 hover:bg-blue-500')
@@ -178,13 +177,6 @@ export default function Navbar() {
                           className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
                         >
                           Ürün Sıralaması
-                        </Link>
-                        <Link
-                          to="/users"
-                          onClick={() => setIsDefinitionsOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-md"
-                        >
-                          Kullanıcı Yönetimi
                         </Link>
                         <Link
                           to="/change-password"

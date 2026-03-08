@@ -11,7 +11,6 @@ import TerritoryListPage from './pages/TerritoryListPage';
 import TerritoryAssignmentPage from './pages/TerritoryAssignmentPage';
 import StockDistributionPage from './pages/StockDistributionPage';
 import ProductOrderPage from './pages/ProductOrderPage';
-import UsersManagementPage from './pages/UsersManagementPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import StockMovementsPage from './pages/StockMovementsPage';
 
@@ -108,14 +107,6 @@ function App() {
           element={
             <AdminRoute>
               <ProductOrderPage />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/users"
-          element={
-            <AdminRoute>
-              <UsersManagementPage />
             </AdminRoute>
           }
         />
