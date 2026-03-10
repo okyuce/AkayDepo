@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.20"
+VERSION = "2.0.21"
 
 
 @asynccontextmanager
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
                     "station_inventory", "stock_movements", "orders",
                     "territories", "territory_info", "loadsheets",
                     "dealers", "load_counters", "revision_diffs", "planning_config",
+                    "cycle_imports", "cycles",
                 ]
                 for table in tables:
                     result = session.execute(text(

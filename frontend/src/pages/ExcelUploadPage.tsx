@@ -54,38 +54,30 @@ export default function ExcelUploadPage() {
         setCycleId(cycle.id);
         localStorage.setItem('latest_cycle_id', cycle.id);
 
-        // İstasyon sayısı kilitliyse input'u kilitle
-        if (typeof cycle.fixed_station_count === 'number' && cycle.fixed_station_count > 0) {
-          setNumStations(cycle.fixed_station_count);
-          setIsPlanLocked(true);
-        }
-        
         // Plan var mı kontrol et
         if (cycle.has_plan) {
           try {
             const plan = await apiService.getPlan(cycle.id);
             if (plan && plan.stations) {
+              // Plandaki gerçek istasyon sayısını set et
+              setNumStations(plan.stations.length);
+              setIsPlanLocked(true);
+
               // Plan formatını dönüştür
               const formattedPlan = {
-                total_territories: plan.stations.reduce((sum: number, s: any) => 
+                total_territories: plan.stations.reduce((sum: number, s: any) =>
                   sum + s.territories.length, 0),
                 num_stations: plan.stations.length,
                 assignments: plan.stations.map((s: any) => ({
                   station_name: s.station_name,
-                  territories: s.territories.map((t: any) => 
+                  territories: s.territories.map((t: any) =>
                     `${t.display_number}-${t.territory_code.split('-')[1]}`),
                   total_carton: s.total_carton
                 })),
                 unbalanced_territories: []
               };
               setPlanResult(formattedPlan);
-              
-              // Plan lock durumunu kontrol et
-              const lockStatus = localStorage.getItem('plan_locked_' + cycle.id);
-              if (lockStatus === 'true') {
-                setIsPlanLocked(true);
-              }
-              
+
               // Plan butonu disable durumunu kontrol et
               const planButtonStatus = localStorage.getItem('plan_button_disabled_' + cycle.id);
               if (planButtonStatus === 'true') {

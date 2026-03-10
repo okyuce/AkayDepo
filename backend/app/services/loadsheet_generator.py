@@ -420,7 +420,8 @@ class LoadsheetGenerator:
                         station_id=station_id,
                         product_id=line.product_id,
                         quantity_carton=0,
-                        quantity_pack=0
+                        quantity_pack=0,
+                        depot_id=self._depot_id
                     )
                     print(f"INFO: StationInventory kaydı yoktu, iade için oluşturuldu (station={station_id}, product={line.product_id})")
                     self.session.add(inventory)
@@ -453,7 +454,8 @@ class LoadsheetGenerator:
                     before_pack=before_pack,
                     after_carton=inventory.quantity_carton,
                     after_pack=inventory.quantity_pack,
-                    note="Revizyon nedeniyle iade"
+                    note="Revizyon nedeniyle iade",
+                    depot_id=self._depot_id
                 )
                 self.session.add(movement)
 

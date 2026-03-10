@@ -101,7 +101,10 @@ class StationPlanner:
             # Manual mapping uygula: aktif istasyonlar için mapping'i oku ve SADECE YENİ territory'leri ata
             # Mevcut assignment'ları KORUYORUZ (loadsheet foreign key nedeniyle)
             
-            mappings = self.session.exec(select(StationTerritoryMap)).all()
+            map_stmt = select(StationTerritoryMap)
+            if self._depot_id:
+                map_stmt = map_stmt.where(StationTerritoryMap.depot_id == self._depot_id)
+            mappings = self.session.exec(map_stmt).all()
             # Aktif istasyon seti
             active_station_ids = {s.id for s in self.session.exec(select(Station).where(Station.active == True, Station.depot_id == self._depot_id)).all()} if self._depot_id else {s.id for s in self.session.exec(select(Station).where(Station.active == True)).all()}
 
@@ -127,7 +130,10 @@ class StationPlanner:
                     if code in assigned_codes:
                         continue
                     
-                    territory = self.session.exec(select(TerritoryModel).where(TerritoryModel.code == code)).first()
+                    t_stmt = select(TerritoryModel).where(TerritoryModel.code == code)
+                    if self._depot_id:
+                        t_stmt = t_stmt.where(TerritoryModel.depot_id == self._depot_id)
+                    territory = self.session.exec(t_stmt).first()
                     if not territory:
                         continue
                     total_carton = int(self._calculate_territory_loads(cycle_id).get(code, 0))
@@ -214,6 +220,8 @@ class StationPlanner:
         for station_idx in range(1, station_count + 1):
             station_name = f"İstasyon-{station_idx}"
             stmt = select(Station).where(Station.name == station_name)
+            if self._depot_id:
+                stmt = stmt.where(Station.depot_id == self._depot_id)
             station = self.session.exec(stmt).first()
             
             if not station:
@@ -345,25 +353,33 @@ class StationPlanner:
         for idx in range(1, station_count + 1):
             station_name = f"İstasyon-{idx}"
             stmt = select(Station).where(Station.name == station_name)
+            if self._depot_id:
+                stmt = stmt.where(Station.depot_id == self._depot_id)
             station = self.session.exec(stmt).first()
             if not station:
                 station = Station(name=station_name, active=True, depot_id=self._depot_id)
                 self.session.add(station)
                 self.session.flush()
-        
+
         # Mevcut assignment'ları set olarak al (territory_id bazlı)
         existing = set()
         from app.models import StationAssignment, Territory
         for sa in self.session.exec(select(StationAssignment).where(StationAssignment.cycle_id==cycle_id)).all():
             existing.add(sa.territory_id)
-        
+
         # Assignment ekle
         for idx, territories in enumerate(assignments, 1):
             # İstasyon id'yi getir
             station_name = f"İstasyon-{idx}"
-            station = self.session.exec(select(Station).where(Station.name==station_name)).first()
+            s_stmt = select(Station).where(Station.name == station_name)
+            if self._depot_id:
+                s_stmt = s_stmt.where(Station.depot_id == self._depot_id)
+            station = self.session.exec(s_stmt).first()
             for rank, territory_code in enumerate(territories, 1):
-                territory = self.session.exec(select(Territory).where(Territory.code==territory_code)).first()
+                t_stmt = select(Territory).where(Territory.code == territory_code)
+                if self._depot_id:
+                    t_stmt = t_stmt.where(Territory.depot_id == self._depot_id)
+                territory = self.session.exec(t_stmt).first()
                 if not territory or territory.id in existing:
                     continue
                 # Territory toplam karton (tüm cycle) — sadece gösterim amaçlı
@@ -384,6 +400,8 @@ class StationPlanner:
     def _get_dealer_count_for_territory(self, cycle_id: UUID, territory_code: str) -> int:
         """Bir territory'de kaç bayi var?"""
         stmt = select(Territory).where(Territory.code == territory_code)
+        if self._depot_id:
+            stmt = stmt.where(Territory.depot_id == self._depot_id)
         territory = self.session.exec(stmt).first()
         
         if not territory:
@@ -446,10 +464,13 @@ class StationPlanner:
         
         for idx in range(1, station_count + 1):
             station_name = f"İstasyon-{idx}"
-            station = self.session.exec(select(Station).where(Station.name==station_name)).first()
+            s_stmt = select(Station).where(Station.name == station_name)
+            if self._depot_id:
+                s_stmt = s_stmt.where(Station.depot_id == self._depot_id)
+            station = self.session.exec(s_stmt).first()
             if not station:
                 continue
-            
+
             # Bu istasyonun tüm territory'leri
             sas = self.session.exec(
                 select(StationAssignment).where(

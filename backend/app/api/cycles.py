@@ -12,7 +12,7 @@ from app.core.database import get_session
 from app.models import Cycle, Loadsheet, StationAssignment
 from app.services.cycle_manager import CycleManager
 from app.services.excel_parser import ExcelParser, ExcelParseError
-from app.api.auth import get_current_user, require_depot
+from app.api.auth import get_current_user, require_depot, verify_depot_access
 
 router = APIRouter()
 
@@ -105,6 +105,8 @@ async def list_cycle_imports(
     cycle = session.get(Cycle, cycle_id)
     if not cycle:
         return []
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(cycle, depot_id, "Döngü")
 
     stmt = select(CycleImport).where(CycleImport.cycle_id == cycle_id).order_by(CycleImport.batch_number)
     items = session.exec(stmt).all()
@@ -149,6 +151,8 @@ async def get_cycle_status(
     cycle = session.get(Cycle, cycle_id)
     if not cycle:
         raise HTTPException(404, "Döngü bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(cycle, depot_id, "Döngü")
 
     stmt = select(Loadsheet).where(Loadsheet.cycle_id == cycle_id)
     loadsheets = session.exec(stmt).all()
@@ -198,44 +202,74 @@ async def cancel_pending(
         # TÜM verileri sil - SADECE BU DEPOYA AİT
         # SQL DELETE ile doğrudan sil (autoflush sorununu önler)
         # Sıralama: önce child tablolar, sonra parent tablolar
+        # ÖNEMLİ: Cycle_id üzerinden silme yapıyoruz (depot_id NULL olabilir)
 
         depot_id_str = str(depot_id)
 
-        # 1. StockMovement
-        session.execute(text("DELETE FROM stock_movements WHERE depot_id = :did"), {"did": depot_id_str})
+        # Bu deponun cycle_id'lerini bul
+        cycle_rows = session.execute(text(
+            "SELECT id FROM cycles WHERE depot_id = :did"
+        ), {"did": depot_id_str}).fetchall()
+        cycle_ids = [str(r[0]) for r in cycle_rows]
 
-        # 2. LoadsheetLine (loadsheet üzerinden)
-        session.execute(text(
-            "DELETE FROM loadsheet_lines WHERE loadsheet_id IN "
-            "(SELECT id FROM loadsheets WHERE depot_id = :did)"
-        ), {"did": depot_id_str})
+        if cycle_ids:
+            cycle_id_list = ",".join(f"'{cid}'" for cid in cycle_ids)
 
-        # 3. Loadsheet
-        session.execute(text("DELETE FROM loadsheets WHERE depot_id = :did"), {"did": depot_id_str})
+            # 1. StockMovement (loadsheet -> cycle üzerinden)
+            session.execute(text(
+                f"DELETE FROM stock_movements WHERE loadsheet_id IN "
+                f"(SELECT id FROM loadsheets WHERE cycle_id IN ({cycle_id_list}))"
+            ))
+            # Ayrıca depot_id ile de sil (loadsheet'siz manual hareketler)
+            session.execute(text("DELETE FROM stock_movements WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 4. StationAssignment
-        session.execute(text("DELETE FROM station_assignments WHERE depot_id = :did"), {"did": depot_id_str})
+            # 2. LoadsheetLine (loadsheet -> cycle üzerinden)
+            session.execute(text(
+                f"DELETE FROM loadsheet_lines WHERE loadsheet_id IN "
+                f"(SELECT id FROM loadsheets WHERE cycle_id IN ({cycle_id_list}))"
+            ))
 
-        # 5. OrderLine (order üzerinden)
-        session.execute(text(
-            "DELETE FROM order_lines WHERE order_id IN "
-            "(SELECT id FROM orders WHERE depot_id = :did)"
-        ), {"did": depot_id_str})
+            # 3. Loadsheet
+            session.execute(text(
+                f"DELETE FROM loadsheets WHERE cycle_id IN ({cycle_id_list})"
+            ))
 
-        # 6. Order
-        session.execute(text("DELETE FROM orders WHERE depot_id = :did"), {"did": depot_id_str})
+            # 4. StationAssignment (cycle_id üzerinden — FK violation fix)
+            session.execute(text(
+                f"DELETE FROM station_assignments WHERE cycle_id IN ({cycle_id_list})"
+            ))
 
-        # 7. LoadCounter
-        session.execute(text("DELETE FROM load_counters WHERE depot_id = :did"), {"did": depot_id_str})
+            # 5. OrderLine (order -> cycle üzerinden)
+            session.execute(text(
+                f"DELETE FROM order_lines WHERE order_id IN "
+                f"(SELECT id FROM orders WHERE cycle_id IN ({cycle_id_list}))"
+            ))
 
-        # 8. RevisionDiff
-        session.execute(text("DELETE FROM revision_diffs WHERE depot_id = :did"), {"did": depot_id_str})
+            # 6. Order
+            session.execute(text(
+                f"DELETE FROM orders WHERE cycle_id IN ({cycle_id_list})"
+            ))
 
-        # 9. CycleImport
-        session.execute(text("DELETE FROM cycle_imports WHERE depot_id = :did"), {"did": depot_id_str})
+            # 7. LoadCounter
+            session.execute(text("DELETE FROM load_counters WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 10. Cycle
-        session.execute(text("DELETE FROM cycles WHERE depot_id = :did"), {"did": depot_id_str})
+            # 8. RevisionDiff
+            session.execute(text("DELETE FROM revision_diffs WHERE depot_id = :did"), {"did": depot_id_str})
+
+            # 9. CycleImport
+            session.execute(text(
+                f"DELETE FROM cycle_imports WHERE cycle_id IN ({cycle_id_list})"
+            ))
+
+            # 10. Cycle
+            session.execute(text(
+                f"DELETE FROM cycles WHERE id IN ({cycle_id_list})"
+            ))
+        else:
+            # Cycle yoksa bile depot'a ait diğer verileri temizle
+            session.execute(text("DELETE FROM stock_movements WHERE depot_id = :did"), {"did": depot_id_str})
+            session.execute(text("DELETE FROM load_counters WHERE depot_id = :did"), {"did": depot_id_str})
+            session.execute(text("DELETE FROM revision_diffs WHERE depot_id = :did"), {"did": depot_id_str})
 
         # 11. Dealer
         session.execute(text("DELETE FROM dealers WHERE depot_id = :did"), {"did": depot_id_str})
@@ -295,7 +329,6 @@ async def get_active_cycle(
             "run_time": cycle.run_time,
             "plan_date": str(cycle.plan_date),
             "status": cycle.status,
-            "fixed_station_count": getattr(cycle, 'fixed_station_count', None),
             "has_plan": has_plan,
             "total_loadsheets": total,
             "completed_loadsheets": completed,

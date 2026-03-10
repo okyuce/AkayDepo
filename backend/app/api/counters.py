@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_session
 from app.core.websocket import manager
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.models import LoadCounter, Cycle, Station
 
 router = APIRouter()
@@ -52,7 +52,8 @@ async def save_counter_reading(
         station = session.get(Station, station_id)
         if not station:
             raise HTTPException(404, "İstasyon bulunamadı")
-        
+        verify_depot_access(station, depot_id, "İstasyon")
+
         # Yeni kayıt oluştur
         counter = LoadCounter(
             cycle_id=cycle.id,
@@ -95,6 +96,12 @@ async def get_cycle_counters(
     session: Session = Depends(get_session)
 ):
     """Döngünün tüm sayaç okumalarını getir"""
+    depot_id = current_user.get("depot_id")
+    cycle = session.get(Cycle, cycle_id)
+    if not cycle:
+        raise HTTPException(404, "Döngü bulunamadı")
+    verify_depot_access(cycle, depot_id, "Döngü")
+
     stmt = select(LoadCounter).where(LoadCounter.cycle_id == cycle_id).order_by(LoadCounter.recorded_at)
     counters = session.exec(stmt).all()
     
@@ -119,17 +126,21 @@ async def get_latest_counter(
     session: Session = Depends(get_session)
 ):
     """İstasyonun son sayaç okumasını getir"""
+    depot_id = current_user.get("depot_id")
+    station = session.get(Station, station_id)
+    if not station:
+        raise HTTPException(404, "İstasyon bulunamadı")
+    verify_depot_access(station, depot_id, "İstasyon")
+
     stmt = (
         select(LoadCounter)
         .where(LoadCounter.station_id == station_id)
         .order_by(LoadCounter.recorded_at.desc())
     )
     counter = session.exec(stmt).first()
-    
+
     if not counter:
         return None
-    
-    station = session.get(Station, counter.station_id)
     
     return {
         "id": str(counter.id),

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 import re
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.core.database import get_session
 from app.models import (
     StationAssignment, Territory, Order, OrderLine, 
@@ -61,16 +61,44 @@ def get_next_station_number(session: Session, depot_id: str = None) -> int:
 
 def create_tablet_user(station_number: int, station_id: UUID, session: Session, depot_id: str = None) -> User:
     """İstasyon için tablet kullanıcısı oluştur"""
+    # Depo kodu al (username'e prefix olarak eklemek için)
+    depot_code = None
+    if depot_id:
+        from app.models.depot import Depot
+        depot = session.get(Depot, depot_id)
+        if depot:
+            depot_code = depot.code.lower()
+
+    # Önce bu depoya ait mevcut tablet kullanıcısını ara
+    if depot_id:
+        stmt = select(User).where(
+            User.station_id == station_id,
+            User.role == "tablet",
+            User.depot_id == depot_id
+        )
+        existing_user = session.exec(stmt).first()
+        if existing_user:
+            existing_user.is_active = True
+            session.add(existing_user)
+            return existing_user
+
+    # Username oluştur: tablet1 (ilk depo) veya tablet1_SEY (sonraki depolar)
     username = f"tablet{station_number}"
+    # Username zaten başka depoda kullanılıyorsa, depot kodu ekle
+    global_check = session.exec(select(User).where(User.username == username)).first()
+    if global_check and str(global_check.depot_id) != str(depot_id):
+        if depot_code:
+            username = f"tablet{station_number}_{depot_code}"
+        else:
+            username = f"tablet{station_number}_{str(depot_id)[:4]}"
 
-    # Kullanıcı zaten var mı kontrol et
-    stmt = select(User).where(User.username == username)
-    existing_user = session.exec(stmt).first()
-
+    # Username hala çakışıyorsa (aynı depo, farklı istasyon), mevcut kullanıcıyı güncelle
+    existing_user = session.exec(select(User).where(User.username == username)).first()
     if existing_user:
-        # Mevcut kullanıcıyı güncelle
         existing_user.station_id = station_id
         existing_user.is_active = True
+        if depot_id:
+            existing_user.depot_id = depot_id
         session.add(existing_user)
         return existing_user
 
@@ -151,7 +179,9 @@ async def delete_station(station_id: UUID, session: Session = Depends(get_sessio
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "İstasyon")
+
     # İlgili tablet kullanıcısını bul ve sil
     stmt = select(User).where(
         User.station_id == station_id,
@@ -176,6 +206,8 @@ async def update_station(station_id: UUID, payload: Dict, session: Session = Dep
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "İstasyon")
     if "active" in payload:
         station.active = payload["active"]
     if "name" in payload:
@@ -202,14 +234,22 @@ async def get_station_distribution(
         station = session.get(Station, station_id)
         if not station:
             raise HTTPException(404, "İstasyon bulunamadı")
-        
+        depot_id = current_user.get("depot_id")
+        verify_depot_access(station, depot_id, "İstasyon")
+
+        from app.models import Cycle
+        cycle = session.get(Cycle, cycle_id)
+        if not cycle:
+            raise HTTPException(404, "Döngü bulunamadı")
+        verify_depot_access(cycle, depot_id, "Döngü")
+
         # Bu istasyonun assignment'larını al
         stmt = select(StationAssignment).where(
             StationAssignment.cycle_id == cycle_id,
             StationAssignment.station_id == station_id
         )
         assignments = session.exec(stmt).all()
-        
+
         if not assignments:
             return {
                 "station_id": str(station_id),
@@ -218,12 +258,12 @@ async def get_station_distribution(
                 "products": [],
                 "grand_total": 0
             }
-        
+
         # Territory'leri topla
         territory_ids = [a.territory_id for a in assignments]
         territories = []
         territory_map = {}
-        
+
         for assignment in assignments:
             territory = session.get(Territory, assignment.territory_id)
             if territory:
@@ -419,14 +459,22 @@ async def get_station_tracking(
         station = session.get(Station, station_id)
         if not station:
             raise HTTPException(404, "İstasyon bulunamadı")
-        
+        depot_id = current_user.get("depot_id")
+        verify_depot_access(station, depot_id, "İstasyon")
+
+        from app.models import Cycle as CycleModel
+        cycle = session.get(CycleModel, cycle_id)
+        if not cycle:
+            raise HTTPException(404, "Döngü bulunamadı")
+        verify_depot_access(cycle, depot_id, "Döngü")
+
         # Bu istasyonun assignment'larını al
         stmt = select(StationAssignment).where(
             StationAssignment.cycle_id == cycle_id,
             StationAssignment.station_id == station_id
         )
         assignments = session.exec(stmt).all()
-        
+
         if not assignments:
             return {
                 "station_id": str(station_id),

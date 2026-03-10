@@ -9,7 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import get_session
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.models import TerritoryInfo
 
 
@@ -73,7 +73,9 @@ async def get_territory(
     territory = session.get(TerritoryInfo, territory_id)
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(territory, depot_id, "Territory")
+
     return {
         "id": str(territory.id),
         "code": territory.code,
@@ -145,6 +147,8 @@ async def update_territory(
     territory = session.get(TerritoryInfo, territory_id)
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(territory, depot_id, "Territory")
 
     # Code unique kontrolü (eğer değiştirildiyse)
     if data.code is not None and data.code != territory.code:
@@ -191,7 +195,9 @@ async def delete_territory(
     territory = session.get(TerritoryInfo, territory_id)
     if not territory:
         raise HTTPException(404, "Territory bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(territory, depot_id, "Territory")
+
     # Kullanımda mı kontrol et (optional - gelecekte eklenebilir)
     # Şimdilik direkt silme izni ver
     
@@ -208,10 +214,12 @@ async def reorder_territories(
     session: Session = Depends(get_session)
 ):
     """Territory sıralamasını güncelle"""
+    depot_id = current_user.get("depot_id")
     for idx, territory_id_str in enumerate(territory_ids):
         territory_id = UUID(territory_id_str)
         territory = session.get(TerritoryInfo, territory_id)
         if territory:
+            verify_depot_access(territory, depot_id, "Territory")
             territory.sort_order = idx + 1
             session.add(territory)
     

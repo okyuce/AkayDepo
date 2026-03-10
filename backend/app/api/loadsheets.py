@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.core.database import get_session
 from app.core.websocket import manager
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.models import (
     Loadsheet, LoadsheetLine, Station, StationAssignment, 
     Territory, Dealer, Product, LoadCounter
@@ -38,10 +38,22 @@ async def get_station_loadsheets(
         sku_match: 'or' veya 'and' - SKU eşleşme modu (varsayılan: or)
     """
     try:
+        from app.models import Cycle
+        depot_id = current_user.get("depot_id")
+
+        # Station depo kontrolü
+        station = session.get(Station, station_id)
+        if not station:
+            raise HTTPException(404, "İstasyon bulunamadı")
+        verify_depot_access(station, depot_id, "İstasyon")
+
         # Cycle belirle
-        if not cycle_id:
-            from app.models import Cycle
-            depot_id = current_user.get("depot_id")
+        if cycle_id:
+            cycle = session.get(Cycle, cycle_id)
+            if not cycle:
+                raise HTTPException(404, "Döngü bulunamadı")
+            verify_depot_access(cycle, depot_id, "Döngü")
+        else:
             stmt = select(Cycle).where(Cycle.status == "active")
             if depot_id:
                 stmt = stmt.where(Cycle.depot_id == depot_id)
@@ -50,7 +62,7 @@ async def get_station_loadsheets(
             if not cycle:
                 raise HTTPException(404, "Aktif döngü bulunamadı")
             cycle_id = cycle.id
-        
+
         # Station assignments al
         stmt = select(StationAssignment).where(
             StationAssignment.cycle_id == cycle_id,
@@ -218,7 +230,9 @@ async def get_loadsheet_detail(
     loadsheet = session.get(Loadsheet, loadsheet_id)
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id, "Fiş")
+
     # Dealer
     dealer = session.get(Dealer, loadsheet.dealer_id)
     
@@ -380,13 +394,15 @@ async def complete_loadsheet(
 ):
     """Fişi tamamla (Yükleme Tamamlandı) ve stoktan düş"""
     from app.models import StationInventory, StockMovement
-    
+
     # SELECT FOR UPDATE - Race condition önleme
     loadsheet = session.exec(
         select(Loadsheet).where(Loadsheet.id == loadsheet_id).with_for_update()
     ).first()
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")
+    depot_id_check = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id_check, "Fiş")
 
     # İdempotency: Zaten tamamlanmış fişi tekrar işleme alma
     if loadsheet.status == "loaded":

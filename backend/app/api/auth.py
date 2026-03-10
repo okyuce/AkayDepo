@@ -119,6 +119,18 @@ def get_depot_id(current_user: dict = Depends(get_current_user)) -> Optional[str
     return current_user.get("depot_id")
 
 
+def verify_depot_access(entity, depot_id: str, entity_name: str = "Kayıt"):
+    """
+    Bir entity'nin depot_id'sinin mevcut kullanıcının depot_id'siyle eşleştiğini doğrula.
+    depot_id None ise (superadmin) kontrol atlanır.
+    """
+    if not depot_id:
+        return  # Superadmin — tüm depolara erişim
+    entity_depot_id = getattr(entity, 'depot_id', None)
+    if entity_depot_id and str(entity_depot_id) != str(depot_id):
+        raise HTTPException(403, f"{entity_name} başka bir depoya ait")
+
+
 def require_depot(current_user: dict = Depends(get_current_user)) -> str:
     """Depot_id zorunlu (superadmin hariç tüm işlemler için)"""
     depot_id = current_user.get("depot_id")

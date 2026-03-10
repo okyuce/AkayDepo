@@ -9,7 +9,7 @@ from uuid import UUID
 from datetime import datetime
 
 from app.core.database import get_session
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.models import StationInventory, StockMovement, Station, Product, Loadsheet, Territory, StationAssignment, Dealer
 
 router = APIRouter()
@@ -25,7 +25,9 @@ async def get_station_inventory(
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "İstasyon")
+
     # Tüm ürünleri al (display_order'a göre sıralı)
     products = session.exec(
         select(Product).order_by(Product.display_order, Product.code)
@@ -70,7 +72,9 @@ async def update_station_inventory(
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "İstasyon")
+
     products_data: List[Dict] = payload.get("products", [])
     
     for item in products_data:
@@ -173,6 +177,8 @@ async def get_stock_movements(
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "İstasyon")
 
     # Query oluştur
     query = select(StockMovement).where(StockMovement.station_id == station_id)
@@ -230,6 +236,13 @@ async def get_movements_by_loadsheet(
     session: Session = Depends(get_session)
 ):
     """Belirli bir fişe ait tüm stok hareketlerini getir"""
+    # Loadsheet'in depo kontrolü
+    loadsheet = session.get(Loadsheet, loadsheet_id)
+    if not loadsheet:
+        raise HTTPException(404, "Yükleme fişi bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id, "Yükleme fişi")
+
     movements = session.exec(
         select(StockMovement)
         .where(StockMovement.loadsheet_id == loadsheet_id)
@@ -280,6 +293,13 @@ async def get_territories_by_cycle(
     Döngüye ait territory listesini getir
     StationAssignment üzerinden cycle'a bağlı territory'leri döndürür
     """
+    from app.models import Cycle
+    depot_id = current_user.get("depot_id")
+    cycle = session.get(Cycle, cycle_id)
+    if not cycle:
+        raise HTTPException(404, "Döngü bulunamadı")
+    verify_depot_access(cycle, depot_id, "Döngü")
+
     # Bu cycle'daki assignment'lardan unique territory'leri al
     assignments = session.exec(
         select(StationAssignment.territory_id)
@@ -325,6 +345,13 @@ async def get_movements_by_cycle(
     - limit: Maksimum kayıt sayısı (varsayılan 500)
     - offset: Sayfalama için başlangıç
     """
+    from app.models import Cycle
+    depot_id = current_user.get("depot_id")
+    cycle = session.get(Cycle, cycle_id)
+    if not cycle:
+        raise HTTPException(404, "Döngü bulunamadı")
+    verify_depot_access(cycle, depot_id, "Döngü")
+
     # Döngüye ait loadsheet'leri bul
     loadsheet_query = select(Loadsheet.id).where(Loadsheet.cycle_id == cycle_id)
     loadsheet_ids = [ls_id for ls_id in session.exec(loadsheet_query).all()]

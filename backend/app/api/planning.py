@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.core.database import get_session
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.services.station_planner import StationPlanner
 from app.services.loadsheet_generator import LoadsheetGenerator
 
@@ -36,21 +36,29 @@ async def create_plan(
         force_station_count: Zorla istasyon sayısı (opsiyonel)
         method: "greedy" (varsayılan)
     """
+    depot_id = current_user.get("depot_id")
     try:
+        from app.models import Cycle
+        cycle = session.get(Cycle, cycle_id)
+        if not cycle:
+            raise HTTPException(404, "Döngü bulunamadı")
+        verify_depot_access(cycle, depot_id, "Döngü")
+
         planner = StationPlanner(session)
         plan = planner.create_plan(
             cycle_id=cycle_id,
             worker_count=request.worker_count,
             force_station_count=request.force_station_count,
-            method=request.method
+            method=request.method,
+            depot_id=depot_id
         )
-        
+
         # Fişleri oluştur (yalnızca son batch)
         from app.models import Order
         from sqlmodel import select
         latest_batch = session.exec(select(Order.import_batch).where(Order.cycle_id==cycle_id).order_by(Order.import_batch.desc())).first()
         generator = LoadsheetGenerator(session)
-        loadsheet_count = generator.generate_loadsheets_for_cycle(cycle_id, only_batch=latest_batch)
+        loadsheet_count = generator.generate_loadsheets_for_cycle(cycle_id, only_batch=latest_batch, depot_id=depot_id)
         
         plan["loadsheet_count"] = loadsheet_count
         
@@ -68,9 +76,15 @@ async def get_plan(
 ):
     """Mevcut planı getir"""
     try:
-        from app.models import StationAssignment, Territory
+        from app.models import StationAssignment, Territory, Cycle
         from sqlmodel import select
-        
+
+        depot_id = current_user.get("depot_id")
+        cycle = session.get(Cycle, cycle_id)
+        if not cycle:
+            raise HTTPException(404, "Döngü bulunamadı")
+        verify_depot_access(cycle, depot_id, "Döngü")
+
         # Assignments al
         stmt = select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
         assignments = session.exec(stmt).all()

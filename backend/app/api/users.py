@@ -9,7 +9,7 @@ from typing import List, Optional
 from uuid import UUID
 from ..core.database import get_session
 from ..models.user import User
-from .auth import get_current_user
+from .auth import get_current_user, verify_depot_access
 
 router = APIRouter()
 
@@ -136,7 +136,9 @@ async def reset_password(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kullanıcı bulunamadı"
         )
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(user, depot_id, "Kullanıcı")
+
     # Yeni şifreyi ayarla
     user.set_password(request.new_password)
     session.add(user)
@@ -169,7 +171,9 @@ async def update_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kullanıcı bulunamadı"
         )
-    
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(user, depot_id, "Kullanıcı")
+
     # Güncellemeleri uygula
     if request.full_name is not None:
         user.full_name = request.full_name

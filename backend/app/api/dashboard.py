@@ -10,7 +10,7 @@ from collections import defaultdict
 import json
 
 from app.core.database import get_session
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, verify_depot_access
 from app.models import (
     Depot, Cycle, Loadsheet, LoadsheetLine, Station, StationAssignment,
     Territory, Dealer, CycleImport, Product, Order, OrderLine
@@ -192,6 +192,11 @@ async def get_depot_summary(
     depot = session.exec(stmt).first()
     if not depot:
         raise HTTPException(404, "Depo bulunamadi")
+
+    # Depo erişim kontrolü
+    depot_id = current_user.get("depot_id")
+    if depot_id and str(depot.id) != str(depot_id):
+        raise HTTPException(403, "Bu depoya erisim yetkiniz yok")
 
     # Aktif donguyu bul (bu depo icin)
     stmt = select(Cycle).where(
@@ -498,12 +503,15 @@ async def get_station_detail(
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "Istasyon bulunamadi")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(station, depot_id, "Istasyon")
 
     # Aktif donguyu bul
     if cycle_id:
         cycle = session.get(Cycle, cycle_id)
+        if cycle:
+            verify_depot_access(cycle, depot_id, "Döngü")
     else:
-        depot_id = current_user.get("depot_id")
         stmt = select(Cycle).where(Cycle.status == "active")
         if depot_id:
             stmt = stmt.where(Cycle.depot_id == depot_id)
@@ -635,8 +643,11 @@ async def get_territory_detail(
         - Territory bilgisi
         - Bayi listesi ve siparis durumlari
     """
-    # Territory bul
+    # Territory bul (depot filtresi ile)
+    depot_id = current_user.get("depot_id")
     stmt = select(Territory).where(Territory.code == territory_code)
+    if depot_id:
+        stmt = stmt.where(Territory.depot_id == depot_id)
     territory = session.exec(stmt).first()
     if not territory:
         raise HTTPException(404, "Territory bulunamadi")
@@ -644,8 +655,9 @@ async def get_territory_detail(
     # Aktif donguyu bul
     if cycle_id:
         cycle = session.get(Cycle, cycle_id)
+        if cycle:
+            verify_depot_access(cycle, depot_id, "Döngü")
     else:
-        depot_id = current_user.get("depot_id")
         stmt = select(Cycle).where(Cycle.status == "active")
         if depot_id:
             stmt = stmt.where(Cycle.depot_id == depot_id)

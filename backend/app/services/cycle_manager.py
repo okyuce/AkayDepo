@@ -159,6 +159,8 @@ class CycleManager:
     def _get_next_cycle_no(self, plan_date: date) -> int:
         """Aynı gün için bir sonraki cycle no'yu hesapla"""
         stmt = select(Cycle).where(Cycle.plan_date == plan_date)
+        if self._depot_id:
+            stmt = stmt.where(Cycle.depot_id == self._depot_id)
         cycles = self.session.exec(stmt).all()
         
         if not cycles:
@@ -183,9 +185,10 @@ class CycleManager:
         Yeni döngü başladığında çağrılır.
         """
         # AnaStok istasyonunu bul
-        main_stock = self.session.exec(
-            select(Station).where(Station.is_main_stock == True)
-        ).first()
+        ms_stmt = select(Station).where(Station.is_main_stock == True)
+        if self._depot_id:
+            ms_stmt = ms_stmt.where(Station.depot_id == self._depot_id)
+        main_stock = self.session.exec(ms_stmt).first()
 
         if not main_stock:
             return
