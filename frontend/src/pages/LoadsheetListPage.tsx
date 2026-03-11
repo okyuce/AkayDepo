@@ -40,6 +40,7 @@ interface Loadsheet {
     name: string;
   };
   included_as_parent?: boolean;
+  order_date?: string | null;
 }
 
 interface DealerGroup {
@@ -570,6 +571,12 @@ const sortedLoadsheets = [...group.loadsheets]
                                 </h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                   {group.dealer_code}
+                                  {group.loadsheets[0]?.territory?.name && (
+                                    <span> - {group.loadsheets[0].territory.name}</span>
+                                  )}
+                                  {group.loadsheets[0]?.order_date && (
+                                    <span> - {new Date(group.loadsheets[0].order_date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(group.loadsheets[0].order_date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  )}
                                 </p>
                                 <div className="flex items-center gap-3 mt-2">
                                   <span className={`text-xs px-2 py-1 rounded font-semibold ${

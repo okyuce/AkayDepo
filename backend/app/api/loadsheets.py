@@ -85,6 +85,16 @@ async def get_station_loadsheets(
             sku_codes = [s.strip().upper() for s in sku.split(',') if s.strip()]
         sku_match_mode = sku_match.lower() if sku_match else "or"
 
+        # Sipariş tarihlerini al (dealer_id + batch_number -> order_date)
+        from app.models import Order
+        order_stmt = select(Order).where(Order.cycle_id == cycle_id)
+        orders = session.exec(order_stmt).all()
+        order_date_map = {}
+        for o in orders:
+            key = (str(o.dealer_id), o.import_batch)
+            if key not in order_date_map:
+                order_date_map[key] = o.order_date
+
         # Territory bazında fişleri grupla
         territories_data = []
         total_carton = 0
@@ -153,6 +163,9 @@ async def get_station_loadsheets(
                 ls_total_pack = sum(line.qty_pack for line in lines)
                 ls_total_carton_equiv = sum(line.qty_carton + (line.qty_pack / 10) for line in lines)
 
+                # Sipariş tarihini bul
+                od = order_date_map.get((str(ls.dealer_id), ls.batch_number))
+
                 loadsheet_data.append({
                     "id": str(ls.id),
                     "package_number": ls.package_number,
@@ -168,7 +181,8 @@ async def get_station_loadsheets(
                     "is_revision": ls.is_revision,
                     "parent_loadsheet_id": str(ls.parent_loadsheet_id) if ls.parent_loadsheet_id else None,
                     "loaded_at": ls.loaded_at.isoformat() if ls.loaded_at else None,
-                    "included_as_parent": (ls.id in parent_ids) if import_batch is not None else False
+                    "included_as_parent": (ls.id in parent_ids) if import_batch is not None else False,
+                    "order_date": od.isoformat() if od else None
                 })
                 
                 if ls.status == "loaded":
