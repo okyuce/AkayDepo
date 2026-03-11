@@ -240,15 +240,16 @@ async def get_loadsheet_detail(
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
     territory = session.get(Territory, assignment.territory_id) if assignment else None
     
-    # Lines - Excel sırasına göre sırala
+    # Lines - depo bazlı sıraya göre sırala
+    from app.api.product_order import get_depot_order_map
+    depot_order = get_depot_order_map(session, depot_id)
+
     stmt = (
         select(LoadsheetLine)
-        .join(Product, LoadsheetLine.product_id == Product.id)
         .where(LoadsheetLine.loadsheet_id == loadsheet_id)
-        .order_by(Product.display_order, Product.code)
     )
     lines = session.exec(stmt).all()
-    
+
     # Önceki fiş miktarlarını al (revizyon veya aynı bayi için önceki batch)
     parent_lines_map = {}
     has_previous = False
@@ -325,7 +326,7 @@ async def get_loadsheet_detail(
             "qty_pack": line.qty_pack,
             "qty_change_carton": qty_change_carton,
             "qty_change_pack": qty_change_pack,
-            "display_order": product.display_order if product else 999
+            "display_order": depot_order.get(str(line.product_id), product.display_order if product else 999)
         })
 
     # Önceki fişte olup yeni fişte olmayan ürünleri ekle (komple iptal edilenler)
@@ -353,7 +354,7 @@ async def get_loadsheet_detail(
                     "qty_pack": 0,
                     "qty_change_carton": qty_change_carton,
                     "qty_change_pack": qty_change_pack,
-                    "display_order": product.display_order if product else 999
+                    "display_order": depot_order.get(product_id_str, product.display_order if product else 999)
                 })
 
     # Tüm ürünleri display_order'a göre sırala

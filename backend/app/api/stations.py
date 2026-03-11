@@ -277,17 +277,19 @@ async def get_station_distribution(
                 territory_map[str(territory.id)] = territory
         
         # Cycle'daki tüm ürünleri al (sadece bu cycle'da kullanılan ürünler)
-        # Excel'deki sıraya göre sırala
+        # Depo bazlı sıralama
+        from app.api.product_order import get_depot_order_map
         stmt = (
             select(Product)
             .join(OrderLine, OrderLine.product_id == Product.id)
             .join(Order, Order.id == OrderLine.order_id)
             .where(Order.cycle_id == cycle_id)
             .distinct()
-            .order_by(Product.display_order, Product.code)
         )
         all_products = session.exec(stmt).all()
-        
+        depot_order = get_depot_order_map(session, depot_id)
+        all_products.sort(key=lambda p: (depot_order.get(str(p.id), p.display_order), p.code))
+
         # Bu territory'lerdeki tüm order'ları al
         stmt = select(Order).where(
             Order.cycle_id == cycle_id,
@@ -497,16 +499,18 @@ async def get_station_tracking(
                     "name": territory.name
                 })
         
-        # Cycle'daki tüm ürünleri al (display_order'a göre sıralı)
+        # Cycle'daki tüm ürünleri al (depo bazlı sıralama)
+        from app.api.product_order import get_depot_order_map
         stmt = (
             select(Product)
             .join(OrderLine, OrderLine.product_id == Product.id)
             .join(Order, Order.id == OrderLine.order_id)
             .where(Order.cycle_id == cycle_id)
             .distinct()
-            .order_by(Product.display_order, Product.code)
         )
         all_products = session.exec(stmt).all()
+        depot_order = get_depot_order_map(session, depot_id)
+        all_products.sort(key=lambda p: (depot_order.get(str(p.id), p.display_order), p.code))
         
         # İstasyon stoklarını al
         stmt = select(StationInventory).where(StationInventory.station_id == station_id)

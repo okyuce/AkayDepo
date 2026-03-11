@@ -28,10 +28,11 @@ async def get_station_inventory(
     depot_id = current_user.get("depot_id")
     verify_depot_access(station, depot_id, "İstasyon")
 
-    # Tüm ürünleri al (display_order'a göre sıralı)
-    products = session.exec(
-        select(Product).order_by(Product.display_order, Product.code)
-    ).all()
+    # Tüm ürünleri al (depo bazlı sıralama)
+    from app.api.product_order import get_depot_order_map
+    products = session.exec(select(Product)).all()
+    depot_order = get_depot_order_map(session, depot_id)
+    products.sort(key=lambda p: (depot_order.get(str(p.id), p.display_order), p.code))
     
     # Mevcut stokları al
     inventories = session.exec(

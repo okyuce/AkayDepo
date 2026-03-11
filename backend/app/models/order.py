@@ -49,6 +49,19 @@ class Order(SQLModel, table=True):
     imported_at: datetime = Field(default_factory=datetime.now)
     depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
+class DepotProductOrder(SQLModel, table=True):
+    """Depo bazlı ürün sıralama"""
+    __tablename__ = "depot_product_order"
+    __table_args__ = (
+        UniqueConstraint("depot_id", "product_id", name="uq_depot_product_order"),
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    depot_id: UUID = Field(foreign_key="depots.id", index=True)
+    product_id: UUID = Field(foreign_key="products.id", index=True)
+    display_order: int = Field(default=999)
+
+
 class OrderLine(SQLModel, table=True):
     """Sipariş satırı modeli"""
     __tablename__ = "order_lines"
