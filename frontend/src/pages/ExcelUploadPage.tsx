@@ -20,6 +20,7 @@ export default function ExcelUploadPage() {
   const [needsPlanning, setNeedsPlanning] = useState(false); // Excel yüklendi, planlama bekleniyor
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
   const [isAutoPlanning, setIsAutoPlanning] = useState(true); // Otomatik planlama modu
+  const [isDragging, setIsDragging] = useState(false); // Sürükle-bırak durumu
 
   // Sayfa yüklenince son cycle ve planı kontrol et + auto planning kontrolü
   useEffect(() => {
@@ -101,6 +102,33 @@ export default function ExcelUploadPage() {
     if (file) {
       setSelectedFile(file);
       setError(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!needsPlanning) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (needsPlanning) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      setSelectedFile(file);
+      setError(null);
+    } else if (file) {
+      setError('Sadece Excel dosyaları desteklenir (.xlsx, .xls)');
     }
   };
 
@@ -310,28 +338,61 @@ export default function ExcelUploadPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Upload Form */}
             <div className="md:col-span-2 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Excel Dosyası Seç (PMI ISMS)
-                </label>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  needsPlanning
+                    ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-50 cursor-not-allowed'
+                    : isDragging
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      : selectedFile
+                        ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                }`}
+              >
+                {isDragging ? (
+                  <div className="py-4">
+                    <svg className="mx-auto h-10 w-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400">Dosyayı buraya bırakın</p>
+                  </div>
+                ) : selectedFile ? (
+                  <div className="py-2">
+                    <svg className="mx-auto h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-300">{selectedFile.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                  </div>
+                ) : (
+                  <div className="py-4">
+                    <svg className="mx-auto h-10 w-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      Excel dosyasını sürükleyip bırakın
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">veya</p>
+                  </div>
+                )}
+
                 <input
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
                   disabled={needsPlanning}
-                  className={`block w-full text-sm text-gray-500
+                  className={`mt-2 block mx-auto text-sm text-gray-500
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-md file:border-0
                     file:text-sm file:font-semibold
                     file:bg-blue-50 file:text-blue-700
                     hover:file:bg-blue-100
-                    ${needsPlanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    dark:file:bg-blue-900/50 dark:file:text-blue-300
+                    ${needsPlanning ? 'cursor-not-allowed' : ''}`}
                 />
-                {selectedFile && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Seçili: {selectedFile.name}
-                  </p>
-                )}
               </div>
 
               <button
