@@ -6,14 +6,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.22"
+VERSION = "2.0.23"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: orphan verileri temizle (depot_id NULL olan kayıtlar)"""
-    from app.core.database import engine
+    """Startup: tabloları oluştur ve orphan verileri temizle"""
+    from app.core.database import engine, create_db_and_tables
     from sqlmodel import Session, text
+
+    # Yeni tabloları oluştur (mevcut tablolara dokunmaz)
+    create_db_and_tables()
 
     try:
         with Session(engine) as session:

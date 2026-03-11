@@ -24,9 +24,12 @@ def get_depot_order_map(session: Session, depot_id) -> dict:
     """Depo bazlı ürün sıralama map'i döndürür. {product_id_str: display_order}"""
     if not depot_id:
         return {}
-    stmt = select(DepotProductOrder).where(DepotProductOrder.depot_id == depot_id)
-    entries = session.exec(stmt).all()
-    return {str(e.product_id): e.display_order for e in entries}
+    try:
+        stmt = select(DepotProductOrder).where(DepotProductOrder.depot_id == depot_id)
+        entries = session.exec(stmt).all()
+        return {str(e.product_id): e.display_order for e in entries}
+    except Exception:
+        return {}
 
 
 @router.get("/")
