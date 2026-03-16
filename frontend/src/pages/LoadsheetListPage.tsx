@@ -76,6 +76,8 @@ export default function LoadsheetListPage() {
   const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const [skuDropdownOpen, setSkuDropdownOpen] = useState(false);
   const skuDropdownRef = useRef<HTMLDivElement>(null);
+  const [skuQtyType, setSkuQtyType] = useState<'carton' | 'pack' | ''>('');
+  const [skuQtyValue, setSkuQtyValue] = useState<string>('');
 
   // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
   const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
@@ -176,7 +178,9 @@ export default function LoadsheetListPage() {
     stationId: string,
     batchOverride?: string,
     territoryOverride?: string,
-    skuOverride?: string[]
+    skuOverride?: string[],
+    qtyTypeOverride?: '' | 'carton' | 'pack',
+    qtyValueOverride?: string
   ) => {
     if (!cycleId) return;
 
@@ -185,12 +189,16 @@ export default function LoadsheetListPage() {
       const batchNum = batchOverride !== undefined ? (batchOverride ? parseInt(batchOverride, 10) : undefined)
         : (selectedBatch ? parseInt(selectedBatch, 10) : undefined);
       const skuList = skuOverride !== undefined ? skuOverride : selectedSkus;
+      const qType = qtyTypeOverride !== undefined ? qtyTypeOverride : skuQtyType;
+      const qVal = qtyValueOverride !== undefined ? qtyValueOverride : skuQtyValue;
       const data = await apiService.getStationLoadsheets(
         stationId,
         cycleId,
         batchNum,
         skuList.length > 0 ? skuList : undefined,
-        skuList.length > 0 ? 'and' : undefined
+        skuList.length > 0 ? 'and' : undefined,
+        (skuList.length > 0 && qType) ? qType as 'carton' | 'pack' : undefined,
+        (skuList.length > 0 && qType && qVal) ? parseInt(qVal, 10) : undefined
       );
       // territories içindeki tüm loadsheet'leri düzleştir ve territory bilgisini ekle
       const allLoadsheets: Loadsheet[] = [];
@@ -303,13 +311,15 @@ export default function LoadsheetListPage() {
     setSelectedTerritoryCode('');
     setSelectedBatch('');
     setSelectedSkus([]);
+    setSkuQtyType('');
+    setSkuQtyValue('');
     // Eski verileri temizle (UI yanılmasın)
     setDealerGroups([]);
     setAvailableTerritories([]);
     setLoadsheets([]);
     // Yeni istasyon için batch'i "Tümü" (override) olarak zorla yükle
     if (stationId) {
-      loadLoadsheets(stationId, '', '', []);
+      loadLoadsheets(stationId, '', '', [], '', '');
     }
   };
 
@@ -491,7 +501,9 @@ export default function LoadsheetListPage() {
                                   type="button"
                                   onClick={() => {
                                     setSelectedSkus([]);
-                                    if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, []);
+                                    setSkuQtyType('');
+                                    setSkuQtyValue('');
+                                    if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, [], '', '');
                                   }}
                                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                                 >
@@ -524,6 +536,58 @@ export default function LoadsheetListPage() {
                             </div>
                           )}
                         </div>
+                        {/* SKU Miktar Filtresi */}
+                        {selectedSkus.length > 0 && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Miktar Filtresi</label>
+                            <div className="flex gap-2 items-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newType = skuQtyType === 'carton' ? '' : 'carton';
+                                  setSkuQtyType(newType as any);
+                                  if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, undefined, newType as any, skuQtyValue);
+                                }}
+                                className={`px-3 py-2 rounded-md text-sm font-medium border ${
+                                  skuQtyType === 'carton'
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                Krt
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newType = skuQtyType === 'pack' ? '' : 'pack';
+                                  setSkuQtyType(newType as any);
+                                  if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, undefined, newType as any, skuQtyValue);
+                                }}
+                                className={`px-3 py-2 rounded-md text-sm font-medium border ${
+                                  skuQtyType === 'pack'
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                Pkt
+                              </button>
+                              {skuQtyType && (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="Adet"
+                                  value={skuQtyValue}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setSkuQtyValue(v);
+                                    if (selectedStationId) loadLoadsheets(selectedStationId, undefined, undefined, undefined, undefined, v);
+                                  }}
+                                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

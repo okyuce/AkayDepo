@@ -25,6 +25,8 @@ async def get_station_loadsheets(
     import_batch: Optional[int] = None,
     sku: Optional[str] = None,
     sku_match: Optional[str] = "or",
+    sku_qty_type: Optional[str] = None,
+    sku_qty_value: Optional[int] = None,
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
@@ -36,6 +38,8 @@ async def get_station_loadsheets(
         cycle_id: Döngü ID (opsiyonel, yoksa son aktif döngü)
         sku: Virgülle ayrılmış ürün kodları (opsiyonel)
         sku_match: 'or' veya 'and' - SKU eşleşme modu (varsayılan: or)
+        sku_qty_type: 'carton' veya 'pack' - miktar tipi filtresi
+        sku_qty_value: Tam miktar değeri (opsiyonel, yoksa >0 yeterli)
     """
     try:
         from app.models import Cycle
@@ -143,21 +147,38 @@ async def get_station_loadsheets(
 
                 # SKU filtresi uygula
                 if sku_codes:
-                    # Bu loadsheet'teki ürün kodlarını al
-                    line_product_codes = set()
+                    # Bu loadsheet'teki ürün kodlarını ve miktarlarını al
+                    line_product_map = {}
                     for line in lines:
                         product = session.get(Product, line.product_id)
                         if product:
-                            line_product_codes.add(product.code.upper())
+                            line_product_map[product.code.upper()] = {
+                                "carton": line.qty_carton,
+                                "pack": line.qty_pack
+                            }
+
+                    def sku_matches(sku_code: str) -> bool:
+                        if sku_code not in line_product_map:
+                            return False
+                        if not sku_qty_type:
+                            return True  # Sadece SKU varlığı yeterli
+                        qty = line_product_map[sku_code]
+                        if sku_qty_type == "carton":
+                            if sku_qty_value is not None:
+                                return qty["carton"] == sku_qty_value
+                            return qty["carton"] > 0
+                        elif sku_qty_type == "pack":
+                            if sku_qty_value is not None:
+                                return qty["pack"] == sku_qty_value
+                            return qty["pack"] > 0
+                        return True
 
                     if sku_match_mode == "and":
-                        # AND: Seçilen TÜM SKU'lar bu loadsheet'te olmalı
-                        if not all(sku_code in line_product_codes for sku_code in sku_codes):
-                            continue  # Bu loadsheet'i atla
+                        if not all(sku_matches(sku_code) for sku_code in sku_codes):
+                            continue
                     else:
-                        # OR: Seçilen SKU'lardan en az biri olmalı
-                        if not any(sku_code in line_product_codes for sku_code in sku_codes):
-                            continue  # Bu loadsheet'i atla
+                        if not any(sku_matches(sku_code) for sku_code in sku_codes):
+                            continue
 
                 ls_total_carton = sum(line.qty_carton for line in lines)
                 ls_total_pack = sum(line.qty_pack for line in lines)

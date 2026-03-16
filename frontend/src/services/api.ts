@@ -134,13 +134,17 @@ class ApiService {
     cycleId?: string,
     importBatch?: number,
     sku?: string[],
-    skuMatch?: 'or' | 'and'
+    skuMatch?: 'or' | 'and',
+    skuQtyType?: 'carton' | 'pack',
+    skuQtyValue?: number
   ) {
     const params: Record<string, string | number> = {};
     if (cycleId) params.cycle_id = cycleId;
     if (importBatch !== undefined && importBatch !== null) params.import_batch = importBatch;
     if (sku && sku.length > 0) params.sku = sku.join(',');
     if (skuMatch) params.sku_match = skuMatch;
+    if (skuQtyType) params.sku_qty_type = skuQtyType;
+    if (skuQtyValue !== undefined && skuQtyValue !== null) params.sku_qty_value = skuQtyValue;
     const response = await this.client.get(`/v1/loadsheets/station/${stationId}`, { params });
     return response.data;
   }
