@@ -673,11 +673,11 @@ const sortedLoadsheets = [...group.loadsheets]
                                     {group.loadsheets.length} Fiş
                                   </span>
                                   <span className="text-xs px-2 py-1 rounded font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
-                                    {group.loadsheets.reduce((sum, ls) => sum + (ls.total_carton || 0), 0)} Krt
+                                    {lastByBatch.total_carton || 0} Krt
                                   </span>
-                                  {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0) > 0 && (
+                                  {(lastByBatch.total_pack || 0) > 0 && (
                                     <span className="text-xs px-2 py-1 rounded font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200">
-                                      {group.loadsheets.reduce((sum, ls) => sum + (ls.total_pack || 0), 0)} Pkt
+                                      {lastByBatch.total_pack || 0} Pkt
                                     </span>
                                   )}
                                   {group.cardColor === 'green' && (

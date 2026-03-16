@@ -15,7 +15,7 @@ export default function ExcelUploadPage() {
   const [planResult, setPlanResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPlanLocked, setIsPlanLocked] = useState(false);
-  const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string;plan_date?:string;first_delivery_time?:string;last_delivery_time?:string}[]>([]);
+  const [imports, setImports] = useState<{id:string;batch_number:number;filename:string;file_size:number;uploaded_at:string;plan_date?:string;first_delivery_time?:string;last_delivery_time?:string;dealer_count?:number}[]>([]);
   const [isPlanButtonDisabled, setIsPlanButtonDisabled] = useState(false); // Planlama butonu disable durumu
   const [needsPlanning, setNeedsPlanning] = useState(false); // Excel yüklendi, planlama bekleniyor
   const [toast, setToast] = useState<{message: string; type: 'success' | 'error'} | null>(null);
@@ -413,6 +413,11 @@ export default function ExcelUploadPage() {
             {/* Import History */}
             <div>
               <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Yükleme Geçmişi</h3>
+              {imports.length > 0 && (
+                <div className="mb-2 text-sm font-bold text-gray-900 dark:text-gray-100">
+                  Toplam: {imports.reduce((sum, it) => sum + (it.dealer_count || 0), 0)} bayi
+                </div>
+              )}
               <div className="max-h-56 overflow-y-auto border dark:border-gray-600 rounded">
                 {imports.length === 0 ? (
                   <div className="p-3 text-sm text-gray-500 dark:text-gray-400">Henüz yükleme yok</div>
@@ -424,19 +429,24 @@ export default function ExcelUploadPage() {
                       if (it.plan_date) {
                         const date = new Date(it.plan_date);
                         const dateStr = date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                        
+
                         if (it.first_delivery_time && it.last_delivery_time) {
                           dateInfo = `${dateStr} ${it.first_delivery_time} - ${it.last_delivery_time}`;
                         } else {
                           dateInfo = dateStr;
                         }
                       }
-                      
+
                       return (
                         <li key={it.id} className="p-3 text-sm">
                           <p className="font-medium truncate text-gray-900 dark:text-gray-100" title={it.filename}>{it.filename}</p>
                           {dateInfo && (
-                            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">{dateInfo}</p>
+                            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                              {dateInfo}
+                              {it.dealer_count !== undefined && it.dealer_count > 0 && (
+                                <span className="font-bold text-gray-900 dark:text-gray-100 ml-2">{it.dealer_count} bayi</span>
+                              )}
+                            </p>
                           )}
                         </li>
                       );

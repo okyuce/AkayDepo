@@ -128,6 +128,13 @@ async def list_cycle_imports(
             first_time = result[0].strftime('%H:%M')
             last_time = result[1].strftime('%H:%M')
 
+        # Batch'teki unique bayi sayısı
+        dealer_stmt = select(func.count(func.distinct(Order.dealer_id))).where(
+            Order.cycle_id == cycle_id,
+            Order.import_batch == x.batch_number
+        )
+        dealer_count = session.exec(dealer_stmt).one() or 0
+
         result_list.append({
             "id": str(x.id),
             "batch_number": x.batch_number,
@@ -136,7 +143,8 @@ async def list_cycle_imports(
             "uploaded_at": x.uploaded_at.isoformat(),
             "plan_date": str(cycle.plan_date),
             "first_delivery_time": first_time,
-            "last_delivery_time": last_time
+            "last_delivery_time": last_time,
+            "dealer_count": dealer_count
         })
 
     return result_list
