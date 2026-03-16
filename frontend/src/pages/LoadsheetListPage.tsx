@@ -77,6 +77,28 @@ export default function LoadsheetListPage() {
   const [skuDropdownOpen, setSkuDropdownOpen] = useState(false);
   const skuDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
+  const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('completed_lines');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggleLineCompleted = (loadsheetId: string, productCode: string) => {
+    const key = `${loadsheetId}_${productCode}`;
+    setCompletedLines(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem('completed_lines', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const isLineCompleted = (loadsheetId: string, productCode: string) => {
+    return completedLines.has(`${loadsheetId}_${productCode}`);
+  };
+
   useEffect(() => {
     loadActiveCycle();
     loadProducts();
@@ -698,33 +720,57 @@ const sortedLoadsheets = [...group.loadsheets]
                                             {loadsheet.territory ? loadsheet.territory.code : 'TERR'}
                                           </td>
                                         </tr>
-                                        {loadsheet.lines.map((line, idx) => (
-                                          <tr key={idx} className={`border-b border-gray-200 dark:border-gray-600 ${
-                                            idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700'
-                                          }`}>
-                                            <td className="p-2 text-lg font-bold truncate text-gray-900 dark:text-gray-100">{line.product_name}</td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative text-gray-900 dark:text-gray-100">
-                                              {line.qty_carton}
-                                              {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
-                                                <sup className={`ml-1 text-xs font-bold ${
-                                                  line.qty_change_carton > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                }`}>
-                                                  {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
-                                                </sup>
-                                              )}
+                                        {loadsheet.lines.map((line, idx) => {
+                                          const done = isLineCompleted(loadsheet.id, line.product_code);
+                                          return (
+                                          <tr
+                                            key={idx}
+                                            onClick={() => toggleLineCompleted(loadsheet.id, line.product_code)}
+                                            className={`border-b border-gray-200 dark:border-gray-600 cursor-pointer select-none transition-colors ${
+                                              done
+                                                ? 'bg-green-50 dark:bg-green-900/30'
+                                                : idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700'
+                                            }`}
+                                          >
+                                            <td className={`p-2 text-sm font-semibold ${done ? 'line-through text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                                              {done && <span className="mr-1 no-underline inline-block">✓</span>}
+                                              {line.product_name}
                                             </td>
-                                            <td className="p-2 text-center font-bold text-lg w-1/5 relative text-gray-900 dark:text-gray-100">
-                                              {line.qty_pack || ''}
-                                              {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
-                                                <sup className={`ml-1 text-xs font-bold ${
-                                                  line.qty_change_pack > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                }`}>
-                                                  {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
-                                                </sup>
-                                              )}
+                                            <td className="p-1.5 w-1/5">
+                                              <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
+                                                done
+                                                  ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
+                                                  : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                              }`}>
+                                                {line.qty_carton || ''}
+                                                {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
+                                                  <sup className={`ml-1 text-xs font-bold ${
+                                                    line.qty_change_carton > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                                  }`}>
+                                                    {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
+                                                  </sup>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="p-1.5 w-1/5">
+                                              <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
+                                                done
+                                                  ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
+                                                  : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                              }`}>
+                                                {line.qty_pack || ''}
+                                                {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
+                                                  <sup className={`ml-1 text-xs font-bold ${
+                                                    line.qty_change_pack > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                                  }`}>
+                                                    {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
+                                                  </sup>
+                                                )}
+                                              </div>
                                             </td>
                                           </tr>
-                                        ))}
+                                          );
+                                        })}
                                         <tr className="bg-gray-100 dark:bg-gray-700 font-bold border-t-2 border-gray-300 dark:border-gray-600">
                                           <td className="p-3 text-gray-900 dark:text-gray-100">Toplam</td>
                                           <td className="p-3 text-center text-gray-900 dark:text-gray-100">{totalCartons}</td>
