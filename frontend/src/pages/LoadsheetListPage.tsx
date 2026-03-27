@@ -79,6 +79,7 @@ export default function LoadsheetListPage() {
   const [skuQtyType, setSkuQtyType] = useState<'carton' | 'pack' | ''>('');
   const [skuQtyValue, setSkuQtyValue] = useState<string>('');
   const [sortByTerritory, setSortByTerritory] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Açılan kartın ref'i - scrollIntoView için
   const expandedCardRef = useRef<HTMLDivElement>(null);
@@ -112,6 +113,15 @@ export default function LoadsheetListPage() {
       return () => window.removeEventListener('resize', calculateContentHeight);
     }
   }, [expandedDealerCode, calculateContentHeight]);
+
+  // Scroll pozisyonunu takip et - yukarı git butonu için
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
   const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
@@ -947,6 +957,17 @@ const sortedLoadsheets = [...group.loadsheets]
           )}
         </div>
       </div>
+
+      {/* Yukarı Git Butonu */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-2xl z-50 transition-opacity"
+          aria-label="Yukarı git"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 }
