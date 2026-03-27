@@ -2,7 +2,7 @@
  * Loadsheet List Page
  * İstasyon bazında fiş listesi ve detay görünümü
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
@@ -78,6 +78,40 @@ export default function LoadsheetListPage() {
   const skuDropdownRef = useRef<HTMLDivElement>(null);
   const [skuQtyType, setSkuQtyType] = useState<'carton' | 'pack' | ''>('');
   const [skuQtyValue, setSkuQtyValue] = useState<string>('');
+  const [sortByTerritory, setSortByTerritory] = useState(false);
+
+  // Açılan kartın ref'i - scrollIntoView için
+  const expandedCardRef = useRef<HTMLDivElement>(null);
+  const cardHeaderRef = useRef<HTMLDivElement>(null);
+  const [contentMaxHeight, setContentMaxHeight] = useState<string>('70vh');
+
+  const calculateContentHeight = useCallback(() => {
+    if (cardHeaderRef.current) {
+      const headerRect = cardHeaderRef.current.getBoundingClientRect();
+      const headerBottom = headerRect.bottom;
+      const available = window.innerHeight - headerBottom - 16; // 16px alt boşluk
+      setContentMaxHeight(`${Math.max(available, 200)}px`);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (expandedDealerCode && expandedCardRef.current) {
+      // Kartı üste scroll et
+      setTimeout(() => {
+        expandedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll bittikten sonra yüksekliği hesapla
+        setTimeout(() => calculateContentHeight(), 400);
+      }, 50);
+    }
+  }, [expandedDealerCode, calculateContentHeight]);
+
+  // Pencere boyutu değişince yeniden hesapla
+  useEffect(() => {
+    if (expandedDealerCode) {
+      window.addEventListener('resize', calculateContentHeight);
+      return () => window.removeEventListener('resize', calculateContentHeight);
+    }
+  }, [expandedDealerCode, calculateContentHeight]);
 
   // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
   const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
@@ -294,11 +328,17 @@ export default function LoadsheetListPage() {
       });
     });
     
-    // Grupları sırala: tamamlanmamış gruplar (gray/orange) üstte, tamamlanmış (green) altta; eşitlikte rut sırası
+    // Grupları sırala: tamamlanmamış gruplar (gray/orange) üstte, tamamlanmış (green) altta
     groups.sort((a, b) => {
       const aDone = a.cardColor === 'green';
       const bDone = b.cardColor === 'green';
       if (aDone !== bDone) return Number(aDone) - Number(bDone);
+      if (sortByTerritory) {
+        const aTerrName = a.loadsheets[0]?.territory?.name || '';
+        const bTerrName = b.loadsheets[0]?.territory?.name || '';
+        const terrCmp = aTerrName.localeCompare(bTerrName, 'tr');
+        if (terrCmp !== 0) return terrCmp;
+      }
       return a.route_order - b.route_order;
     });
     
@@ -321,6 +361,29 @@ export default function LoadsheetListPage() {
     if (stationId) {
       loadLoadsheets(stationId, '', '', [], '', '');
     }
+  };
+
+  const handleToggleTerritorySort = () => {
+    setSortByTerritory(prev => {
+      const next = !prev;
+      // Mevcut grupları yeniden sırala
+      setDealerGroups(groups => {
+        const sorted = [...groups].sort((a, b) => {
+          const aDone = a.cardColor === 'green';
+          const bDone = b.cardColor === 'green';
+          if (aDone !== bDone) return Number(aDone) - Number(bDone);
+          if (next) {
+            const aTerrName = a.loadsheets[0]?.territory?.name || '';
+            const bTerrName = b.loadsheets[0]?.territory?.name || '';
+            const terrCmp = aTerrName.localeCompare(bTerrName, 'tr');
+            if (terrCmp !== 0) return terrCmp;
+          }
+          return a.route_order - b.route_order;
+        });
+        return sorted;
+      });
+      return next;
+    });
   };
 
   const handleTerritoryChange = (territoryCode: string) => {
@@ -588,10 +651,25 @@ export default function LoadsheetListPage() {
                             </div>
                           </div>
                         )}
+                        {/* Territory Sıralama */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sıralama</label>
+                          <button
+                            type="button"
+                            onClick={handleToggleTerritorySort}
+                            className={`px-3 py-2 rounded-md text-sm font-medium border whitespace-nowrap ${
+                              sortByTerritory
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            Territory A-Z
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
-                  
+
                   <button
                     onClick={() => loadActiveCycle()}
                     className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
@@ -639,14 +717,16 @@ const sortedLoadsheets = [...group.loadsheets]
                     return (
                       <div
                         key={group.dealer_code}
+                        ref={isExpanded ? expandedCardRef : undefined}
                         className={`border-2 rounded-lg overflow-hidden ${getCardColorClass(group.cardColor)}`}
                       >
                         {/* Dealer Card Header */}
                         <div
+                          ref={isExpanded ? cardHeaderRef : undefined}
                           className="p-4 cursor-pointer hover:bg-opacity-80 transition"
                           onClick={() => handleDealerCardClick(group.dealer_code)}
                         >
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-start">
                             <div className="flex items-center gap-4">
                               <span className="text-3xl font-bold text-gray-900 bg-white dark:bg-gray-200 px-3 py-1 rounded">
                                 {group.route_order}
@@ -689,15 +769,25 @@ const sortedLoadsheets = [...group.loadsheets]
                                 </div>
                               </div>
                             </div>
-                            <span className="text-2xl text-gray-600 dark:text-gray-400">
-                              {isExpanded ? '▲' : '▼'}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              {group.loadsheets[0]?.territory?.name && (
+                                <span className="font-bold text-xl text-gray-900 dark:text-gray-100">
+                                  {group.loadsheets[0].territory.name}
+                                </span>
+                              )}
+                              <span className="text-2xl text-gray-600 dark:text-gray-400">
+                                {isExpanded ? '▲' : '▼'}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
                         {/* Expanded: Tüm fişler */}
                         {isExpanded && (
-                          <div className="bg-white dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600 p-4 space-y-6">
+                          <div
+                            className="bg-white dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600 p-4 space-y-6 overflow-y-auto"
+                            style={{ maxHeight: contentMaxHeight }}
+                          >
                             {sortedLoadsheets
                               .sort((a, b) => {
                                 // Batch filtresi aktifse: parent (included_as_parent) önce, sonra batch ASC, sonra tamamlanmayan üstte
