@@ -23,9 +23,12 @@ class LoadsheetGenerator:
         self._depot_id = None
 
     def _get_main_stock_station(self) -> Optional[Station]:
-        """AnaStok istasyonunu al (cache)"""
+        """AnaStok istasyonunu al (cache). Aktif değilse None döner."""
         if self._main_stock_station is None:
-            stmt = select(Station).where(Station.is_main_stock == True)
+            stmt = select(Station).where(
+                Station.is_main_stock == True,
+                Station.active == True
+            )
             if self._depot_id:
                 stmt = stmt.where(Station.depot_id == self._depot_id)
             self._main_stock_station = self.session.exec(stmt).first()

@@ -841,7 +841,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                     ) : !loadsheet.completed_at ? (
                                       <button
                                         onClick={() => handleCompleteLoadsheet(loadsheet.id)}
-                                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-semibold"
+                                        className="bg-green-600 text-white px-12 py-3 rounded-md hover:bg-green-700 text-base font-bold"
                                       >
                                         Tamamla
                                       </button>

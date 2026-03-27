@@ -15,7 +15,7 @@ interface Territory {
   is_active: boolean;
 }
 
-interface Station { id: string; name: string; active: boolean }
+interface Station { id: string; name: string; active: boolean; is_main_stock?: boolean }
 
 const STATION_COLORS = [
   '#E67E22', // orange
@@ -254,6 +254,36 @@ export default function TerritoryAssignmentPage() {
               className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
             >Kaydet</button>
             <button onClick={handleReset} disabled={autoPlanning} className={`px-4 py-2 rounded-md text-white ${autoPlanning ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'}`}>Sıfırla</button>
+            {/* AnaStok Toggle */}
+            {(() => {
+              const mainStockStation = stations.find(s => s.is_main_stock);
+              if (!mainStockStation) return null;
+              return (
+                <button
+                  onClick={async () => {
+                    try {
+                      const updated = await apiService.updateStation(mainStockStation.id, { active: !mainStockStation.active });
+                      setStations(prev => prev.map(s => s.id === mainStockStation.id ? { ...s, active: updated.active } : s));
+                      setToast({
+                        message: updated.active ? 'AnaStok aktif edildi - 300+ karton bayiler AnaStok\'a yönlendirilecek' : 'AnaStok devre dışı - tüm bayiler normal istasyonlara dağıtılacak',
+                        type: 'success'
+                      });
+                      setTimeout(() => setToast(null), 4000);
+                    } catch {
+                      setToast({ message: 'AnaStok durumu değiştirilemedi', type: 'error' });
+                      setTimeout(() => setToast(null), 3000);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-md font-semibold ${
+                    mainStockStation.active
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                      : 'bg-gray-300 hover:bg-gray-400 text-gray-700'
+                  }`}
+                >
+                  {mainStockStation.active ? 'AnaStok Aktif' : 'AnaStok Kapalı'}
+                </button>
+              );
+            })()}
           </div>
         </div>
 

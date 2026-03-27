@@ -41,7 +41,7 @@ async def get_config(
     return {
         "auto_planning_enabled": auto_planning,
         "stations": [
-            {"id": str(s.id), "name": s.name, "active": s.active}
+            {"id": str(s.id), "name": s.name, "active": s.active, "is_main_stock": getattr(s, 'is_main_stock', False)}
             for s in stations
         ],
         "assignments": [
