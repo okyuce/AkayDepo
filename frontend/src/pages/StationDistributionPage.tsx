@@ -212,6 +212,9 @@ export default function StationDistributionPage() {
                               {territory.code}
                             </th>
                           ))}
+                          <th rowSpan={2} className="px-4 py-2 text-center text-sm font-bold text-white border border-gray-300 dark:border-gray-600 bg-indigo-600 dark:bg-indigo-700">
+                            İst. Toplamı
+                          </th>
                         </tr>
                         <tr>
                           {trackingData.territories.map((territory) => (
@@ -269,6 +272,9 @@ export default function StationDistributionPage() {
                                 </td>
                               </>
                             ))}
+                            <td className="px-3 py-2 text-center text-sm font-bold border border-gray-300 dark:border-gray-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                              {(product.stock_total + totalRemaining + product.territories.reduce((sum, t) => sum + t.prepared_total, 0)).toFixed(1).replace(/\.0$/, '')}
+                            </td>
                           </tr>
                         );
                         })}
@@ -301,6 +307,13 @@ export default function StationDistributionPage() {
                               </>
                             );
                           })}
+                          <td className="px-3 py-3 text-center text-sm font-bold text-indigo-700 dark:text-indigo-300 border border-gray-300 dark:border-gray-600 bg-indigo-50 dark:bg-indigo-900/30">
+                            {trackingData.products.reduce((sum, p) => {
+                              const remaining = p.territories.reduce((s, t) => s + t.remaining_total, 0);
+                              const prepared = p.territories.reduce((s, t) => s + t.prepared_total, 0);
+                              return sum + p.stock_total + remaining + prepared;
+                            }, 0).toFixed(1).replace(/\.0$/, '')}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>
