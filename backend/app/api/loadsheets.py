@@ -12,11 +12,21 @@ from app.core.database import get_session
 from app.core.websocket import manager
 from app.api.auth import get_current_user, verify_depot_access
 from app.models import (
-    Loadsheet, LoadsheetLine, Station, StationAssignment, 
-    Territory, Dealer, Product, LoadCounter
+    Loadsheet, LoadsheetLine, Station, StationAssignment,
+    Territory, Dealer, Product, LoadCounter, TerritoryInfo
 )
 
 router = APIRouter()
+
+def _get_territory_display_name(session: Session, territory: Territory, depot_id) -> str:
+    """TerritoryInfo master tablosundan doğru territory adını al"""
+    if not territory:
+        return ""
+    stmt = select(TerritoryInfo).where(TerritoryInfo.code == territory.code)
+    if depot_id:
+        stmt = stmt.where(TerritoryInfo.depot_id == depot_id)
+    ti = session.exec(stmt).first()
+    return ti.name if ti else territory.name
 
 @router.get("/station/{station_id}")
 async def get_station_loadsheets(
@@ -225,7 +235,7 @@ async def get_station_loadsheets(
             territories_data.append({
                 "territory_code": territory.code if territory else "",
                 "display_number": territory.display_number if territory else "",
-                "name": territory.name if territory else "",
+                "name": _get_territory_display_name(session, territory, depot_id) if territory else "",
                 "total_carton": territory_total,
                 "completed_carton": round(territory_completed, 1),
                 "progress_percent": progress_percent,
@@ -410,7 +420,7 @@ async def get_loadsheet_detail(
         "territory": {
             "code": territory.code if territory else "",
             "display_number": territory.display_number if territory else "",
-            "name": territory.name if territory else ""
+            "name": _get_territory_display_name(session, territory, depot_id) if territory else ""
         },
         "lines": lines_data,
         "total_carton": round(total_carton, 1),

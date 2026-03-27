@@ -161,18 +161,19 @@ def extract_territory_info(territory_code: str) -> Tuple[str, str]:
         (display_number, name): ("T07", "Sille")
     """
     # TERR030707-Sille → 07, Sille
-    parts = territory_code.split('-')
+    # TERR030702-Eski-Garaj → 02, Eski Garaj
+    parts = territory_code.split('-', 1)  # İlk tire'den böl
     if len(parts) != 2:
         return "T00", territory_code
-    
+
     code_part = parts[0]  # TERR030707
-    name_part = parts[1]  # Sille
-    
+    name_part = parts[1].replace('-', ' ')  # Eski-Garaj → Eski Garaj
+
     # Son 2 digit al: 030707 → 07
     if len(code_part) >= 2:
         last_two = code_part[-2:]
         display_number = f"T{last_two}"
     else:
         display_number = "T00"
-    
+
     return display_number, name_part
