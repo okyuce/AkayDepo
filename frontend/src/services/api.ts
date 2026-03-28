@@ -159,6 +159,16 @@ class ApiService {
     return response.data;
   }
 
+  async cancelLoadsheet(loadsheetId: string) {
+    const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/cancel`);
+    return response.data;
+  }
+
+  async uncancelLoadsheet(loadsheetId: string) {
+    const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/uncancel`);
+    return response.data;
+  }
+
   // Counters
   async saveCounterReading(stationId: string, counterValue: number) {
     const response = await this.client.post('/v1/counters/', {

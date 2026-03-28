@@ -567,17 +567,14 @@ async def get_station_tracking(
                         "prepared_pack": 0
                     }
                 
-                # Hazırlanan/kalan hesaplama: yalnızca status == 'loaded' hazırlanana gider.
-                # 'cancelled' ve 'pending' hazırlanana dahil edilmez. 'pending' kalan'a eklenir.
+                # Hazırlanan/kalan hesaplama:
+                # 'loaded' → hazırlanan, 'pending' ve 'cancelled' → kalan
                 if loadsheet.status == 'loaded':
                     product_tracking[product_id]["territories"][territory_id]["prepared_carton"] += line.qty_carton
                     product_tracking[product_id]["territories"][territory_id]["prepared_pack"] += line.qty_pack
-                elif loadsheet.status == 'pending':
+                elif loadsheet.status in ('pending', 'cancelled'):
                     product_tracking[product_id]["territories"][territory_id]["remaining_carton"] += line.qty_carton
                     product_tracking[product_id]["territories"][territory_id]["remaining_pack"] += line.qty_pack
-                else:
-                    # cancelled or other statuses: ignore in both prepared and remaining
-                    pass
         
         # Response hazırla
         products_list = []

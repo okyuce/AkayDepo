@@ -48,7 +48,7 @@ interface DealerGroup {
   dealer_name: string;
   route_order: number;
   loadsheets: Loadsheet[];
-  cardColor: 'gray' | 'green' | 'orange';
+  cardColor: 'gray' | 'green' | 'orange' | 'red';
 }
 
 interface Product {
@@ -316,12 +316,17 @@ export default function LoadsheetListPage() {
       });
       
       const completedCount = lsList.filter(ls => ls.completed_at !== null || ls.status === 'loaded').length;
+      const cancelledCount = lsList.filter(ls => ls.status === 'cancelled').length;
       const totalCount = lsList.length;
-      
-      let cardColor: 'gray' | 'green' | 'orange' = 'gray';
-      
-      // Kart rengi tamamlanma durumuna göre
-      if (completedCount === totalCount) {
+
+      let cardColor: 'gray' | 'green' | 'orange' | 'red' = 'gray';
+
+      // Kart rengi duruma göre
+      // Son batch (aktif fiş) iptal edildiyse kırmızı
+      const lastBatch = lsList.reduce((prev, curr) => (prev.batch_number > curr.batch_number ? prev : curr));
+      if (lastBatch.status === 'cancelled') {
+        cardColor = 'red';    // Aktif fiş iptal edildi
+      } else if (completedCount === totalCount) {
         cardColor = 'green';  // Hepsi tamamlandı
       } else if (completedCount > 0 && completedCount < totalCount) {
         cardColor = 'orange'; // Bazıları tamamlandı, bazıları bekliyor
@@ -340,8 +345,8 @@ export default function LoadsheetListPage() {
     
     // Grupları sırala: tamamlanmamış gruplar (gray/orange) üstte, tamamlanmış (green) altta
     groups.sort((a, b) => {
-      const aDone = a.cardColor === 'green';
-      const bDone = b.cardColor === 'green';
+      const aDone = a.cardColor === 'green' || a.cardColor === 'red';
+      const bDone = b.cardColor === 'green' || b.cardColor === 'red';
       if (aDone !== bDone) return Number(aDone) - Number(bDone);
       if (sortByTerritory) {
         const aTerrName = a.loadsheets[0]?.territory?.name || '';
@@ -379,8 +384,8 @@ export default function LoadsheetListPage() {
       // Mevcut grupları yeniden sırala
       setDealerGroups(groups => {
         const sorted = [...groups].sort((a, b) => {
-          const aDone = a.cardColor === 'green';
-          const bDone = b.cardColor === 'green';
+          const aDone = a.cardColor === 'green' || a.cardColor === 'red';
+          const bDone = b.cardColor === 'green' || b.cardColor === 'red';
           if (aDone !== bDone) return Number(aDone) - Number(bDone);
           if (next) {
             const aTerrName = a.loadsheets[0]?.territory?.name || '';
@@ -460,12 +465,37 @@ export default function LoadsheetListPage() {
     }
   };
 
-  const getCardColorClass = (cardColor: 'gray' | 'green' | 'orange') => {
+  const handleCancelLoadsheet = async (loadsheetId: string) => {
+    if (!confirm('Bu fişi iptal etmek istediğinize emin misiniz?')) return;
+    try {
+      await apiService.cancelLoadsheet(loadsheetId);
+      if (selectedStationId) await loadLoadsheets(selectedStationId);
+    } catch (err) {
+      console.error('Fiş iptal edilemedi:', err);
+      alert('Hata: Fiş iptal edilemedi');
+    }
+  };
+
+  const handleUncancelLoadsheet = async (loadsheetId: string) => {
+    try {
+      await apiService.uncancelLoadsheet(loadsheetId);
+      if (selectedStationId) await loadLoadsheets(selectedStationId);
+    } catch (err) {
+      console.error('İptal geri alınamadı:', err);
+      alert('Hata: İptal geri alınamadı');
+    }
+  };
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+  const getCardColorClass = (cardColor: 'gray' | 'green' | 'orange' | 'red') => {
     switch (cardColor) {
       case 'green':
         return 'bg-green-100 dark:bg-green-900/30 border-green-400 dark:border-green-700';
       case 'orange':
         return 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 dark:border-orange-700';
+      case 'red':
+        return 'bg-red-100 dark:bg-red-900/30 border-red-400 dark:border-red-700';
       default:
         return 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600';
     }
@@ -776,6 +806,9 @@ const sortedLoadsheets = [...group.loadsheets]
                                   {group.cardColor === 'orange' && (
                                     <span className="text-xs text-orange-700 dark:text-orange-300 font-semibold">⚠ Ek Fiş</span>
                                   )}
+                                  {group.cardColor === 'red' && (
+                                    <span className="text-xs text-red-700 dark:text-red-300 font-semibold">❌ İptal</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -816,8 +849,8 @@ const sortedLoadsheets = [...group.loadsheets]
                                 const totalCartons = loadsheet.lines?.reduce((sum, line) => sum + line.qty_carton, 0) || 0;
                                 const totalPacks = loadsheet.lines?.reduce((sum, line) => sum + (line.qty_pack || 0), 0) || 0;
                                 
-                                // İptal: son batch dışındaki tümü iptal
-                                const isCancelled = loadsheet.id !== lastByBatch.id;
+                                // İptal: son batch dışındaki tümü iptal VEYA manuel iptal
+                                const isCancelled = loadsheet.id !== lastByBatch.id || loadsheet.status === 'cancelled';
                                 // Fiş numarası: batch sırasındaki konum (1'den başlar)
                                 const loadsheetNumber = orderByBatch.indexOf(loadsheet.id) + 1;
 
@@ -846,18 +879,50 @@ const sortedLoadsheets = [...group.loadsheets]
                                         </span>
                                       )}
                                     </div>
-                                    {isCancelled ? (
-                                      <span className="text-red-700 font-semibold text-sm">❌ İptal Edildi</span>
-                                    ) : !loadsheet.completed_at ? (
-                                      <button
-                                        onClick={() => handleCompleteLoadsheet(loadsheet.id)}
-                                        className="bg-green-600 text-white px-12 py-3 rounded-md hover:bg-green-700 text-base font-bold"
-                                      >
-                                        Tamamla
-                                      </button>
-                                    ) : (
-                                      <span className="text-green-700 font-semibold text-sm">✓ Tamamlandı</span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {isCancelled ? (
+                                        <>
+                                          <span className="text-red-700 font-semibold text-sm">❌ İptal Edildi</span>
+                                          {isAdmin && loadsheet.status === 'cancelled' && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleUncancelLoadsheet(loadsheet.id); }}
+                                              className="text-xs px-2 py-1 rounded border border-blue-400 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                            >
+                                              Geri Al
+                                            </button>
+                                          )}
+                                        </>
+                                      ) : !loadsheet.completed_at ? (
+                                        <>
+                                          {isAdmin && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleCancelLoadsheet(loadsheet.id); }}
+                                              className="text-xs px-2 py-1 rounded border border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                            >
+                                              İptal
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => handleCompleteLoadsheet(loadsheet.id)}
+                                            className="bg-green-600 text-white px-12 py-3 rounded-md hover:bg-green-700 text-base font-bold"
+                                          >
+                                            Tamamla
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-green-700 font-semibold text-sm">✓ Tamamlandı</span>
+                                          {isAdmin && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleCancelLoadsheet(loadsheet.id); }}
+                                              className="text-xs px-2 py-1 rounded border border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                            >
+                                              İptal
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* Fiş Detay Tablosu */}

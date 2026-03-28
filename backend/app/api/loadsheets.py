@@ -558,3 +558,119 @@ async def complete_loadsheet(
         "loaded_at": loadsheet.loaded_at.isoformat(),
         "territory_completed": territory_completed
     }
+
+
+@router.post("/{loadsheet_id}/cancel")
+async def cancel_loadsheet(
+    loadsheet_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Fişi iptal et (sadece admin). Tamamlanmış fişlerde stok geri eklenir."""
+    from app.models import StationInventory, StockMovement
+
+    # Sadece admin
+    if current_user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(403, "Bu işlem sadece admin kullanıcılar için geçerlidir")
+
+    loadsheet = session.exec(
+        select(Loadsheet).where(Loadsheet.id == loadsheet_id).with_for_update()
+    ).first()
+    if not loadsheet:
+        raise HTTPException(404, "Fiş bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id, "Fiş")
+
+    if loadsheet.status == "cancelled":
+        return {"loadsheet_id": str(loadsheet_id), "status": "cancelled", "already_cancelled": True}
+
+    was_loaded = loadsheet.status == "loaded"
+
+    # Tamamlanmış fişse stok geri ekle
+    if was_loaded:
+        assignment = session.get(StationAssignment, loadsheet.assignment_id)
+        if assignment:
+            stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet_id)
+            lines = session.exec(stmt).all()
+
+            for line in lines:
+                stmt = select(StationInventory).where(
+                    StationInventory.station_id == assignment.station_id,
+                    StationInventory.product_id == line.product_id
+                )
+                inventory = session.exec(stmt).first()
+
+                if not inventory:
+                    inventory = StationInventory(
+                        station_id=assignment.station_id,
+                        product_id=line.product_id,
+                        quantity_carton=0,
+                        quantity_pack=0
+                    )
+                    session.add(inventory)
+                    session.flush()
+
+                before_carton = inventory.quantity_carton
+                before_pack = inventory.quantity_pack
+
+                # Stok geri ekle (ters yönde)
+                total_packs_equiv = inventory.quantity_carton * 10 + inventory.quantity_pack
+                return_packs_equiv = line.qty_carton * 10 + line.qty_pack
+                new_total = total_packs_equiv + return_packs_equiv
+
+                inventory.quantity_carton = new_total // 10
+                inventory.quantity_pack = new_total % 10
+                inventory.updated_at = datetime.now()
+                session.add(inventory)
+
+                # Stok hareket logu - iade
+                movement = StockMovement(
+                    station_id=assignment.station_id,
+                    product_id=line.product_id,
+                    loadsheet_id=loadsheet_id,
+                    movement_type="cancel_return",
+                    quantity_carton=line.qty_carton,
+                    quantity_pack=line.qty_pack,
+                    before_carton=before_carton,
+                    before_pack=before_pack,
+                    after_carton=inventory.quantity_carton,
+                    after_pack=inventory.quantity_pack
+                )
+                session.add(movement)
+
+    loadsheet.status = "cancelled"
+    loadsheet.completed_at = None
+    loadsheet.loaded_at = None
+    session.add(loadsheet)
+    session.commit()
+
+    return {"loadsheet_id": str(loadsheet_id), "status": "cancelled", "stock_returned": was_loaded}
+
+
+@router.post("/{loadsheet_id}/uncancel")
+async def uncancel_loadsheet(
+    loadsheet_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """İptal edilen fişi geri al (sadece admin). Fiş pending durumuna döner."""
+    # Sadece admin
+    if current_user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(403, "Bu işlem sadece admin kullanıcılar için geçerlidir")
+
+    loadsheet = session.exec(
+        select(Loadsheet).where(Loadsheet.id == loadsheet_id).with_for_update()
+    ).first()
+    if not loadsheet:
+        raise HTTPException(404, "Fiş bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id, "Fiş")
+
+    if loadsheet.status != "cancelled":
+        raise HTTPException(400, "Bu fiş iptal durumunda değil")
+
+    loadsheet.status = "pending"
+    session.add(loadsheet)
+    session.commit()
+
+    return {"loadsheet_id": str(loadsheet_id), "status": "pending"}
