@@ -316,7 +316,6 @@ export default function LoadsheetListPage() {
       });
       
       const completedCount = lsList.filter(ls => ls.completed_at !== null || ls.status === 'loaded').length;
-      const cancelledCount = lsList.filter(ls => ls.status === 'cancelled').length;
       const totalCount = lsList.length;
 
       let cardColor: 'gray' | 'green' | 'orange' | 'red' = 'gray';
