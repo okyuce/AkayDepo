@@ -41,6 +41,7 @@ interface Loadsheet {
   };
   included_as_parent?: boolean;
   order_date?: string | null;
+  cancelled_by_revision?: boolean;
 }
 
 interface DealerGroup {
@@ -882,7 +883,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                       {isCancelled ? (
                                         <>
                                           <span className="text-red-700 font-semibold text-sm">❌ İptal Edildi</span>
-                                          {isAdmin && loadsheet.status === 'cancelled' && (
+                                          {isAdmin && loadsheet.status === 'cancelled' && !loadsheet.cancelled_by_revision && (
                                             <button
                                               onClick={(e) => { e.stopPropagation(); handleUncancelLoadsheet(loadsheet.id); }}
                                               className="text-xs px-2 py-1 rounded border border-blue-400 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30"

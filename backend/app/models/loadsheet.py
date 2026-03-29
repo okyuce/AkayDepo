@@ -44,6 +44,7 @@ class Loadsheet(SQLModel, table=True):
     revision_diff: Optional[str] = None  # Revizyon farkı JSON (product diff listesi)
     is_revision: bool = Field(default=False)
     parent_loadsheet_id: Optional[UUID] = None  # Revizyon ise orjinal fişin ID'si
+    cancelled_by_revision: bool = Field(default=False)  # Revizyon nedeniyle iptal edildi mi?
     printed_at: Optional[datetime] = None
     loaded_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None  # Tamamlandığı zaman

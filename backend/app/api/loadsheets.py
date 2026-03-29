@@ -213,7 +213,8 @@ async def get_station_loadsheets(
                     "parent_loadsheet_id": str(ls.parent_loadsheet_id) if ls.parent_loadsheet_id else None,
                     "loaded_at": ls.loaded_at.isoformat() if ls.loaded_at else None,
                     "included_as_parent": (ls.id in parent_ids) if import_batch is not None else False,
-                    "order_date": od.isoformat() if od else None
+                    "order_date": od.isoformat() if od else None,
+                    "cancelled_by_revision": ls.cancelled_by_revision
                 })
                 
                 if ls.status == "loaded":
