@@ -86,13 +86,25 @@ export default function LoadsheetListPage() {
   const expandedCardRef = useRef<HTMLDivElement>(null);
   const cardHeaderRef = useRef<HTMLDivElement>(null);
   const [contentMaxHeight, setContentMaxHeight] = useState<string>('70vh');
+  const [productListMaxHeight, setProductListMaxHeight] = useState<string>('50vh');
+  const loadsheetFixedTopRef = useRef<HTMLTableElement>(null);
+  const loadsheetFixedBottomRef = useRef<HTMLTableElement>(null);
+  const loadsheetHeaderRef = useRef<HTMLDivElement>(null);
 
   const calculateContentHeight = useCallback(() => {
     if (cardHeaderRef.current) {
       const headerRect = cardHeaderRef.current.getBoundingClientRect();
       const headerBottom = headerRect.bottom;
-      const available = window.innerHeight - headerBottom - 16; // 16px alt boşluk
+      const available = window.innerHeight - headerBottom - 16;
       setContentMaxHeight(`${Math.max(available, 200)}px`);
+
+      // Ürün listesi: gerçek DOM ölçümü ile hesapla
+      const topH = loadsheetFixedTopRef.current?.offsetHeight || 0;
+      const bottomH = loadsheetFixedBottomRef.current?.offsetHeight || 0;
+      const lsHeaderH = loadsheetHeaderRef.current?.offsetHeight || 0;
+      const padding = 48; // dış container padding + border + boşluklar
+      const productArea = available - topH - bottomH - lsHeaderH - padding;
+      setProductListMaxHeight(`${Math.max(productArea, 150)}px`);
     }
   }, []);
 
@@ -101,8 +113,9 @@ export default function LoadsheetListPage() {
       // Kartı üste scroll et
       setTimeout(() => {
         expandedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Scroll bittikten sonra yüksekliği hesapla
+        // Scroll bittikten sonra yüksekliği hesapla (iki aşamada, DOM'un hazır olduğundan emin ol)
         setTimeout(() => calculateContentHeight(), 400);
+        setTimeout(() => calculateContentHeight(), 600);
       }, 50);
     }
   }, [expandedDealerCode, calculateContentHeight]);
@@ -123,6 +136,11 @@ export default function LoadsheetListPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Uyarı modalı
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  // Onay modalı
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
   const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
@@ -453,6 +471,18 @@ export default function LoadsheetListPage() {
   };
 
   const handleCompleteLoadsheet = async (loadsheetId: string) => {
+    // Tüm ürünlerin tıklanmış olup olmadığını kontrol et
+    const loadsheet = loadsheets.find(ls => ls.id === loadsheetId);
+    if (loadsheet?.lines) {
+      const uncompletedLines = loadsheet.lines.filter(
+        line => !isLineCompleted(loadsheetId, line.product_code)
+      );
+      if (uncompletedLines.length > 0) {
+        setWarningMessage(`İşlemi yapılmamış ${uncompletedLines.length} ürün var.\nLütfen tüm ürünleri tamamlayın.`);
+        return;
+      }
+    }
+
     try {
       await apiService.completeLoadsheet(loadsheetId);
       // Listeyi yenile
@@ -465,15 +495,20 @@ export default function LoadsheetListPage() {
     }
   };
 
-  const handleCancelLoadsheet = async (loadsheetId: string) => {
-    if (!confirm('Bu fişi iptal etmek istediğinize emin misiniz?')) return;
-    try {
-      await apiService.cancelLoadsheet(loadsheetId);
-      if (selectedStationId) await loadLoadsheets(selectedStationId);
-    } catch (err) {
-      console.error('Fiş iptal edilemedi:', err);
-      alert('Hata: Fiş iptal edilemedi');
-    }
+  const handleCancelLoadsheet = (loadsheetId: string) => {
+    setConfirmModal({
+      message: 'Bu fişi iptal etmek istediğinize emin misiniz?',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await apiService.cancelLoadsheet(loadsheetId);
+          if (selectedStationId) await loadLoadsheets(selectedStationId);
+        } catch (err) {
+          console.error('Fiş iptal edilemedi:', err);
+          setWarningMessage('Hata: Fiş iptal edilemedi');
+        }
+      }
+    });
   };
 
   const handleUncancelLoadsheet = async (loadsheetId: string) => {
@@ -859,7 +894,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                   isCancelled ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : 'border-gray-200 dark:border-gray-600'
                                 }`}>
                                   {/* Fiş Başlık */}
-                                  <div className={`p-3 flex justify-between items-center ${
+                                  <div ref={loadsheetHeaderRef} className={`p-3 flex justify-between items-center ${
                                     isCancelled ? 'bg-red-100 dark:bg-red-900/40' : 'bg-gray-50 dark:bg-gray-700'
                                   }`}>
                                     <div className="flex items-center gap-2">
@@ -927,86 +962,103 @@ const sortedLoadsheets = [...group.loadsheets]
 
                                   {/* Fiş Detay Tablosu */}
                                   {loadsheet.lines && (
-                                    <table className="w-full table-fixed">
-                                      <thead className="bg-gray-100 dark:bg-gray-700">
-                                        <tr>
-                                          <th className="text-left p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-3/5 text-gray-900 dark:text-gray-100">Rut Sırası</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Krt</th>
-                                          <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Pkt</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        <tr className="bg-black text-white font-bold">
-                                          <td className="p-2">{loadsheet.dealer_name}</td>
-                                          <td className="p-2 text-center">{totalCartons}</td>
-                                          <td className="p-2 text-center">{totalPacks || ''}</td>
-                                        </tr>
-                                        <tr className="bg-white dark:bg-gray-800">
-                                          <td className="p-2 text-gray-900 dark:text-gray-100" colSpan={3}>{loadsheet.dealer_code}</td>
-                                        </tr>
-                                        <tr className="bg-black text-white">
-                                          <td className="p-2" colSpan={3}>
-                                            {loadsheet.territory ? loadsheet.territory.code : 'TERR'}
-                                          </td>
-                                        </tr>
-                                        {loadsheet.lines.map((line, idx) => {
-                                          const done = isLineCompleted(loadsheet.id, line.product_code);
-                                          return (
-                                          <tr
-                                            key={idx}
-                                            onClick={() => toggleLineCompleted(loadsheet.id, line.product_code)}
-                                            className={`border-b border-gray-200 dark:border-gray-600 cursor-pointer select-none transition-colors ${
-                                              done
-                                                ? 'bg-green-50 dark:bg-green-900/30'
-                                                : idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700'
-                                            }`}
-                                          >
-                                            <td className={`p-2 text-sm font-semibold ${done ? 'line-through text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                                              {done && <span className="mr-1 no-underline inline-block">✓</span>}
-                                              {line.product_name}
-                                            </td>
-                                            <td className="p-1.5 w-1/5">
-                                              <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
-                                                done
-                                                  ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
-                                                  : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                              }`}>
-                                                {line.qty_carton || ''}
-                                                {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
-                                                  <sup className={`ml-1 text-xs font-bold ${
-                                                    line.qty_change_carton > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                  }`}>
-                                                    {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
-                                                  </sup>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td className="p-1.5 w-1/5">
-                                              <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
-                                                done
-                                                  ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
-                                                  : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                                              }`}>
-                                                {line.qty_pack || ''}
-                                                {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
-                                                  <sup className={`ml-1 text-xs font-bold ${
-                                                    line.qty_change_pack > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                  }`}>
-                                                    {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
-                                                  </sup>
-                                                )}
-                                              </div>
+                                    <div className="flex flex-col">
+                                      {/* Sabit Üst: Tablo başlığı + Bayi bilgisi */}
+                                      <table ref={loadsheetFixedTopRef} className="w-full table-fixed flex-shrink-0">
+                                        <thead className="bg-gray-100 dark:bg-gray-700">
+                                          <tr>
+                                            <th className="text-left p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-3/5 text-gray-900 dark:text-gray-100">Rut Sırası</th>
+                                            <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Krt</th>
+                                            <th className="text-center p-3 font-bold border-b-2 border-gray-300 dark:border-gray-600 w-1/5 text-gray-900 dark:text-gray-100">Pkt</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr className="bg-black text-white font-bold">
+                                            <td className="p-2">{loadsheet.dealer_name}</td>
+                                            <td className="p-2 text-center">{totalCartons}</td>
+                                            <td className="p-2 text-center">{totalPacks || ''}</td>
+                                          </tr>
+                                          <tr className="bg-white dark:bg-gray-800">
+                                            <td className="p-2 text-gray-900 dark:text-gray-100" colSpan={3}>{loadsheet.dealer_code}</td>
+                                          </tr>
+                                          <tr className="bg-black text-white">
+                                            <td className="p-2" colSpan={3}>
+                                              {loadsheet.territory ? loadsheet.territory.code : 'TERR'}
                                             </td>
                                           </tr>
-                                          );
-                                        })}
-                                        <tr className="bg-gray-100 dark:bg-gray-700 font-bold border-t-2 border-gray-300 dark:border-gray-600">
-                                          <td className="p-3 text-gray-900 dark:text-gray-100">Toplam</td>
-                                          <td className="p-3 text-center text-gray-900 dark:text-gray-100">{totalCartons}</td>
-                                          <td className="p-3 text-center text-gray-900 dark:text-gray-100">{totalPacks || ''}</td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
+                                        </tbody>
+                                      </table>
+
+                                      {/* Scrollable Orta: Ürün satırları */}
+                                      <div className="overflow-y-auto" style={{ maxHeight: productListMaxHeight }}>
+                                        <table className="w-full table-fixed">
+                                          <tbody>
+                                            {loadsheet.lines.map((line, idx) => {
+                                              const done = isLineCompleted(loadsheet.id, line.product_code);
+                                              return (
+                                              <tr
+                                                key={idx}
+                                                onClick={() => toggleLineCompleted(loadsheet.id, line.product_code)}
+                                                className={`border-b border-gray-200 dark:border-gray-600 cursor-pointer select-none transition-colors ${
+                                                  done
+                                                    ? 'bg-green-50 dark:bg-green-900/30'
+                                                    : idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-700'
+                                                }`}
+                                              >
+                                                <td className={`p-2 text-sm font-semibold w-3/5 ${done ? 'line-through text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                                                  {done && <span className="mr-1 no-underline inline-block">✓</span>}
+                                                  {line.product_name}
+                                                </td>
+                                                <td className="p-1.5 w-1/5">
+                                                  <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
+                                                    done
+                                                      ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
+                                                      : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                                  }`}>
+                                                    {line.qty_carton || ''}
+                                                    {line.qty_change_carton !== null && line.qty_change_carton !== undefined && line.qty_change_carton !== 0 && (
+                                                      <sup className={`ml-1 text-xs font-bold ${
+                                                        line.qty_change_carton > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                                      }`}>
+                                                        {line.qty_change_carton > 0 ? '+' : ''}{line.qty_change_carton}
+                                                      </sup>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                                <td className="p-1.5 w-1/5">
+                                                  <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
+                                                    done
+                                                      ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
+                                                      : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                                  }`}>
+                                                    {line.qty_pack || ''}
+                                                    {line.qty_change_pack !== null && line.qty_change_pack !== undefined && line.qty_change_pack !== 0 && (
+                                                      <sup className={`ml-1 text-xs font-bold ${
+                                                        line.qty_change_pack > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                                      }`}>
+                                                        {line.qty_change_pack > 0 ? '+' : ''}{line.qty_change_pack}
+                                                      </sup>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+
+                                      {/* Sabit Alt: Toplam satırı */}
+                                      <table ref={loadsheetFixedBottomRef} className="w-full table-fixed flex-shrink-0">
+                                        <tbody>
+                                          <tr className="bg-gray-100 dark:bg-gray-700 font-bold border-t-2 border-gray-300 dark:border-gray-600">
+                                            <td className="p-3 w-3/5 text-gray-900 dark:text-gray-100">Toplam</td>
+                                            <td className="p-3 text-center w-1/5 text-gray-900 dark:text-gray-100">{totalCartons}</td>
+                                            <td className="p-3 text-center w-1/5 text-gray-900 dark:text-gray-100">{totalPacks || ''}</td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
                                   )}
                                 </div>
                               );
@@ -1032,6 +1084,46 @@ const sortedLoadsheets = [...group.loadsheets]
         >
           ↑
         </button>
+      )}
+
+      {/* Onay Modalı */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 mx-4 max-w-md w-full text-center">
+            <div className="text-orange-500 text-5xl mb-4">?</div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">{confirmModal.message}</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-gray-100 font-bold px-8 py-3 rounded-lg text-base"
+              >
+                Hayır
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-3 rounded-lg text-base"
+              >
+                Evet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Uyarı Modalı */}
+      {warningMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={() => setWarningMessage(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 mx-4 max-w-md w-full text-center" onClick={e => e.stopPropagation()}>
+            <div className="text-red-500 text-5xl mb-4">!</div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 whitespace-pre-line mb-6">{warningMessage}</p>
+            <button
+              onClick={() => setWarningMessage(null)}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-3 rounded-lg text-base"
+            >
+              Tamam
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
