@@ -194,6 +194,37 @@ export default function LoadsheetListPage() {
     return completedLines.has(`${loadsheetId}_${productCode}_${box}`);
   };
 
+  // Hepsini seç / kaldır
+  const toggleAllLines = (loadsheet: any) => {
+    const lines = loadsheet.lines || [];
+    const allDone = lines.every((line: any) =>
+      isLineCompleted(loadsheet.id, line.product_code, !!line.qty_carton, !!line.qty_pack)
+    );
+    setCompletedLines(prev => {
+      const next = new Set(prev);
+      lines.forEach((line: any) => {
+        const cartonKey = `${loadsheet.id}_${line.product_code}_carton`;
+        const packKey = `${loadsheet.id}_${line.product_code}_pack`;
+        if (allDone) {
+          next.delete(cartonKey);
+          next.delete(packKey);
+        } else {
+          if (line.qty_carton) next.add(cartonKey);
+          if (line.qty_pack) next.add(packKey);
+        }
+      });
+      saveCompletedLines(next);
+      return next;
+    });
+  };
+
+  const areAllLinesCompleted = (loadsheet: any) => {
+    const lines = loadsheet.lines || [];
+    return lines.length > 0 && lines.every((line: any) =>
+      isLineCompleted(loadsheet.id, line.product_code, !!line.qty_carton, !!line.qty_pack)
+    );
+  };
+
   const isLineCompleted = (loadsheetId: string, productCode: string, hasCarton: boolean = true, hasPack: boolean = true) => {
     const cartonDone = !hasCarton || completedLines.has(`${loadsheetId}_${productCode}_carton`);
     const packDone = !hasPack || completedLines.has(`${loadsheetId}_${productCode}_pack`);
@@ -1018,8 +1049,20 @@ const sortedLoadsheets = [...group.loadsheets]
                                             <td className="p-2 text-gray-900 dark:text-gray-100" colSpan={3}>{loadsheet.dealer_code}</td>
                                           </tr>
                                           <tr className="bg-black text-white">
-                                            <td className="p-2" colSpan={3}>
+                                            <td className="p-2" colSpan={2}>
                                               {loadsheet.territory ? loadsheet.territory.code : 'TERR'}
+                                            </td>
+                                            <td className="p-2 text-right">
+                                              <button
+                                                onClick={() => toggleAllLines(loadsheet)}
+                                                className={`text-xs font-bold px-3 py-1 rounded transition-colors ${
+                                                  areAllLinesCompleted(loadsheet)
+                                                    ? 'bg-green-600 text-white'
+                                                    : 'bg-white/20 text-white hover:bg-white/30'
+                                                }`}
+                                              >
+                                                {areAllLinesCompleted(loadsheet) ? '✓ Seçildi' : 'Hepsini Seç'}
+                                              </button>
                                             </td>
                                           </tr>
                                         </tbody>
