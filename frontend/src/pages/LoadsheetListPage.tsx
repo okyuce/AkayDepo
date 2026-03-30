@@ -152,7 +152,17 @@ export default function LoadsheetListPage() {
   });
 
   const saveCompletedLines = (next: Set<string>) => {
-    localStorage.setItem('completed_lines', JSON.stringify([...next]));
+    try {
+      localStorage.setItem('completed_lines', JSON.stringify([...next]));
+    } catch (e) {
+      console.error('localStorage kayıt hatası:', e);
+      // localStorage doluysa eski kayıtları temizle
+      try {
+        const arr = [...next];
+        const trimmed = arr.slice(Math.max(0, arr.length - 500));
+        localStorage.setItem('completed_lines', JSON.stringify(trimmed));
+      } catch { /* ignore */ }
+    }
   };
 
   // Kutu tıklama: sadece karton veya paket
@@ -196,26 +206,32 @@ export default function LoadsheetListPage() {
 
   // Hepsini seç / kaldır
   const toggleAllLines = (loadsheet: any) => {
-    const lines = loadsheet.lines || [];
-    const allDone = lines.every((line: any) =>
-      isLineCompleted(loadsheet.id, line.product_code, !!line.qty_carton, !!line.qty_pack)
-    );
-    setCompletedLines(prev => {
-      const next = new Set(prev);
-      lines.forEach((line: any) => {
-        const cartonKey = `${loadsheet.id}_${line.product_code}_carton`;
-        const packKey = `${loadsheet.id}_${line.product_code}_pack`;
-        if (allDone) {
-          next.delete(cartonKey);
-          next.delete(packKey);
-        } else {
-          if (line.qty_carton) next.add(cartonKey);
-          if (line.qty_pack) next.add(packKey);
-        }
+    try {
+      const lines = loadsheet?.lines || [];
+      if (lines.length === 0) return;
+      const allDone = lines.every((line: any) =>
+        line?.product_code && isLineCompleted(loadsheet.id, line.product_code, !!line.qty_carton, !!line.qty_pack)
+      );
+      setCompletedLines(prev => {
+        const next = new Set(prev);
+        lines.forEach((line: any) => {
+          if (!line?.product_code) return;
+          const cartonKey = `${loadsheet.id}_${line.product_code}_carton`;
+          const packKey = `${loadsheet.id}_${line.product_code}_pack`;
+          if (allDone) {
+            next.delete(cartonKey);
+            next.delete(packKey);
+          } else {
+            if (line.qty_carton) next.add(cartonKey);
+            if (line.qty_pack) next.add(packKey);
+          }
+        });
+        saveCompletedLines(next);
+        return next;
       });
-      saveCompletedLines(next);
-      return next;
-    });
+    } catch (e) {
+      console.error('Hepsini seç hatası:', e);
+    }
   };
 
   const areAllLinesCompleted = (loadsheet: any) => {
@@ -1054,7 +1070,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                             </td>
                                             <td className="p-2 text-right">
                                               <button
-                                                onClick={() => toggleAllLines(loadsheet)}
+                                                onClick={(e) => { e.stopPropagation(); toggleAllLines(loadsheet); }}
                                                 className={`text-xs font-bold px-3 py-1 rounded transition-colors ${
                                                   areAllLinesCompleted(loadsheet)
                                                     ? 'bg-green-600 text-white'
