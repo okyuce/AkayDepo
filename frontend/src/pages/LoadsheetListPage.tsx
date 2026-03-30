@@ -142,7 +142,8 @@ export default function LoadsheetListPage() {
   // Onay modalı
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
-  // Satır "yapıldı" işaretleme (localStorage'da kalıcı)
+  // Satır/kutu "yapıldı" işaretleme (localStorage'da kalıcı)
+  // Key formatı: loadsheetId_productCode_carton, loadsheetId_productCode_pack
   const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('completed_lines');
@@ -150,18 +151,53 @@ export default function LoadsheetListPage() {
     } catch { return new Set(); }
   });
 
-  const toggleLineCompleted = (loadsheetId: string, productCode: string) => {
-    const key = `${loadsheetId}_${productCode}`;
+  const saveCompletedLines = (next: Set<string>) => {
+    localStorage.setItem('completed_lines', JSON.stringify([...next]));
+  };
+
+  // Kutu tıklama: sadece karton veya paket
+  const toggleBoxCompleted = (loadsheetId: string, productCode: string, box: 'carton' | 'pack') => {
+    const key = `${loadsheetId}_${productCode}_${box}`;
     setCompletedLines(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      localStorage.setItem('completed_lines', JSON.stringify([...next]));
+      saveCompletedLines(next);
       return next;
     });
   };
 
-  const isLineCompleted = (loadsheetId: string, productCode: string) => {
-    return completedLines.has(`${loadsheetId}_${productCode}`);
+  // Satır tıklama: komple toggle
+  const toggleLineCompleted = (loadsheetId: string, productCode: string, hasCarton: boolean, hasPack: boolean) => {
+    const cartonKey = `${loadsheetId}_${productCode}_carton`;
+    const packKey = `${loadsheetId}_${productCode}_pack`;
+    setCompletedLines(prev => {
+      const next = new Set(prev);
+      const cartonDone = !hasCarton || next.has(cartonKey);
+      const packDone = !hasPack || next.has(packKey);
+      const allDone = cartonDone && packDone;
+
+      if (allDone) {
+        // Geri al: en son eklenen kutuyu kaldır (ikisi de varsa sadece birini kaldır)
+        if (hasPack && next.has(packKey)) next.delete(packKey);
+        else if (hasCarton && next.has(cartonKey)) next.delete(cartonKey);
+      } else {
+        // Tamamla: eksik olanları ekle
+        if (hasCarton) next.add(cartonKey);
+        if (hasPack) next.add(packKey);
+      }
+      saveCompletedLines(next);
+      return next;
+    });
+  };
+
+  const isBoxCompleted = (loadsheetId: string, productCode: string, box: 'carton' | 'pack') => {
+    return completedLines.has(`${loadsheetId}_${productCode}_${box}`);
+  };
+
+  const isLineCompleted = (loadsheetId: string, productCode: string, hasCarton: boolean = true, hasPack: boolean = true) => {
+    const cartonDone = !hasCarton || completedLines.has(`${loadsheetId}_${productCode}_carton`);
+    const packDone = !hasPack || completedLines.has(`${loadsheetId}_${productCode}_pack`);
+    return cartonDone && packDone;
   };
 
   useEffect(() => {
@@ -475,7 +511,7 @@ export default function LoadsheetListPage() {
     const loadsheet = loadsheets.find(ls => ls.id === loadsheetId);
     if (loadsheet?.lines) {
       const uncompletedLines = loadsheet.lines.filter(
-        line => !isLineCompleted(loadsheetId, line.product_code)
+        line => !isLineCompleted(loadsheetId, line.product_code, !!line.qty_carton, !!line.qty_pack)
       );
       if (uncompletedLines.length > 0) {
         setWarningMessage(`İşlemi yapılmamış ${uncompletedLines.length} ürün var.\nLütfen tüm ürünleri tamamlayın.`);
@@ -994,11 +1030,15 @@ const sortedLoadsheets = [...group.loadsheets]
                                         <table className="w-full table-fixed">
                                           <tbody>
                                             {loadsheet.lines.map((line, idx) => {
-                                              const done = isLineCompleted(loadsheet.id, line.product_code);
+                                              const hasCarton = !!line.qty_carton;
+                                              const hasPack = !!line.qty_pack;
+                                              const cartonDone = isBoxCompleted(loadsheet.id, line.product_code, 'carton');
+                                              const packDone = isBoxCompleted(loadsheet.id, line.product_code, 'pack');
+                                              const done = isLineCompleted(loadsheet.id, line.product_code, hasCarton, hasPack);
                                               return (
                                               <tr
                                                 key={idx}
-                                                onClick={() => toggleLineCompleted(loadsheet.id, line.product_code)}
+                                                onClick={() => toggleLineCompleted(loadsheet.id, line.product_code, hasCarton, hasPack)}
                                                 className={`border-b border-gray-200 dark:border-gray-600 cursor-pointer select-none transition-colors ${
                                                   done
                                                     ? 'bg-green-50 dark:bg-green-900/30'
@@ -1009,9 +1049,9 @@ const sortedLoadsheets = [...group.loadsheets]
                                                   {done && <span className="mr-1 no-underline inline-block">✓</span>}
                                                   {line.product_name}
                                                 </td>
-                                                <td className="p-1.5 w-1/5">
+                                                <td className="p-1.5 w-1/5" onClick={(e) => { e.stopPropagation(); toggleBoxCompleted(loadsheet.id, line.product_code, 'carton'); }}>
                                                   <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
-                                                    done
+                                                    done || (hasCarton && cartonDone)
                                                       ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
                                                       : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                                                   }`}>
@@ -1025,9 +1065,9 @@ const sortedLoadsheets = [...group.loadsheets]
                                                     )}
                                                   </div>
                                                 </td>
-                                                <td className="p-1.5 w-1/5">
+                                                <td className="p-1.5 w-1/5" onClick={(e) => { e.stopPropagation(); toggleBoxCompleted(loadsheet.id, line.product_code, 'pack'); }}>
                                                   <div className={`border rounded px-2 py-1 text-center font-bold text-lg min-h-[2rem] ${
-                                                    done
+                                                    done || (hasPack && packDone)
                                                       ? 'border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
                                                       : 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                                                   }`}>
