@@ -2,12 +2,13 @@
  * Excel Upload Page
  * Excel dosyası yükleme ve planlama oluşturma sayfası
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
 
 export default function ExcelUploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [numStations, setNumStations] = useState(5);
   const [isUploading, setIsUploading] = useState(false);
   const [isPlanning, setIsPlanning] = useState(false);
@@ -380,19 +381,28 @@ export default function ExcelUploadPage() {
                 )}
 
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
                   disabled={needsPlanning}
-                  className={`mt-2 block mx-auto text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-md file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100
-                    dark:file:bg-blue-900/50 dark:file:text-blue-300
-                    ${needsPlanning ? 'cursor-not-allowed' : ''}`}
+                  className="hidden"
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={needsPlanning}
+                  className={`mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold transition-colors ${
+                    needsPlanning
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-900/70'
+                  }`}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Dosya Seç
+                </button>
               </div>
 
               <button
