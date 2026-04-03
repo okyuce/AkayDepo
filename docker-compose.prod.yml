@@ -131,6 +131,20 @@ services:
     networks:
       - akaydepo_network
 
+  # Auto-heal: unhealthy container'ları otomatik restart eder
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: akaydepo_autoheal
+    restart: always
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+      AUTOHEAL_INTERVAL: 60
+      AUTOHEAL_START_PERIOD: 30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - akaydepo_network
+
 volumes:
   postgres_data:
     driver: local
