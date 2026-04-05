@@ -142,26 +142,43 @@ export default function LoadsheetListPage() {
   // Onay modalı
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
-  // Satır/kutu "yapıldı" işaretleme (localStorage'da kalıcı)
+  // Satır/kutu "yapıldı" işaretleme (localStorage'da kalıcı, cycle bazlı)
   // Key formatı: loadsheetId_productCode_carton, loadsheetId_productCode_pack
-  const [completedLines, setCompletedLines] = useState<Set<string>>(() => {
+  const [completedLines, setCompletedLines] = useState<Set<string>>(new Set());
+
+  // Cycle değiştiğinde completed_lines'ı yükle ve eski döngü verilerini temizle
+  useEffect(() => {
+    if (!cycleId) return;
     try {
-      const saved = localStorage.getItem('completed_lines');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch { return new Set(); }
-  });
+      const storageKey = `completed_lines_${cycleId}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setCompletedLines(new Set(JSON.parse(saved)));
+      } else {
+        setCompletedLines(new Set());
+      }
+      // Eski döngü verilerini temizle
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('completed_lines_') && key !== storageKey) {
+          keysToRemove.push(key);
+        }
+      }
+      // Eski format temizle
+      if (localStorage.getItem('completed_lines')) {
+        keysToRemove.push('completed_lines');
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch { setCompletedLines(new Set()); }
+  }, [cycleId]);
 
   const saveCompletedLines = (next: Set<string>) => {
+    if (!cycleId) return;
     try {
-      localStorage.setItem('completed_lines', JSON.stringify([...next]));
+      localStorage.setItem(`completed_lines_${cycleId}`, JSON.stringify([...next]));
     } catch (e) {
       console.error('localStorage kayıt hatası:', e);
-      // localStorage doluysa eski kayıtları temizle
-      try {
-        const arr = [...next];
-        const trimmed = arr.slice(Math.max(0, arr.length - 500));
-        localStorage.setItem('completed_lines', JSON.stringify(trimmed));
-      } catch { /* ignore */ }
     }
   };
 

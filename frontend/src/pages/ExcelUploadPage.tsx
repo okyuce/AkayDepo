@@ -215,7 +215,10 @@ export default function ExcelUploadPage() {
       if (cycleId) {
         localStorage.removeItem('plan_locked_' + cycleId);
         localStorage.removeItem('plan_button_disabled_' + cycleId);
+        localStorage.removeItem('completed_lines_' + cycleId);
       }
+      // Eski format temizle
+      localStorage.removeItem('completed_lines');
       
       alert('Yeni döngü başlatmaya hazır! Excel dosyası yükleyebilirsiniz.');
     } catch (err: any) {
