@@ -3,12 +3,14 @@ Cycles API Router
 Döngü yönetimi endpoint'leri
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
+from sqlalchemy import case
 from datetime import date
 from typing import Optional
 from uuid import UUID
 
 from app.core.database import get_session
+from app.core.cache import cache_get, cache_set, cache_delete_pattern
 from app.models import Cycle, Loadsheet, StationAssignment
 from app.services.cycle_manager import CycleManager
 from app.services.excel_parser import ExcelParser, ExcelParseError
@@ -75,6 +77,9 @@ async def import_cycle(
         )
         session.add(ci)
         session.commit()
+
+        # Cache temizle
+        cache_delete_pattern(f"active_cycle:{depot_id}")
 
         return {
             "cycle_id": str(cycle.id),
@@ -287,6 +292,9 @@ async def cancel_pending(
 
         session.commit()
 
+        # Cache temizle
+        cache_delete_pattern(f"active_cycle:{depot_id_str}")
+
         return {
             "success": True,
             "message": "Döngü verileri silindi. Station'lar, stoklar ve ürünler korundu. Yeni döngü başlatmaya hazır.",
@@ -303,8 +311,14 @@ async def get_active_cycle(
     session: Session = Depends(get_session),
     current_user: dict = Depends(get_current_user)
 ):
-    """En son aktif döngüyü getir (depo bazlı)"""
+    """En son aktif döngüyü getir (depo bazlı) - Redis cache 10s"""
     depot_id = current_user.get("depot_id")
+
+    # Cache kontrolü
+    cache_key = f"active_cycle:{depot_id or 'all'}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     # DEPOT FİLTRESİ
     stmt = select(Cycle).where(
@@ -317,19 +331,26 @@ async def get_active_cycle(
     cycle = session.exec(stmt).first()
 
     if not cycle:
-        return {"cycle": None, "has_active_cycle": False}
+        result = {"cycle": None, "has_active_cycle": False}
+        cache_set(cache_key, result, ttl=10)
+        return result
 
-    stmt = select(Loadsheet).where(Loadsheet.cycle_id == cycle.id)
-    loadsheets = session.exec(stmt).all()
+    # Tek SQL sorgusu ile sayım (tüm satırları çekme)
+    counts_stmt = select(
+        func.count(Loadsheet.id),
+        func.sum(case((Loadsheet.status == "loaded", 1), else_=0)),
+        func.sum(case((Loadsheet.status == "pending", 1), else_=0)),
+    ).where(Loadsheet.cycle_id == cycle.id)
+    counts_row = session.exec(counts_stmt).first()
+    total = counts_row[0] or 0
+    completed = counts_row[1] or 0
+    pending = counts_row[2] or 0
 
-    total = len(loadsheets)
-    completed = len([ls for ls in loadsheets if ls.status == "loaded"])
-    pending = len([ls for ls in loadsheets if ls.status == "pending"])
+    # Plan var mı - sadece varlık kontrolü
+    has_plan_stmt = select(StationAssignment.id).where(StationAssignment.cycle_id == cycle.id).limit(1)
+    has_plan = session.exec(has_plan_stmt).first() is not None
 
-    stmt = select(StationAssignment).where(StationAssignment.cycle_id == cycle.id)
-    has_plan = session.exec(stmt).first() is not None
-
-    return {
+    result = {
         "has_active_cycle": True,
         "cycle": {
             "id": str(cycle.id),
@@ -343,6 +364,8 @@ async def get_active_cycle(
             "pending_loadsheets": pending
         }
     }
+    cache_set(cache_key, result, ttl=10)
+    return result
 
 
 @router.get("/{cycle_id}/revisions")

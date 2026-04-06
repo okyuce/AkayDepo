@@ -293,10 +293,10 @@ export default function LoadsheetListPage() {
     }
   };
 
-  const loadActiveCycle = async () => {
+  const loadActiveCycle = async (retryCount = 0) => {
     try {
       const activeData = await apiService.getActivecycle();
-        if (activeData.has_active_cycle && activeData.cycle) {
+      if (activeData.has_active_cycle && activeData.cycle) {
         setCycleId(activeData.cycle.id);
         // Batch listesi (Excel importları)
         const imp = await apiService.getCycleImports(activeData.cycle.id);
@@ -304,9 +304,17 @@ export default function LoadsheetListPage() {
         if (activeData.cycle.has_plan) {
           await loadStations(activeData.cycle.id);
         }
+      } else if (retryCount < 2) {
+        // API "döngü yok" dedi ama emin olmak için 1 saniye sonra tekrar dene
+        // (geçici timeout/cache miss durumlarına karşı koruma)
+        setTimeout(() => loadActiveCycle(retryCount + 1), 1000);
       }
     } catch (err) {
       console.error('Aktif cycle yüklenemedi:', err);
+      // Hata durumunda 2 sn sonra retry, max 3 deneme
+      if (retryCount < 2) {
+        setTimeout(() => loadActiveCycle(retryCount + 1), 2000);
+      }
     }
   };
 

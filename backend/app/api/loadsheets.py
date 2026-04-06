@@ -535,12 +535,16 @@ async def complete_loadsheet(
             session.add(movement)
     
     session.commit()
-    
+
+    # Cache temizle - aktif cycle sayıları değişti
+    from app.core.cache import cache_delete_pattern
+    cache_delete_pattern(f"active_cycle:{depot_id_check}")
+
     # Territory tamamlandı mı kontrol et
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
     stmt = select(Loadsheet).where(Loadsheet.assignment_id == assignment.id)
     all_loadsheets = session.exec(stmt).all()
-    
+
     territory_completed = all(ls.status == "loaded" for ls in all_loadsheets)
     
     # WebSocket bildirimi gönder
