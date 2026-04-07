@@ -60,7 +60,17 @@ services:
         condition: service_healthy
     networks:
       - akaydepo_network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
+    command: >
+      gunicorn app.main:app
+      -k uvicorn.workers.UvicornWorker
+      -w 4
+      -b 0.0.0.0:8001
+      --timeout 60
+      --graceful-timeout 30
+      --max-requests 1000
+      --max-requests-jitter 100
+      --access-logfile -
+      --error-logfile -
     healthcheck:
       test: ["CMD", "curl", "-f", "--max-time", "5", "http://localhost:8001/v1/auth/depots/public"]
       interval: 60s
