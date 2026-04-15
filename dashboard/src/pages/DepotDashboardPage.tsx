@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiService, DepotDashboardSummary } from '../services/api';
 import { usePolling } from '../hooks/usePolling';
@@ -21,6 +21,14 @@ export default function DepotDashboardPage() {
     interval: 30000,
     enabled: !!depotCode,
   });
+
+  // Depot bilgisini navbar için kaydet
+  useEffect(() => {
+    if (data?.depot_name && depotCode) {
+      localStorage.setItem('dashboard_current_depot', depotCode);
+      localStorage.setItem('dashboard_current_depot_name', data.depot_name);
+    }
+  }, [data?.depot_name, depotCode]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('tr-TR', {

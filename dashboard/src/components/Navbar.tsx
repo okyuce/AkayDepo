@@ -1,13 +1,33 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Navbar() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
+  const [currentDepot, setCurrentDepot] = useState<{ code: string; name: string } | null>(null);
 
   const isActive = (path: string) => location.pathname === path;
   const isDepotPage = location.pathname.startsWith('/depot/');
   const depotCode = isDepotPage ? location.pathname.split('/')[2] : null;
+  const isSubPage = location.pathname.startsWith('/station/') || location.pathname.startsWith('/territory/');
+
+  // Depot sayfasına girildiğinde kaydet
+  useEffect(() => {
+    if (depotCode) {
+      localStorage.setItem('dashboard_current_depot', depotCode);
+      setCurrentDepot({ code: depotCode, name: '' });
+    }
+  }, [depotCode]);
+
+  // Sayfa yüklendiğinde son depot'u oku
+  useEffect(() => {
+    const savedCode = localStorage.getItem('dashboard_current_depot');
+    const savedName = localStorage.getItem('dashboard_current_depot_name');
+    if (savedCode) {
+      setCurrentDepot({ code: savedCode, name: savedName || '' });
+    }
+  }, [location.pathname]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-b border-gray-200 z-50">
@@ -44,14 +64,17 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {isDepotPage && depotCode && (
+            {(isDepotPage || isSubPage) && (depotCode || currentDepot) && (
               <>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium">
-                  {depotCode}
-                </span>
+                <Link
+                  to={`/depot/${depotCode || currentDepot?.code}`}
+                  className="px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
+                >
+                  {currentDepot?.name || depotCode || currentDepot?.code}
+                </Link>
               </>
             )}
 
