@@ -72,13 +72,28 @@ export default function StationDetailPage() {
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center gap-3">
           <Link to="/" className="inline-flex items-center gap-2 text-violet-600 hover:text-violet-800 font-medium transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Dashboard'a Dön
           </Link>
+          {(() => {
+            const depotName = localStorage.getItem('dashboard_current_depot_name');
+            const depotCode = localStorage.getItem('dashboard_current_depot');
+            if (depotName || depotCode) {
+              return (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <Link to={`/depot/${depotCode}`} className="px-3 py-1 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors">
+                    {depotName || depotCode}
+                  </Link>
+                </>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Header */}
