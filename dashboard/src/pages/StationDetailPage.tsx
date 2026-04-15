@@ -17,26 +17,24 @@ export default function StationDetailPage() {
   const [trackingData, setTrackingData] = useState<StationTracking | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
 
-  useEffect(() => {
-    apiService.getActiveCycle().then((res) => {
-      if (res.has_active_cycle && res.cycle) {
-        setCycleId(res.cycle.id);
-      }
-    });
-  }, []);
-
+  // Station detail'den doğru cycle_id'yi al (backend station'ın depot'una göre buluyor)
   const fetchStationDetail = useCallback(async () => {
-    if (!stationId || !cycleId) return null;
-    return apiService.getStationDetail(stationId, cycleId);
+    if (!stationId) return null;
+    const detail = await apiService.getStationDetail(stationId);
+    // Backend'den dönen doğru cycle_id'yi kaydet
+    if (detail?.cycle_id && detail.cycle_id !== cycleId) {
+      setCycleId(detail.cycle_id);
+    }
+    return detail;
   }, [stationId, cycleId]);
 
   const { data, isLoading, error, lastUpdated, refresh } = usePolling<StationDetail | null>({
     fetchFn: fetchStationDetail,
     interval: 30000,
-    enabled: !!stationId && !!cycleId,
+    enabled: !!stationId,
   });
 
-  // Tracking verisini ayrı çek
+  // Tracking verisini cycle_id belirlendiğinde çek
   useEffect(() => {
     if (stationId && cycleId) {
       setTrackingLoading(true);

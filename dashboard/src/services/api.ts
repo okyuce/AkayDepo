@@ -42,6 +42,7 @@ export interface DashboardSummary {
 export interface StationDetail {
   station_id: string;
   station_name: string;
+  cycle_id?: string;
   territories: Array<{
     territory_code: string;
     display_number: string;
@@ -264,9 +265,9 @@ class ApiService {
   }
 
   // Station Detail for Dashboard
-  async getStationDetail(stationId: string, cycleId: string): Promise<StationDetail> {
+  async getStationDetail(stationId: string, cycleId?: string): Promise<StationDetail> {
     const response = await this.client.get(`/v1/dashboard/station/${stationId}`, {
-      params: { cycle_id: cycleId }
+      params: cycleId ? { cycle_id: cycleId } : {}
     });
     return response.data;
   }
