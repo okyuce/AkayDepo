@@ -80,6 +80,7 @@ export default function LoadsheetListPage() {
   const [skuQtyType, setSkuQtyType] = useState<'carton' | 'pack' | ''>('');
   const [skuQtyValue, setSkuQtyValue] = useState<string>('');
   const [sortByTerritory, setSortByTerritory] = useState(false);
+  const [completingLoadsheetId, setCompletingLoadsheetId] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Açılan kartın ref'i - scrollIntoView için
@@ -579,6 +580,9 @@ export default function LoadsheetListPage() {
   };
 
   const handleCompleteLoadsheet = async (loadsheetId: string) => {
+    // Çift tıklama koruması
+    if (completingLoadsheetId) return;
+
     // Tüm ürünlerin tıklanmış olup olmadığını kontrol et
     const loadsheet = loadsheets.find(ls => ls.id === loadsheetId);
     if (loadsheet?.lines) {
@@ -591,6 +595,7 @@ export default function LoadsheetListPage() {
       }
     }
 
+    setCompletingLoadsheetId(loadsheetId);
     try {
       await apiService.completeLoadsheet(loadsheetId);
       // Listeyi yenile
@@ -599,7 +604,9 @@ export default function LoadsheetListPage() {
       }
     } catch (err) {
       console.error('Fiş tamamlanamadı:', err);
-      alert('Hata: Fiş tamamlanamadı');
+      setWarningMessage('Hata: Fiş tamamlanamadı');
+    } finally {
+      setCompletingLoadsheetId(null);
     }
   };
 
@@ -1047,9 +1054,14 @@ const sortedLoadsheets = [...group.loadsheets]
                                           )}
                                           <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
-                                            className="bg-green-600 text-white px-12 py-3 rounded-md hover:bg-green-700 text-base font-bold"
+                                            disabled={completingLoadsheetId === loadsheet.id}
+                                            className={`text-white px-12 py-3 rounded-md text-base font-bold ${
+                                              completingLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-green-600 hover:bg-green-700'
+                                            }`}
                                           >
-                                            Tamamla
+                                            {completingLoadsheetId === loadsheet.id ? 'Tamamlanıyor...' : 'Tamamla'}
                                           </button>
                                         </>
                                       ) : (

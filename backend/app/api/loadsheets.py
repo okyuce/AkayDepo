@@ -466,11 +466,14 @@ async def complete_loadsheet(
             "already_completed": True
         }
 
-    # Durumu güncelle
+    # Durumu HEMEN güncelle ve commit et - race condition önleme
+    # Böylece eşzamanlı ikinci istek status="loaded" görür ve yukarıdaki idempotency kontrolüne takılır
     loadsheet.status = "loaded"
     loadsheet.loaded_at = datetime.now()
     loadsheet.completed_at = datetime.now()
     session.add(loadsheet)
+    session.commit()
+    session.refresh(loadsheet)
     
     # STOK DÜŞÜRME: Pack-equivalent ile atomik düşüm (1 karton = 10 paket)
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
