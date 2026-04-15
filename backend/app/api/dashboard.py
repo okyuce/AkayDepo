@@ -507,19 +507,14 @@ async def get_station_detail(
     verify_depot_access(station, depot_id, "Istasyon")
 
     # Station'ın depot_id'sini kullan (dashboard kullanıcısı depot_id=NULL olabilir)
-    effective_depot_id = depot_id or station.depot_id
+    effective_depot_id = station.depot_id or depot_id
 
-    # Aktif donguyu bul
-    if cycle_id:
-        cycle = session.get(Cycle, cycle_id)
-        if cycle:
-            verify_depot_access(cycle, depot_id, "Döngü")
-    else:
-        stmt = select(Cycle).where(Cycle.status == "active")
-        if effective_depot_id:
-            stmt = stmt.where(Cycle.depot_id == effective_depot_id)
-        stmt = stmt.order_by(Cycle.imported_at.desc())
-        cycle = session.exec(stmt).first()
+    # Aktif donguyu bul - her zaman station'ın depot'una ait cycle'ı bul
+    stmt = select(Cycle).where(Cycle.status == "active")
+    if effective_depot_id:
+        stmt = stmt.where(Cycle.depot_id == effective_depot_id)
+    stmt = stmt.order_by(Cycle.imported_at.desc())
+    cycle = session.exec(stmt).first()
 
     if not cycle:
         raise HTTPException(404, "Aktif dongu bulunamadi")
