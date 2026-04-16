@@ -603,9 +603,23 @@ export default function LoadsheetListPage() {
     setCompletingLoadsheetId(loadsheetId);
     try {
       await apiService.completeLoadsheet(loadsheetId);
-      // Listeyi yenile
+      // Fişi lokal olarak güncelle (tüm listeyi yeniden yüklemeden)
+      setLoadsheets(prev => prev.map(ls =>
+        ls.id === loadsheetId ? { ...ls, status: 'loaded', completed_at: new Date().toISOString() } : ls
+      ));
+      // Dealer gruplarını da güncelle
+      setDealerGroups(prev => prev.map(group => ({
+        ...group,
+        loadsheets: group.loadsheets.map(ls =>
+          ls.id === loadsheetId ? { ...ls, status: 'loaded', completed_at: new Date().toISOString() } : ls
+        ),
+        cardColor: group.loadsheets.every(ls =>
+          ls.id === loadsheetId || ls.completed_at || ls.status === 'loaded' || ls.status === 'cancelled'
+        ) ? 'green' as const : group.cardColor
+      })));
+      // Arka planda listeyi yenile (UI bloke etmeden)
       if (selectedStationId) {
-        await loadLoadsheets(selectedStationId);
+        loadLoadsheets(selectedStationId).catch(() => {});
       }
     } catch (err) {
       console.error('Fiş tamamlanamadı:', err);
