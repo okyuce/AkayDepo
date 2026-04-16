@@ -2,7 +2,7 @@
  * Loadsheet List Page
  * İstasyon bazında fiş listesi ve detay görünümü
  */
-import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
@@ -193,37 +193,41 @@ export default function LoadsheetListPage() {
   // Kutu tıklama: sadece karton veya paket
   const toggleBoxCompleted = (loadsheetId: string, productCode: string, box: 'carton' | 'pack') => {
     const key = `${loadsheetId}_${productCode}_${box}`;
-    const next = new Set(completedLines);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    startTransition(() => { setCompletedLines(next); });
-    saveCompletedLines(next);
+    setCompletedLines(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      saveCompletedLines(next);
+      return next;
+    });
   };
 
   // Satır tıklama: komple toggle
   const toggleLineCompleted = (loadsheetId: string, productCode: string, hasCarton: boolean, hasPack: boolean) => {
     const cartonKey = `${loadsheetId}_${productCode}_carton`;
     const packKey = `${loadsheetId}_${productCode}_pack`;
-    const next = new Set(completedLines);
-    const cartonDone = !hasCarton || next.has(cartonKey);
-    const packDone = !hasPack || next.has(packKey);
-    const allDone = cartonDone && packDone;
+    setCompletedLines(prev => {
+      const next = new Set(prev);
+      const cartonDone = !hasCarton || next.has(cartonKey);
+      const packDone = !hasPack || next.has(packKey);
+      const allDone = cartonDone && packDone;
 
-    if (allDone) {
-      if (hasPack && next.has(packKey)) next.delete(packKey);
-      else if (hasCarton && next.has(cartonKey)) next.delete(cartonKey);
-    } else {
-      if (hasCarton) next.add(cartonKey);
-      if (hasPack) next.add(packKey);
-    }
-    startTransition(() => { setCompletedLines(next); });
-    saveCompletedLines(next);
+      if (allDone) {
+        if (hasPack && next.has(packKey)) next.delete(packKey);
+        else if (hasCarton && next.has(cartonKey)) next.delete(cartonKey);
+      } else {
+        if (hasCarton) next.add(cartonKey);
+        if (hasPack) next.add(packKey);
+      }
+      saveCompletedLines(next);
+      return next;
+    });
   };
 
   const isBoxCompleted = (loadsheetId: string, productCode: string, box: 'carton' | 'pack') => {
     return completedLines.has(`${loadsheetId}_${productCode}_${box}`);
   };
 
-  // Hepsini seç / kaldır - startTransition ile UI bloke olmaz
+  // Hepsini seç / kaldır
   const toggleAllLines = (loadsheet: any) => {
     try {
       const lines = loadsheet?.lines || [];
@@ -231,25 +235,23 @@ export default function LoadsheetListPage() {
       const allDone = lines.every((line: any) =>
         line?.product_code && isLineCompleted(loadsheet.id, line.product_code, !!line.qty_carton, !!line.qty_pack)
       );
-      // Önce yeni Set'i hesapla
-      const next = new Set(completedLines);
-      lines.forEach((line: any) => {
-        if (!line?.product_code) return;
-        const cartonKey = `${loadsheet.id}_${line.product_code}_carton`;
-        const packKey = `${loadsheet.id}_${line.product_code}_pack`;
-        if (allDone) {
-          next.delete(cartonKey);
-          next.delete(packKey);
-        } else {
-          if (line.qty_carton) next.add(cartonKey);
-          if (line.qty_pack) next.add(packKey);
-        }
+      setCompletedLines(prev => {
+        const next = new Set(prev);
+        lines.forEach((line: any) => {
+          if (!line?.product_code) return;
+          const cartonKey = `${loadsheet.id}_${line.product_code}_carton`;
+          const packKey = `${loadsheet.id}_${line.product_code}_pack`;
+          if (allDone) {
+            next.delete(cartonKey);
+            next.delete(packKey);
+          } else {
+            if (line.qty_carton) next.add(cartonKey);
+            if (line.qty_pack) next.add(packKey);
+          }
+        });
+        saveCompletedLines(next);
+        return next;
       });
-      // State güncellemesini düşük öncelikli yap - UI donmasını önler
-      startTransition(() => {
-        setCompletedLines(next);
-      });
-      saveCompletedLines(next);
     } catch (e) {
       console.error('Hepsini seç hatası:', e);
     }
@@ -583,8 +585,8 @@ export default function LoadsheetListPage() {
   };
 
   const handleCompleteLoadsheet = async (loadsheetId: string) => {
-    // Çift tıklama koruması
-    if (completingLoadsheetId) return;
+    // Çift tıklama koruması - aynı fiş için
+    if (completingLoadsheetId === loadsheetId) return;
 
     // Tüm ürünlerin tıklanmış olup olmadığını kontrol et
     const loadsheet = loadsheets.find(ls => ls.id === loadsheetId);
