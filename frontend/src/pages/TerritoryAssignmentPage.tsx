@@ -15,7 +15,7 @@ interface Territory {
   is_active: boolean;
 }
 
-interface Station { id: string; name: string; active: boolean; is_main_stock?: boolean }
+interface Station { id: string; name: string; active: boolean; is_main_stock?: boolean; is_park?: boolean }
 
 const STATION_COLORS = [
   '#E67E22', // orange
@@ -106,11 +106,17 @@ export default function TerritoryAssignmentPage() {
     }
     
     try {
+      const parkStationIds = new Set(stations.filter(s => s.is_park).map(s => s.id));
+      // Auto modda sadece park atamalarını gönder; manuel modda tüm atamaları gönder
+      const entries = Object.entries(assignments).filter(([, sid]) => !!sid);
+      const assignmentPayload = autoPlanning
+        ? entries
+            .filter(([, sid]) => parkStationIds.has(sid as string))
+            .map(([territoryCode, sid]) => ({ territory_code: territoryCode, station_id: sid as string }))
+        : entries.map(([territoryCode, sid]) => ({ territory_code: territoryCode, station_id: sid as string }));
       const payload = {
         auto_planning_enabled: autoPlanning,
-        assignments: autoPlanning ? [] : Object.entries(assignments)
-          .filter(([, sid]) => !!sid)
-          .map(([territoryCode, sid]) => ({ territory_code: territoryCode, station_id: sid as string })),
+        assignments: assignmentPayload,
       };
       await apiService.saveAssignmentsConfig(payload);
       alert(autoPlanning ? 'Otomatik planlama aktif edildi' : 'Manuel atamalar kaydedildi');
@@ -126,11 +132,17 @@ export default function TerritoryAssignmentPage() {
   };
 
   const handleReset = async () => {
-    if (!confirm('Tüm atamaları sıfırlamak istiyor musunuz?')) return;
+    if (!confirm('Tüm atamaları sıfırlamak istiyor musunuz? (Park\'takiler korunur)')) return;
     await apiService.resetAssignments();
-    const map: Record<string, string | null> = {};
-    territories.forEach(t => map[t.code] = null);
-    setAssignments(map);
+    const parkStationIds = new Set(stations.filter(s => s.is_park).map(s => s.id));
+    setAssignments(prev => {
+      const map: Record<string, string | null> = {};
+      territories.forEach(t => {
+        const cur = prev[t.code];
+        map[t.code] = cur && parkStationIds.has(cur as string) ? cur : null;
+      });
+      return map;
+    });
   };
 
   const handleAddStation = async () => {
@@ -296,13 +308,13 @@ export default function TerritoryAssignmentPage() {
           </div>
         )}
 
-        {/* Pool */}
-        <div className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 ${autoPlanning ? 'opacity-50' : ''}`} onDrop={autoPlanning ? undefined : onDropToPool}>
+        {/* Pool (Park'a taşıma her zaman açık; pool her zaman drop kabul eder) */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6" onDrop={onDropToPool}>
           <h2 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Territory</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {poolTerritories.map(t => (
               <div key={t.code}
-                   draggable={!autoPlanning}
+                   draggable
                    onDragStart={(e) => onDragStart(e, t.code)}
                    className="px-3 py-1 rounded border text-sm bg-gray-100 dark:bg-gray-700 cursor-move text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600">
                 {t.display_number} {t.name}
@@ -313,6 +325,37 @@ export default function TerritoryAssignmentPage() {
             )}
           </div>
         </div>
+
+        {/* Park (hesaplamalardan tamamen dışlanır; auto/manuel farketmeksizin kullanılır) */}
+        {(() => {
+          const parkStation = stations.find(s => s.is_park);
+          if (!parkStation) return null;
+          const parkTerritories = byStation[parkStation.id] || [];
+          return (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border-2 border-dashed border-gray-400 dark:border-gray-500">
+              <div className="flex items-center justify-between px-4 py-2 rounded-t bg-gray-500 text-white">
+                <div className="font-bold">Park <span className="text-xs font-normal opacity-90">(hesaplamalara dahil değil)</span></div>
+              </div>
+              <div className="p-4 min-h-[64px]"
+                   onDrop={(e) => onDropToStation(e, parkStation.id)}
+                   onDragOver={(e) => e.preventDefault()}>
+                <div className="flex flex-wrap gap-3">
+                  {parkTerritories.map(t => (
+                    <div key={t.code}
+                         draggable
+                         onDragStart={(e) => onDragStart(e, t.code)}
+                         className="px-3 py-1 rounded border text-sm cursor-move bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-400 dark:border-gray-500">
+                      {t.display_number} {t.name}
+                    </div>
+                  ))}
+                  {parkTerritories.length === 0 && (
+                    <div className="text-gray-400 dark:text-gray-500 text-sm">Hesaplamaya dahil edilmesin istediğiniz territory'leri buraya sürükleyin…</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Add Station Button */}
         {!autoPlanning && (
@@ -327,9 +370,9 @@ export default function TerritoryAssignmentPage() {
           </div>
         )}
 
-        {/* Stations */}
+        {/* Stations (park station ayrı render edildi) */}
         <div className="space-y-4">
-          {stations.map((s, idx) => (
+          {stations.filter(s => !s.is_park).map((s, idx) => (
             <div key={s.id} className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <div className="flex items-center justify-between px-4 py-2 rounded-t" style={{ backgroundColor: STATION_COLORS[idx % STATION_COLORS.length], color: '#fff' }}>
                 <div className="font-bold">{s.name}</div>

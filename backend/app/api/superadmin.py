@@ -272,6 +272,17 @@ async def init_depot(
     session.flush()
     created_items["main_stock"] = "AnaStok"
 
+    # 2b. Park istasyonu oluştur (hesaplamalardan dışlanacak territory'ler için)
+    park_station = Station(
+        name="Park",
+        active=True,
+        is_park=True,
+        depot_id=depot.id,
+    )
+    session.add(park_station)
+    session.flush()
+    created_items["park"] = "Park"
+
     # 3. Tablet kullanıcıları ve istasyonlar oluştur
     for i in range(1, data.worker_count + 1):
         # İstasyon

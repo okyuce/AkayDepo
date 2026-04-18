@@ -15,6 +15,29 @@ class StationPlanner:
         self.session = session
         self._depot_id = None
 
+    def _get_parked_territory_codes(self) -> set:
+        """Depoya ait Park istasyon(lar)ına map edilmiş territory code'larını döndür.
+        Bu kodlar hesaplamalara, atamalara ve fiş üretimine dahil edilmez."""
+        from app.models import StationTerritoryMap
+        park_stmt = select(Station.id).where(Station.is_park == True)
+        if self._depot_id:
+            park_stmt = park_stmt.where(Station.depot_id == self._depot_id)
+        park_ids = list(self.session.exec(park_stmt).all())
+        if not park_ids:
+            return set()
+        map_stmt = select(StationTerritoryMap).where(
+            StationTerritoryMap.station_id.in_(park_ids)
+        )
+        if self._depot_id:
+            map_stmt = map_stmt.where(StationTerritoryMap.depot_id == self._depot_id)
+        return {m.territory_code for m in self.session.exec(map_stmt).all()}
+
+    def _get_park_station_ids(self) -> set:
+        stmt = select(Station.id).where(Station.is_park == True)
+        if self._depot_id:
+            stmt = stmt.where(Station.depot_id == self._depot_id)
+        return set(self.session.exec(stmt).all())
+
     def create_plan(
         self,
         cycle_id: UUID,
@@ -56,7 +79,12 @@ class StationPlanner:
 
         # Territory'leri ve yüklerini hesapla
         territory_loads = self._calculate_territory_loads(cycle_id)
-        
+
+        # Park'a atanmış territory'leri hesaplamalardan tamamen çıkar
+        parked_codes = self._get_parked_territory_codes()
+        if parked_codes:
+            territory_loads = {c: v for c, v in territory_loads.items() if c not in parked_codes}
+
         if not territory_loads:
             raise Exception("Döngüde sipariş bulunamadı")
         
@@ -108,8 +136,14 @@ class StationPlanner:
             # Aktif istasyon seti
             active_station_ids = {s.id for s in self.session.exec(select(Station).where(Station.active == True, Station.depot_id == self._depot_id)).all()} if self._depot_id else {s.id for s in self.session.exec(select(Station).where(Station.active == True)).all()}
 
+            # Park istasyon ID'leri — bunlara ait mapping'ler assignment üretmez
+            park_station_ids = self._get_park_station_ids()
+
             by_station: Dict[UUID, List[str]] = {}
             for m in mappings:
+                # Park istasyonu mapping'lerini atla (hesaba katılmazlar)
+                if m.station_id in park_station_ids:
+                    continue
                 if m.station_id in active_station_ids:
                     by_station.setdefault(m.station_id, []).append(m.territory_code)
 
@@ -165,7 +199,7 @@ class StationPlanner:
                 
                 # Yeni batch'teki territory'leri bul
                 new_territory_codes = self._get_territories_for_batch(cycle_id, latest_batch)
-                
+
                 # Zaten atanmış territory'leri filtrele
                 assigned_territory_ids = {a.territory_id for a in existing_assignments}
                 assigned_codes = set()
@@ -173,9 +207,12 @@ class StationPlanner:
                     t = self.session.get(Territory, tid)
                     if t:
                         assigned_codes.add(t.code)
-                
-                # Atanmamış territory'leri bul
-                to_assign_codes = [code for code in new_territory_codes if code not in assigned_codes]
+
+                # Atanmamış territory'leri bul (park'taki territory'ler hariç)
+                to_assign_codes = [
+                    code for code in new_territory_codes
+                    if code not in assigned_codes and code not in parked_codes
+                ]
                 
                 if to_assign_codes:
                     # Mevcut istasyon yüklerini hesapla

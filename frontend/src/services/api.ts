@@ -224,7 +224,7 @@ class ApiService {
     const response = await this.client.get('/v1/assignments/config');
     return response.data as {
       auto_planning_enabled: boolean;
-      stations: { id: string; name: string; active: boolean; is_main_stock?: boolean }[];
+      stations: { id: string; name: string; active: boolean; is_main_stock?: boolean; is_park?: boolean }[];
       assignments: { station_id: string; territory_code: string }[];
     };
   }

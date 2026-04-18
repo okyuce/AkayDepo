@@ -11,7 +11,7 @@ from uuid import UUID
 from app.core.database import get_session
 from app.api.auth import get_current_user
 from app.models import (
-    TerritoryInfo, Station, StationTerritoryMap, PlanningConfig
+    TerritoryInfo, Station, StationTerritoryMap, PlanningConfig,
 )
 
 router = APIRouter()
@@ -41,7 +41,13 @@ async def get_config(
     return {
         "auto_planning_enabled": auto_planning,
         "stations": [
-            {"id": str(s.id), "name": s.name, "active": s.active, "is_main_stock": getattr(s, 'is_main_stock', False)}
+            {
+                "id": str(s.id),
+                "name": s.name,
+                "active": s.active,
+                "is_main_stock": getattr(s, 'is_main_stock', False),
+                "is_park": getattr(s, 'is_park', False),
+            }
             for s in stations
         ],
         "assignments": [
@@ -71,7 +77,17 @@ async def save_config(
         cfg.auto_planning_enabled = auto
     session.add(cfg)
 
-    # Validate: only in manual mode (when auto=False)
+    # Bu depoya ait park istasyonlarını bul (depo izolasyonu şart)
+    park_stmt = select(Station.id).where(Station.is_park == True)
+    if depot_id:
+        park_stmt = park_stmt.where(Station.depot_id == depot_id)
+    park_station_ids = {str(sid) for sid in session.exec(park_stmt).all()}
+
+    # Park ve normal mapping'leri ayır
+    park_items = [i for i in items if i.get("station_id") in park_station_ids]
+    regular_items = [i for i in items if i.get("station_id") not in park_station_ids]
+
+    # Validate: only in manual mode (when auto=False). Park territory'leri "atanmış" sayılır.
     if not auto:
         territory_stmt = select(TerritoryInfo).where(TerritoryInfo.is_active == True)
         if depot_id:
@@ -87,24 +103,49 @@ async def save_config(
         if dup:
             raise HTTPException(400, detail={"error": "duplicate_territories", "territories": dup})
 
-    # Manuel mappingleri GÜNCELLE (otomatik modda koruyoruz, sadece manuel modda güncelliyoruz)
+    # Park mapping'leri HER ZAMAN (auto veya manuel fark etmez) güncellenir,
+    # çünkü park hesaplamalardan dışlanma tercihidir ve mod bağımsızdır.
+    park_del_stmt = select(StationTerritoryMap).where(
+        StationTerritoryMap.station_id.in_([UUID(sid) for sid in park_station_ids])
+    ) if park_station_ids else None
+    if park_del_stmt is not None:
+        if depot_id:
+            park_del_stmt = park_del_stmt.where(StationTerritoryMap.depot_id == depot_id)
+        for existing in session.exec(park_del_stmt).all():
+            session.delete(existing)
+        session.flush()
+        for it in park_items:
+            station_id = it.get("station_id")
+            code = it.get("territory_code")
+            if not station_id or not code:
+                continue
+            session.add(StationTerritoryMap(
+                station_id=UUID(station_id),
+                territory_code=code,
+                depot_id=depot_id,
+            ))
+
+    # Manuel mode: normal mapping'leri replace-all
     if not auto:
-        # Replace-all semantics (sadece manuel modda)
-        del_stmt = select(StationTerritoryMap)
+        del_stmt = select(StationTerritoryMap).where(
+            StationTerritoryMap.station_id.notin_([UUID(sid) for sid in park_station_ids])
+        ) if park_station_ids else select(StationTerritoryMap)
         if depot_id:
             del_stmt = del_stmt.where(StationTerritoryMap.depot_id == depot_id)
         for existing in session.exec(del_stmt).all():
             session.delete(existing)
         session.flush()
 
-        # Insert new
-        for it in items:
+        for it in regular_items:
             station_id = it.get("station_id")
             code = it.get("territory_code")
             if not station_id or not code:
                 continue
-            stm = StationTerritoryMap(station_id=UUID(station_id), territory_code=code, depot_id=depot_id)
-            session.add(stm)
+            session.add(StationTerritoryMap(
+                station_id=UUID(station_id),
+                territory_code=code,
+                depot_id=depot_id,
+            ))
 
     session.commit()
 
@@ -115,11 +156,19 @@ async def reset_mapping(
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    # Delete all mappings, keep config as-is
+    # Delete all mappings EXCEPT park (park kullanıcı tercihi, reset'ten etkilenmez)
     depot_id = current_user.get("depot_id")
+
+    park_stmt = select(Station.id).where(Station.is_park == True)
+    if depot_id:
+        park_stmt = park_stmt.where(Station.depot_id == depot_id)
+    park_station_ids = list(session.exec(park_stmt).all())
+
     del_stmt = select(StationTerritoryMap)
     if depot_id:
         del_stmt = del_stmt.where(StationTerritoryMap.depot_id == depot_id)
+    if park_station_ids:
+        del_stmt = del_stmt.where(StationTerritoryMap.station_id.notin_(park_station_ids))
     for existing in session.exec(del_stmt).all():
         session.delete(existing)
     session.commit()

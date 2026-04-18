@@ -120,7 +120,8 @@ async def list_stations(
     current_user: dict = Depends(get_current_user)
 ):
     depot_id = current_user.get("depot_id")
-    stmt = select(Station)
+    # Park istasyonları dağılım/stok ekranlarında görünmez (hesaba katılmaz)
+    stmt = select(Station).where(Station.is_park == False)
     if depot_id:
         stmt = stmt.where(Station.depot_id == depot_id)
     stations = session.exec(stmt).all()
@@ -179,6 +180,10 @@ async def delete_station(station_id: UUID, session: Session = Depends(get_sessio
     station = session.get(Station, station_id)
     if not station:
         raise HTTPException(404, "İstasyon bulunamadı")
+    if getattr(station, 'is_park', False):
+        raise HTTPException(400, "Park istasyonu silinemez")
+    if getattr(station, 'is_main_stock', False):
+        raise HTTPException(400, "AnaStok istasyonu silinemez")
     depot_id = current_user.get("depot_id")
     verify_depot_access(station, depot_id, "İstasyon")
 

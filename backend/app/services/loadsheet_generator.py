@@ -110,11 +110,19 @@ class LoadsheetGenerator:
         if not cycle:
             raise Exception("Döngü bulunamadı.")
 
-        # Döngünün station assignments'ını al (AnaStok hariç - normal istasyonlar)
+        # Döngünün station assignments'ını al (AnaStok ve Park hariç - normal istasyonlar)
         main_stock = self._get_main_stock_station()
+        # Park istasyon ID'lerini bul (depo scope'unda) - park'taki territory'ler için fiş üretilmez
+        park_stmt = select(Station.id).where(Station.is_park == True)
+        if self._depot_id:
+            park_stmt = park_stmt.where(Station.depot_id == self._depot_id)
+        park_station_ids = list(self.session.exec(park_stmt).all())
+
         stmt = select(StationAssignment).where(StationAssignment.cycle_id == cycle_id)
         if main_stock:
             stmt = stmt.where(StationAssignment.station_id != main_stock.id)
+        if park_station_ids:
+            stmt = stmt.where(StationAssignment.station_id.notin_(park_station_ids))
         assignments = self.session.exec(stmt).all()
 
         if not assignments:

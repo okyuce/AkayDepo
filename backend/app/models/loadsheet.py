@@ -12,6 +12,7 @@ class Station(SQLModel, table=True):
     active: bool = Field(default=True)
     worker_id: Optional[UUID] = None  # Depo görevlisi (opsiyonel)
     is_main_stock: bool = Field(default=False)  # AnaStok istasyonu mu?
+    is_park: bool = Field(default=False)  # Park istasyonu mu? (hesaplamalardan tamamen dışlanır)
     depot_id: Optional[UUID] = Field(default=None, foreign_key="depots.id", index=True)
 
 class StationAssignment(SQLModel, table=True):
