@@ -6,6 +6,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../services/api';
 import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
+import PrintLabel, { PrintLabelData } from '../components/PrintLabel';
+import { renderAndShare } from '../utils/printShare';
 
 interface Station {
   id: string;
@@ -82,6 +84,10 @@ export default function LoadsheetListPage() {
   const [sortByTerritory, setSortByTerritory] = useState(false);
   const [completingLoadsheetId, setCompletingLoadsheetId] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [printingLoadsheetId, setPrintingLoadsheetId] = useState<string | null>(null);
+  const [printData, setPrintData] = useState<PrintLabelData | null>(null);
+  const printLabelRef = useRef<HTMLDivElement>(null);
+  const [printToast, setPrintToast] = useState<string | null>(null);
 
   // Açılan kartın ref'i - scrollIntoView için
   const expandedCardRef = useRef<HTMLDivElement>(null);
@@ -625,6 +631,76 @@ export default function LoadsheetListPage() {
     }
   };
 
+  // Yazdır: PNG render + Web Share API → Zebra Setup Utility
+  const handlePrintLoadsheet = async (loadsheet: Loadsheet) => {
+    if (printingLoadsheetId) return;
+    if (!loadsheet.lines || loadsheet.lines.length === 0) {
+      setWarningMessage('Fiş detayı yüklenmemiş, kartı açıp tekrar deneyin.');
+      return;
+    }
+    // Bu bayinin fişleri içinde batch'e göre sıralı sırasını bul (FIŞ-N için)
+    const sameDealer = loadsheets
+      .filter(ls => ls.dealer_code === loadsheet.dealer_code)
+      .sort((a, b) => a.batch_number - b.batch_number);
+    const orderIdx = sameDealer.findIndex(ls => ls.id === loadsheet.id);
+    const loadsheetNo = orderIdx >= 0 ? orderIdx + 1 : 1;
+
+    const data: PrintLabelData = {
+      loadsheet_no: loadsheetNo,
+      package_number: loadsheet.package_number,
+      dealer_code: loadsheet.dealer_code,
+      dealer_name: loadsheet.dealer_name,
+      territory_code: loadsheet.territory?.code,
+      territory_name: loadsheet.territory?.name,
+      lines: loadsheet.lines.map(l => ({
+        product_code: l.product_code,
+        product_name: l.product_name,
+        qty_carton: l.qty_carton,
+        qty_pack: l.qty_pack,
+      })),
+      total_carton: loadsheet.total_carton,
+      total_pack: loadsheet.total_pack,
+    };
+
+    setPrintingLoadsheetId(loadsheet.id);
+    setPrintData(data);
+
+    // Render edildikten sonra paylaş — iki frame bekle, layout/font yerine otursun
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        try {
+          const node = printLabelRef.current;
+          if (!node) throw new Error('Render hedefi bulunamadı');
+          const result = await renderAndShare(node, {
+            filename: `${loadsheet.package_number || 'etiket'}.png`,
+            title: `Yükleme Fişi ${loadsheet.package_number}`,
+          });
+          if (result.shared) {
+            setPrintToast('Yazdır uygulamasına gönderildi');
+          } else if (result.downloaded) {
+            setPrintToast('Etiket indirildi (paylaşım desteklenmiyor)');
+          } else if (result.reason === 'user_cancelled') {
+            setPrintToast(null);
+          }
+        } catch (e: any) {
+          console.error('Yazdırma hatası:', e);
+          setWarningMessage('Etiket oluşturulamadı: ' + (e?.message || 'bilinmeyen hata'));
+        } finally {
+          setPrintData(null);
+          setPrintingLoadsheetId(null);
+          // Toast otomatik kapanışı useEffect ile yönetiliyor
+        }
+      });
+    });
+  };
+
+  // Toast otomatik kapat
+  useEffect(() => {
+    if (!printToast) return;
+    const t = setTimeout(() => setPrintToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [printToast]);
+
   const handleCancelLoadsheet = (loadsheetId: string) => {
     setConfirmModal({
       message: 'Bu fişi iptal etmek istediğinize emin misiniz?',
@@ -1068,6 +1144,18 @@ const sortedLoadsheets = [...group.loadsheets]
                                             </button>
                                           )}
                                           <button
+                                            onClick={(e) => { e.stopPropagation(); handlePrintLoadsheet(loadsheet); }}
+                                            disabled={printingLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              printingLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-indigo-600 hover:bg-indigo-700'
+                                            }`}
+                                            title="Etiketi Zebra'ya gönder"
+                                          >
+                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                          </button>
+                                          <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
                                             disabled={completingLoadsheetId === loadsheet.id}
                                             className={`text-white px-12 py-3 rounded-md text-base font-bold ${
@@ -1082,6 +1170,18 @@ const sortedLoadsheets = [...group.loadsheets]
                                       ) : (
                                         <>
                                           <span className="text-green-700 font-semibold text-sm">✓ Tamamlandı</span>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handlePrintLoadsheet(loadsheet); }}
+                                            disabled={printingLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              printingLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-indigo-600 hover:bg-indigo-700'
+                                            }`}
+                                            title="Etiketi Zebra'ya gönder"
+                                          >
+                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                          </button>
                                           {isAdmin && (
                                             <button
                                               onClick={(e) => { e.stopPropagation(); handleCancelLoadsheet(loadsheet.id); }}
@@ -1258,6 +1358,29 @@ const sortedLoadsheets = [...group.loadsheets]
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Gizli print render alanı — html2canvas için DOM'da olmalı ama görünmez */}
+      {printData && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: 0,
+            zIndex: -1,
+            pointerEvents: 'none',
+          }}
+        >
+          <PrintLabel ref={printLabelRef} data={printData} />
+        </div>
+      )}
+
+      {/* Print toast */}
+      {printToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] bg-indigo-600 text-white px-5 py-3 rounded-lg shadow-2xl text-sm font-semibold">
+          {printToast}
         </div>
       )}
 
