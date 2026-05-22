@@ -752,30 +752,19 @@ def _verify_print_token(token: str, loadsheet_id: UUID) -> dict:
 @router.get("/{loadsheet_id}/zpl")
 async def get_loadsheet_zpl(
     loadsheet_id: UUID,
-    token: Optional[str] = Query(None, description="Print token (URL scheme fetch için)"),
-    current_user: Optional[dict] = None,
+    token: str = Query(..., description="Print token (zorunlu, /print-token'den alınır)"),
     session: Session = Depends(get_session),
 ):
     """
     Fiş için ham ZPL döndür. text/plain; charset=utf-8.
 
-    Auth modları (ikisinden biri):
-      1. `?token=<short-jwt>` — print-token endpoint'inden alınan kısa JWT
-      2. `Authorization: Bearer <main-jwt>` — normal kullanıcı session token'ı
-
-    iPad'deki ZebraPrintBT yalnızca query token'ı yollar (Authorization header yok).
-    Tarayıcı içinden test ederken normal Bearer ile de çalışır.
+    Auth: yalnızca `?token=<short-jwt>` desteklenir. iPad'deki ZebraPrintBT URL
+    fetch'te Authorization header gönderemediği için Bearer auth bu endpoint'te
+    desteklenmiyor. Tarayıcıdan test için önce /print-token al, sonra ?token=...
+    ile çağır.
     """
-    depot_id: Optional[str] = None
-
-    if token:
-        payload = _verify_print_token(token, loadsheet_id)
-        depot_id = payload.get("depot_id")
-    else:
-        # Bearer fallback — get_current_user'ı manuel çağırmak yerine basit kontrol.
-        # FastAPI dependency injection'da Optional Bearer karmaşık olduğu için bu yolu
-        # şimdilik desteklemiyoruz; test/dev için ?token= kullanın.
-        raise HTTPException(401, "Print token gerekli (?token=...)")
+    payload = _verify_print_token(token, loadsheet_id)
+    depot_id: Optional[str] = payload.get("depot_id")
 
     loadsheet = session.get(Loadsheet, loadsheet_id)
     if not loadsheet:

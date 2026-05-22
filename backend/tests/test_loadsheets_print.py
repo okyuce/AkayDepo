@@ -163,9 +163,10 @@ def test_print_token_unknown_loadsheet_404(client: TestClient, superadmin_header
 
 # ---------- ZPL endpoint ----------
 
-def test_zpl_endpoint_without_token_401(client: TestClient, loadsheet_with_deps):
+def test_zpl_endpoint_without_token_422(client: TestClient, loadsheet_with_deps):
+    """Token zorunlu Query — eksikse FastAPI 422 (validation error) döner."""
     response = client.get(f"/v1/loadsheets/{loadsheet_with_deps.id}/zpl")
-    assert response.status_code == 401
+    assert response.status_code == 422
 
 
 def test_zpl_endpoint_invalid_token_401(client: TestClient, loadsheet_with_deps):
