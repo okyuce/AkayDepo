@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
 import PrintLabel, { PrintLabelData } from '../components/PrintLabel';
 import { renderAndShare } from '../utils/printShare';
+import { triggerZebraPrint } from '../utils/zebraPrint';
 
 interface Station {
   id: string;
@@ -88,6 +89,7 @@ export default function LoadsheetListPage() {
   const [printData, setPrintData] = useState<PrintLabelData | null>(null);
   const printLabelRef = useRef<HTMLDivElement>(null);
   const [printToast, setPrintToast] = useState<string | null>(null);
+  const [zebraLoadsheetId, setZebraLoadsheetId] = useState<string | null>(null);
 
   // Açılan kartın ref'i - scrollIntoView için
   const expandedCardRef = useRef<HTMLDivElement>(null);
@@ -694,6 +696,33 @@ export default function LoadsheetListPage() {
     });
   };
 
+  // Zebra'ya gönder: ZebraPrintBT URL scheme köprüsü
+  const handleZebraPrint = async (loadsheet: Loadsheet) => {
+    if (zebraLoadsheetId) return;
+    setZebraLoadsheetId(loadsheet.id);
+    try {
+      const { token } = await apiService.getLoadsheetPrintToken(loadsheet.id);
+      const result = await triggerZebraPrint({
+        apiBaseUrl: apiService.baseURL,
+        loadsheetId: loadsheet.id,
+        printToken: token,
+      });
+      if (result.appOpened) {
+        setPrintToast('Zebra yazıcıya gönderildi');
+      } else {
+        setWarningMessage(
+          'ZebraPrintBT uygulaması açılamadı. iPad\'e yüklü olduğundan emin olun.'
+        );
+      }
+    } catch (e: any) {
+      console.error('Zebra print hatası:', e);
+      const detail = e?.response?.data?.detail || e?.message || 'bilinmeyen hata';
+      setWarningMessage('Zebra yazdırma başarısız: ' + detail);
+    } finally {
+      setZebraLoadsheetId(null);
+    }
+  };
+
   // Toast otomatik kapat
   useEffect(() => {
     if (!printToast) return;
@@ -1151,9 +1180,21 @@ const sortedLoadsheets = [...group.loadsheets]
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
-                                            title="Etiketi Zebra'ya gönder"
+                                            title="Etiketi PNG olarak paylaş"
                                           >
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                          </button>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleZebraPrint(loadsheet); }}
+                                            disabled={zebraLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              zebraLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 hover:bg-emerald-700'
+                                            }`}
+                                            title="ZebraPrintBT ile Bluetooth yazıcıya gönder"
+                                          >
+                                            {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
                                           </button>
                                           <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
@@ -1178,9 +1219,21 @@ const sortedLoadsheets = [...group.loadsheets]
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
-                                            title="Etiketi Zebra'ya gönder"
+                                            title="Etiketi PNG olarak paylaş"
                                           >
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                          </button>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleZebraPrint(loadsheet); }}
+                                            disabled={zebraLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              zebraLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 hover:bg-emerald-700'
+                                            }`}
+                                            title="ZebraPrintBT ile Bluetooth yazıcıya gönder"
+                                          >
+                                            {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
                                           </button>
                                           {isAdmin && (
                                             <button

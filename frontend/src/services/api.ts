@@ -169,6 +169,21 @@ class ApiService {
     return response.data;
   }
 
+  /** Zebra (ZebraPrintBT) için kısa ömürlü ZPL fetch token'ı al. */
+  async getLoadsheetPrintToken(loadsheetId: string) {
+    const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/print-token`);
+    return response.data as {
+      token: string;
+      expires_in: number;
+      loadsheet_id: string;
+    };
+  }
+
+  /** API base URL — Zebra fetch URL'i kurmak için. */
+  get baseURL(): string {
+    return API_BASE_URL;
+  }
+
   // Counters
   async saveCounterReading(stationId: string, counterValue: number) {
     const response = await this.client.post('/v1/counters/', {
