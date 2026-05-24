@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.63"
+VERSION = "2.0.64"
 
 
 @asynccontextmanager

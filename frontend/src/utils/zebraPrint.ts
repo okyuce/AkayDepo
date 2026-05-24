@@ -1,15 +1,15 @@
 /**
- * zebraPrint — ZebraPrintBT iOS köprü uygulamasını URL scheme ile tetikler.
+ * zebraPrint — AkayPrintBT iOS köprü uygulamasını URL scheme ile tetikler.
  *
  * Akış:
  *   1. Backend'ten kısa ömürlü print token al
  *   2. ZPL fetch URL'i kur (api/.../zpl?token=...)
- *   3. `zebraprintbt://print?url=...&x-success=akaydepo://...&x-error=...` URL'ini aç
- *   4. iPad arka plana düşer → ZebraPrintBT açılır → ZPL fetch + BT basım
+ *   3. `akayprintbt://print?url=...&x-success=akaydepo://...&x-error=...` URL'ini aç
+ *   4. iPad arka plana düşer → AkayPrintBT açılır → ZPL fetch + BT basım
  *   5. Job bitince callback URL ile geri döner (visibility değişikliğiyle de tespit edilir)
  *
  * Bu modül sadece iPad/iOS Safari için anlamlıdır. Diğer platformlarda
- * `zebraprintbt://` açılamaz; visibility değişmez ve `installed: false` döner.
+ * `akayprintbt://` açılamaz; visibility değişmez ve `installed: false` döner.
  */
 
 export interface ZebraPrintOptions {
@@ -27,8 +27,8 @@ export interface ZebraPrintOptions {
 
 export interface ZebraPrintResult {
   /**
-   * Triggered: URL scheme çağrıldı (Safari → ZebraPrintBT geçişi tespit edildi).
-   * False ise ZebraPrintBT yüklü değil olabilir.
+   * Triggered: URL scheme çağrıldı (Safari → AkayPrintBT geçişi tespit edildi).
+   * False ise AkayPrintBT yüklü değil olabilir.
    */
   appOpened: boolean;
   /** Tetiklenen tam URL — log için. */
@@ -36,7 +36,7 @@ export interface ZebraPrintResult {
 }
 
 /**
- * ZPL'i ZebraPrintBT'ye gönder.
+ * ZPL'i AkayPrintBT'ye gönder.
  *
  * Resolve eder: app açıldı mı? (visibility değişikliği gözlemlenir, 1500ms timeout).
  * Reject etmez — başarısızlık `appOpened: false` ile döner.
@@ -47,8 +47,8 @@ export function triggerZebraPrint(opts: ZebraPrintOptions): Promise<ZebraPrintRe
   // ZPL endpoint URL'i (iPad bunu fetch eder).
   const zplUrl = `${apiBaseUrl}/v1/loadsheets/${loadsheetId}/zpl?token=${encodeURIComponent(printToken)}`;
 
-  // ZebraPrintBT URL scheme'i.
-  const u = new URL('zebraprintbt://print');
+  // AkayPrintBT URL scheme'i.
+  const u = new URL('akayprintbt://print');
   u.searchParams.set('url', zplUrl);
   if (copies && copies > 1) u.searchParams.set('copies', String(copies));
   if (serial) u.searchParams.set('serial', serial);
@@ -70,7 +70,7 @@ export function triggerZebraPrint(opts: ZebraPrintOptions): Promise<ZebraPrintRe
     };
 
     const onVis = () => {
-      // Tab arka plana düşmüşse ZebraPrintBT açılmış demektir.
+      // Tab arka plana düşmüşse AkayPrintBT açılmış demektir.
       if (document.visibilityState === 'hidden') {
         finish(true);
       }

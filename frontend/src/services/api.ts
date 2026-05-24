@@ -169,7 +169,7 @@ class ApiService {
     return response.data;
   }
 
-  /** Zebra (ZebraPrintBT) için kısa ömürlü ZPL fetch token'ı al. */
+  /** AkayPrintBT (Zebra köprüsü) için kısa ömürlü ZPL fetch token'ı al. */
   async getLoadsheetPrintToken(loadsheetId: string) {
     const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/print-token`);
     return response.data as {

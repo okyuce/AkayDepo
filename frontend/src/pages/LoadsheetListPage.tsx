@@ -696,7 +696,7 @@ export default function LoadsheetListPage() {
     });
   };
 
-  // Zebra'ya gönder: ZebraPrintBT URL scheme köprüsü
+  // Zebra'ya gönder: AkayPrintBT URL scheme köprüsü
   const handleZebraPrint = async (loadsheet: Loadsheet) => {
     if (zebraLoadsheetId) return;
     setZebraLoadsheetId(loadsheet.id);
@@ -711,7 +711,7 @@ export default function LoadsheetListPage() {
         setPrintToast('Zebra yazıcıya gönderildi');
       } else {
         setWarningMessage(
-          'ZebraPrintBT uygulaması açılamadı. iPad\'e yüklü olduğundan emin olun.'
+          'AkayPrintBT uygulaması açılamadı. iPad\'e yüklü olduğundan emin olun.'
         );
       }
     } catch (e: any) {
@@ -1192,7 +1192,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-emerald-600 hover:bg-emerald-700'
                                             }`}
-                                            title="ZebraPrintBT ile Bluetooth yazıcıya gönder"
+                                            title="AkayPrintBT ile Bluetooth yazıcıya gönder"
                                           >
                                             {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
                                           </button>
@@ -1231,7 +1231,7 @@ const sortedLoadsheets = [...group.loadsheets]
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-emerald-600 hover:bg-emerald-700'
                                             }`}
-                                            title="ZebraPrintBT ile Bluetooth yazıcıya gönder"
+                                            title="AkayPrintBT ile Bluetooth yazıcıya gönder"
                                           >
                                             {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
                                           </button>

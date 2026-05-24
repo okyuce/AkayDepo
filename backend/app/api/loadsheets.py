@@ -694,7 +694,7 @@ async def uncancel_loadsheet(
 
 
 # ---------------------------------------------------------------------------
-# Zebra (ZebraPrintBT) entegrasyonu
+# Zebra (AkayPrintBT) entegrasyonu
 # ---------------------------------------------------------------------------
 
 @router.post("/{loadsheet_id}/print-token")
@@ -706,9 +706,9 @@ async def issue_print_token(
     """
     Kısa ömürlü ZPL fetch token'ı üret.
 
-    iPad'deki ZebraPrintBT app'i `?token=...` ile ZPL endpoint'ini çağırırken
+    iPad'deki AkayPrintBT app'i `?token=...` ile ZPL endpoint'ini çağırırken
     Authorization header gönderemediği için, Bearer ile çağrılan bu endpoint'ten
-    kısa ömürlü (≤2 dk) JWT alınır. Frontend bu token'ı `zebraprintbt://print?url=`
+    kısa ömürlü (≤2 dk) JWT alınır. Frontend bu token'ı `akayprintbt://print?url=`
     parametresine gömer.
     """
     loadsheet = session.get(Loadsheet, loadsheet_id)
@@ -758,7 +758,7 @@ async def get_loadsheet_zpl(
     """
     Fiş için ham ZPL döndür. text/plain; charset=utf-8.
 
-    Auth: yalnızca `?token=<short-jwt>` desteklenir. iPad'deki ZebraPrintBT URL
+    Auth: yalnızca `?token=<short-jwt>` desteklenir. iPad'deki AkayPrintBT URL
     fetch'te Authorization header gönderemediği için Bearer auth bu endpoint'te
     desteklenmiyor. Tarayıcıdan test için önce /print-token al, sonra ?token=...
     ile çağır.
