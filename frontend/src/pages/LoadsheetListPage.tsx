@@ -8,7 +8,7 @@ import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
 import PrintLabel, { PrintLabelData } from '../components/PrintLabel';
 import { renderAndShare } from '../utils/printShare';
-import { triggerZebraPrint } from '../utils/zebraPrint';
+import { triggerZebraPrint, isIOS } from '../utils/zebraPrint';
 
 interface Station {
   id: string;
@@ -723,6 +723,17 @@ export default function LoadsheetListPage() {
     }
   };
 
+  // Tek "Yazdır" butonunun işletim sistemine göre yönlendirmesi:
+  //   iOS/iPadOS → AkayPrintBT (Bluetooth Zebra köprüsü)
+  //   diğer (Android/PC) → PNG render + paylaşım (Zebra Setup Utility)
+  const handlePrint = (loadsheet: Loadsheet) => {
+    if (isIOS()) {
+      handleZebraPrint(loadsheet);
+    } else {
+      handlePrintLoadsheet(loadsheet);
+    }
+  };
+
   // Toast otomatik kapat
   useEffect(() => {
     if (!printToast) return;
@@ -1173,28 +1184,16 @@ const sortedLoadsheets = [...group.loadsheets]
                                             </button>
                                           )}
                                           <button
-                                            onClick={(e) => { e.stopPropagation(); handlePrintLoadsheet(loadsheet); }}
-                                            disabled={printingLoadsheetId === loadsheet.id}
+                                            onClick={(e) => { e.stopPropagation(); handlePrint(loadsheet); }}
+                                            disabled={printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id}
                                             className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              printingLoadsheetId === loadsheet.id
+                                              (printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id)
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
-                                            title="Etiketi PNG olarak paylaş"
+                                            title="Yükleme fişini yazdır"
                                           >
-                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
-                                          </button>
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); handleZebraPrint(loadsheet); }}
-                                            disabled={zebraLoadsheetId === loadsheet.id}
-                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              zebraLoadsheetId === loadsheet.id
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-emerald-600 hover:bg-emerald-700'
-                                            }`}
-                                            title="AkayPrintBT ile Bluetooth yazıcıya gönder"
-                                          >
-                                            {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
+                                            {(printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id) ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
                                           <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
@@ -1212,28 +1211,16 @@ const sortedLoadsheets = [...group.loadsheets]
                                         <>
                                           <span className="text-green-700 font-semibold text-sm">✓ Tamamlandı</span>
                                           <button
-                                            onClick={(e) => { e.stopPropagation(); handlePrintLoadsheet(loadsheet); }}
-                                            disabled={printingLoadsheetId === loadsheet.id}
+                                            onClick={(e) => { e.stopPropagation(); handlePrint(loadsheet); }}
+                                            disabled={printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id}
                                             className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              printingLoadsheetId === loadsheet.id
+                                              (printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id)
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
-                                            title="Etiketi PNG olarak paylaş"
+                                            title="Yükleme fişini yazdır"
                                           >
-                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
-                                          </button>
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); handleZebraPrint(loadsheet); }}
-                                            disabled={zebraLoadsheetId === loadsheet.id}
-                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              zebraLoadsheetId === loadsheet.id
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-emerald-600 hover:bg-emerald-700'
-                                            }`}
-                                            title="AkayPrintBT ile Bluetooth yazıcıya gönder"
-                                          >
-                                            {zebraLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '📡 Zebra'}
+                                            {(printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id) ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
                                           {isAdmin && (
                                             <button

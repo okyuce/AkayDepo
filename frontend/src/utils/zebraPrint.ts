@@ -41,6 +41,18 @@ export interface ZebraPrintResult {
  * Resolve eder: app açıldı mı? (visibility değişikliği gözlemlenir, 1500ms timeout).
  * Reject etmez — başarısızlık `appOpened: false` ile döner.
  */
+/**
+ * iOS/iPadOS cihaz tespiti. iPadOS 13+ kendini "MacIntel" olarak tanıttığı için
+ * dokunmatik nokta sayısı da kontrol edilir.
+ */
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const iOSDevice = /iPad|iPhone|iPod/.test(ua);
+  const iPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return iOSDevice || iPadOS;
+}
+
 export function triggerZebraPrint(opts: ZebraPrintOptions): Promise<ZebraPrintResult> {
   const { apiBaseUrl, loadsheetId, printToken, copies, serial } = opts;
 
