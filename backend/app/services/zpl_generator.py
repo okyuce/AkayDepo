@@ -198,7 +198,9 @@ def build_zpl(data: Dict[str, Any]) -> str:
     """
     parts: List[str] = ["^XA", "^CI28", f"^PW{LABEL_WIDTH_DOTS}", "^LH0,0"]
 
-    y = 20
+    # Üst boşluk: yazıcı kafa↔kesim bıçağı ölü bölgesi (~12mm) yüzünden
+    # içerik çok yukarıdan başlarsa fiş kesilince üst yazılar kayboluyor.
+    y = 96
 
     # FIŞ-N başlık (center).
     fis_text = f"FIŞ-{data['loadsheet_no']}"
@@ -305,8 +307,9 @@ def build_zpl(data: Dict[str, Any]) -> str:
         ))
     y += FOOTER_HEIGHT
 
-    # Alt boşluk (yazıcı şeritte kessin).
-    y += 30
+    # Alt boşluk (yazıcı şeritte kessin) — kafa↔kesim ölü bölgesi kadar feed,
+    # böylece son satırlar da kesim bıçağının üstüne çıkar.
+    y += 96
 
     # Etiket yüksekliği — toplam içeriği yerleştirecek kadar.
     label_length = max(y, 480)
