@@ -53,6 +53,28 @@ export function isIOS(): boolean {
   return iOSDevice || iPadOS;
 }
 
+/**
+ * akayprintbt:// URL'ini SENKRON kurar (token önceden alınmış olmalı).
+ * iOS'ta navigasyon, kullanıcı dokunuşunun içinde await olmadan yapılabilsin diye
+ * URL kurulumu token fetch'ten ayrıldı. (await sonrası scheme açma iOS Safari'de
+ * sessizce bloklanıyor — bu yüzden token kart açılışında önceden çekilir.)
+ */
+export function buildZebraPrintUrl(opts: {
+  apiBaseUrl: string;
+  loadsheetId: string;
+  printToken: string;
+  copies?: number;
+  serial?: string;
+}): string {
+  const { apiBaseUrl, loadsheetId, printToken, copies, serial } = opts;
+  const zplUrl = `${apiBaseUrl}/v1/loadsheets/${loadsheetId}/zpl?token=${encodeURIComponent(printToken)}`;
+  const u = new URL('akayprintbt://print');
+  u.searchParams.set('url', zplUrl);
+  if (copies && copies > 1) u.searchParams.set('copies', String(copies));
+  if (serial) u.searchParams.set('serial', serial);
+  return u.toString();
+}
+
 export function triggerZebraPrint(opts: ZebraPrintOptions): Promise<ZebraPrintResult> {
   const { apiBaseUrl, loadsheetId, printToken, copies, serial } = opts;
 

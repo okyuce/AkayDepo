@@ -8,7 +8,7 @@ import Navbar from '../components/Navbar';
 import { useAuthStore } from '../stores/authStore';
 import PrintLabel, { PrintLabelData } from '../components/PrintLabel';
 import { renderAndShare } from '../utils/printShare';
-import { triggerZebraPrint, isIOS } from '../utils/zebraPrint';
+import { isIOS, buildZebraPrintUrl } from '../utils/zebraPrint';
 
 interface Station {
   id: string;
@@ -89,7 +89,8 @@ export default function LoadsheetListPage() {
   const [printData, setPrintData] = useState<PrintLabelData | null>(null);
   const printLabelRef = useRef<HTMLDivElement>(null);
   const [printToast, setPrintToast] = useState<string | null>(null);
-  const [zebraLoadsheetId, setZebraLoadsheetId] = useState<string | null>(null);
+  // iOS senkron yazdırma için token önbelleği (kart açılışında/dokunuşta doldurulur)
+  const printTokenCacheRef = useRef<Map<string, { token: string; ts: number }>>(new Map());
 
   // Açılan kartın ref'i - scrollIntoView için
   const expandedCardRef = useRef<HTMLDivElement>(null);
@@ -587,6 +588,11 @@ export default function LoadsheetListPage() {
       
       // Dealer grubu aç
       setExpandedDealerCode(dealerCode);
+
+      // iOS: bu gruptaki fişlerin yazdırma token'larını önceden çek (senkron/gesture-safe açma için)
+      if (isIOS()) {
+        group.loadsheets.forEach(ls => { prefetchPrintToken(ls.id); });
+      }
     } catch (err) {
       console.error('Fiş detayları yüklenemedi:', err);
     }
@@ -696,39 +702,42 @@ export default function LoadsheetListPage() {
     });
   };
 
-  // Zebra'ya gönder: AkayPrintBT URL scheme köprüsü
-  const handleZebraPrint = async (loadsheet: Loadsheet) => {
-    if (zebraLoadsheetId) return;
-    setZebraLoadsheetId(loadsheet.id);
+  // Print token'ı önceden çek ve önbelleğe al. Böylece "Yazdır"a basınca token
+  // hazır olur ve akayprintbt:// navigasyonu dokunuşun İÇİNDE (await'siz) yapılır.
+  // (await sonrası custom scheme açma iOS Safari'de sessizce bloklanıyor.)
+  const prefetchPrintToken = async (loadsheetId: string) => {
     try {
-      const { token } = await apiService.getLoadsheetPrintToken(loadsheet.id);
-      const result = await triggerZebraPrint({
-        apiBaseUrl: apiService.baseURL,
-        loadsheetId: loadsheet.id,
-        printToken: token,
-      });
-      if (result.appOpened) {
-        setPrintToast('Zebra yazıcıya gönderildi');
-      } else {
-        setWarningMessage(
-          'AkayPrintBT uygulaması açılamadı. iPad\'e yüklü olduğundan emin olun.'
-        );
-      }
-    } catch (e: any) {
-      console.error('Zebra print hatası:', e);
-      const detail = e?.response?.data?.detail || e?.message || 'bilinmeyen hata';
-      setWarningMessage('Zebra yazdırma başarısız: ' + detail);
-    } finally {
-      setZebraLoadsheetId(null);
+      const { token } = await apiService.getLoadsheetPrintToken(loadsheetId);
+      printTokenCacheRef.current.set(loadsheetId, { token, ts: Date.now() });
+    } catch {
+      // sessiz — tıklama anında tekrar denenir
     }
   };
 
+  // iOS/iPadOS: AkayPrintBT'yi SENKRON aç (gesture korunur, app açılır).
+  const handleZebraPrintIOS = (loadsheet: Loadsheet) => {
+    const cached = printTokenCacheRef.current.get(loadsheet.id);
+    const fresh = cached && Date.now() - cached.ts < 9 * 60 * 1000; // 9 dk güvenli pencere
+    if (!cached || !fresh) {
+      // Token hazır değil/eski → arka planda çek, kullanıcı bir daha bassın
+      prefetchPrintToken(loadsheet.id);
+      setWarningMessage('Yazdırma hazırlanıyor, lütfen "Yazdır"a bir daha basın.');
+      return;
+    }
+    const url = buildZebraPrintUrl({
+      apiBaseUrl: apiService.baseURL,
+      loadsheetId: loadsheet.id,
+      printToken: cached.token,
+    });
+    window.location.href = url; // senkron navigasyon — iOS uygulamayı açar
+  };
+
   // Tek "Yazdır" butonunun işletim sistemine göre yönlendirmesi:
-  //   iOS/iPadOS → AkayPrintBT (Bluetooth Zebra köprüsü)
+  //   iOS/iPadOS → AkayPrintBT (Bluetooth Zebra köprüsü, senkron)
   //   diğer (Android/PC) → PNG render + paylaşım (Zebra Setup Utility)
   const handlePrint = (loadsheet: Loadsheet) => {
     if (isIOS()) {
-      handleZebraPrint(loadsheet);
+      handleZebraPrintIOS(loadsheet);
     } else {
       handlePrintLoadsheet(loadsheet);
     }
@@ -1184,16 +1193,17 @@ const sortedLoadsheets = [...group.loadsheets]
                                             </button>
                                           )}
                                           <button
+                                            onPointerDown={() => { if (isIOS()) prefetchPrintToken(loadsheet.id); }}
                                             onClick={(e) => { e.stopPropagation(); handlePrint(loadsheet); }}
-                                            disabled={printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id}
+                                            disabled={printingLoadsheetId === loadsheet.id}
                                             className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              (printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id)
+                                              printingLoadsheetId === loadsheet.id
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
                                             title="Yükleme fişini yazdır"
                                           >
-                                            {(printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id) ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
                                           <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
@@ -1211,16 +1221,17 @@ const sortedLoadsheets = [...group.loadsheets]
                                         <>
                                           <span className="text-green-700 font-semibold text-sm">✓ Tamamlandı</span>
                                           <button
+                                            onPointerDown={() => { if (isIOS()) prefetchPrintToken(loadsheet.id); }}
                                             onClick={(e) => { e.stopPropagation(); handlePrint(loadsheet); }}
-                                            disabled={printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id}
+                                            disabled={printingLoadsheetId === loadsheet.id}
                                             className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              (printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id)
+                                              printingLoadsheetId === loadsheet.id
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-indigo-600 hover:bg-indigo-700'
                                             }`}
                                             title="Yükleme fişini yazdır"
                                           >
-                                            {(printingLoadsheetId === loadsheet.id || zebraLoadsheetId === loadsheet.id) ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                            {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
                                           {isAdmin && (
                                             <button

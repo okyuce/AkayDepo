@@ -24,7 +24,7 @@ from app.services.zpl_generator import generate_loadsheet_zpl
 router = APIRouter()
 
 # ZPL print token'ı kısa ömürlü — sadece tek ZPL fetch için.
-PRINT_TOKEN_TTL_SECONDS = 120
+PRINT_TOKEN_TTL_SECONDS = 600
 PRINT_TOKEN_TYPE = "loadsheet-zpl"
 
 def _get_territory_display_name(session: Session, territory: Territory, depot_id) -> str:
