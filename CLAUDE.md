@@ -66,3 +66,21 @@ docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d api web
 - Backend API: 8001
 - Frontend Dev: 8000
 - Production Nginx: 8005
+
+---
+
+## Kalıcı Hafıza & Oturum Kuralları
+
+> Oturumlar-arası hafıza içindir. Yukarıdaki proje bilgisi korunur; burası çalışma disiplinini tanımlar.
+
+- **`WORKLOG.md`** — oturum oturum "ne yaptık / nerede kaldık". SessionStart hook'u oturum başında son kayıtları + hafıza indeksini otomatik yükler.
+- **`memory/MEMORY.md`** — kalıcı kararlar/gerçekler indeksi (+ ayrı `.md` not dosyaları).
+- **`worklog-archive/`** — WORKLOG büyüyünce eski kayıtların aylık arşivi.
+
+### Kurallar
+1. Oturum başında **WORKLOG.md**'nin en üstteki kaydını oku; kaldığımız yerden devam et.
+2. **Her önemli adımdan sonra OTOMATİK** WORKLOG'a en üste kayıt ekle (`tarih · ne yapıldı · kararlar · sıradaki adım`). Önemli = görev/özellik bitti · çalışan kod/deploy · commit · teknik/mimari karar · bug fix · yön değişimi · engel · "kaydet" denmesi. Önemli değil (yazma) = okuma/arama/keşif, değişiklik yapmayan sohbet, tutmayan deneme. Pusula: *"Sonraki oturum bunu bilmeli mi?"*
+3. Kalıcı karar çıkarsa `memory/`'ye not + **MEMORY.md**'ye tek satır indeks ekle.
+4. **Arşivle:** WORKLOG 12+ kayıt olunca eskileri `worklog-archive/YYYY-MM.md`'ye taşı, aktifte son ~10 kalsın.
+5. **Ara:** Eski bilgi için tüm arşivi yükleme — `worklog-archive/` içinde `grep` / `read` ile hedefli ara.
+6. Yukarıdaki **"Önemli Kurallar" geçerli:** veritabanına dokunma (`backend/akaydepo.db` + production DB), deploy'da sadece `api`/`web` rebuild, commit mesajları Türkçe, "Generated with Claude Code" ekleme, commit/push/deploy öncesi onay al.
