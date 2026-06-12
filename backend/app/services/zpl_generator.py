@@ -167,6 +167,7 @@ def build_label_data(
 
     return {
         "loadsheet_no": _compute_dealer_local_seq(session, loadsheet),
+        "route_order": dealer.route_order if dealer else 0,
         "package_number": loadsheet.package_number,
         "dealer_code": dealer.code if dealer else "",
         "dealer_name": dealer.name if dealer else "",
@@ -201,6 +202,15 @@ def build_zpl(data: Dict[str, Any]) -> str:
     # Üst boşluk: yazıcı kafa↔kesim bıçağı ölü bölgesi (~12mm) yüzünden
     # içerik çok yukarıdan başlarsa fiş kesilince üst yazılar kayboluyor.
     y = 96
+
+    # RUT (Rut Sırası) — en üstte büyük, şoför/yükleyici dağıtım sırasını uzaktan görsün.
+    route_order = data.get("route_order") or 0
+    if route_order:
+        rut_text = f"RUT {route_order}"
+        rut_w = len(rut_text) * 31
+        rut_x = max(MARGIN_X, (LABEL_WIDTH_DOTS - rut_w) // 2)
+        parts.append(f"^CF0,56\n^FO{rut_x},{y}^FD{_zpl_escape(rut_text)}^FS")
+        y += 60
 
     # FIŞ-N başlık (center).
     fis_text = f"FIŞ-{data['loadsheet_no']}"

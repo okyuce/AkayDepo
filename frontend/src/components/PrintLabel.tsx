@@ -14,6 +14,7 @@ export interface PrintLabelLine {
 
 export interface PrintLabelData {
   loadsheet_no: number;
+  route_order: number;
   package_number: string;
   dealer_code: string;
   dealer_name: string;
@@ -46,6 +47,11 @@ const PrintLabel = forwardRef<HTMLDivElement, PrintLabelProps>(({ data }, ref) =
         lineHeight: 1.25,
       }}
     >
+      {data.route_order ? (
+        <div style={{ textAlign: 'center', fontSize: '30px', fontWeight: 800, marginBottom: '2px' }}>
+          RUT {data.route_order}
+        </div>
+      ) : null}
       <div style={{ textAlign: 'center', fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>
         FIŞ-{data.loadsheet_no}
       </div>

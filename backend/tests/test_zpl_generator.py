@@ -87,6 +87,17 @@ def test_build_zpl_includes_fis_number():
     assert "FIŞ-7" in zpl
 
 
+def test_build_zpl_includes_route_order():
+    zpl = build_zpl(_minimal_label_data(route_order=6))
+    assert "RUT 6" in zpl
+
+
+def test_build_zpl_omits_route_when_zero_or_missing():
+    # route_order yoksa / 0 ise RUT satırı basılmamalı.
+    assert "RUT" not in build_zpl(_minimal_label_data(route_order=0))
+    assert "RUT" not in build_zpl(_minimal_label_data())
+
+
 def test_build_zpl_includes_package_dealer_territory():
     zpl = build_zpl(_minimal_label_data())
     assert "T07-B01" in zpl
@@ -216,6 +227,7 @@ def test_build_label_data_pulls_dealer_and_territory(session: Session, populated
     assert data["territory_code"] == "T07"
     assert data["package_number"] == "T07-B01"
     assert data["loadsheet_no"] == 1  # tek fiş — ilk sıra
+    assert data["route_order"] == 1  # dealer.route_order — fişe RUT olarak basılır
 
 
 def test_build_label_data_includes_lines_in_order(session: Session, populated_loadsheet):

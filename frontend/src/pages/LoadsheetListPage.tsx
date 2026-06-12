@@ -655,6 +655,7 @@ export default function LoadsheetListPage() {
 
     const data: PrintLabelData = {
       loadsheet_no: loadsheetNo,
+      route_order: loadsheet.route_order,
       package_number: loadsheet.package_number,
       dealer_code: loadsheet.dealer_code,
       dealer_name: loadsheet.dealer_name,
