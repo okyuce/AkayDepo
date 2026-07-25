@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from app.models import (
     Loadsheet, LoadsheetLine, Dealer, Product,
     StationAssignment, Territory, TerritoryInfo,
+    Station, Cycle,
 )
 
 
@@ -131,6 +132,14 @@ def build_label_data(
     dealer = session.get(Dealer, loadsheet.dealer_id)
     assignment = session.get(StationAssignment, loadsheet.assignment_id)
     territory = session.get(Territory, assignment.territory_id) if assignment else None
+    station = session.get(Station, assignment.station_id) if assignment else None
+
+    # Fiş tarihi — atamanın plan tarihi, yoksa döngünün plan tarihi.
+    plan_date_val = assignment.plan_date if assignment else None
+    if plan_date_val is None:
+        cycle = session.get(Cycle, loadsheet.cycle_id)
+        plan_date_val = cycle.plan_date if cycle else None
+    plan_date_str = plan_date_val.strftime("%d.%m.%Y") if plan_date_val else ""
 
     # Lines — depot bazlı sıraya göre
     try:
@@ -167,6 +176,8 @@ def build_label_data(
 
     return {
         "loadsheet_no": _compute_dealer_local_seq(session, loadsheet),
+        "station_name": station.name if station else "",
+        "plan_date": plan_date_str,
         "route_order": dealer.route_order if dealer else 0,
         "package_number": loadsheet.package_number,
         "dealer_code": dealer.code if dealer else "",
@@ -202,6 +213,19 @@ def build_zpl(data: Dict[str, Any]) -> str:
     # Üst boşluk: yazıcı kafa↔kesim bıçağı ölü bölgesi (~12mm) yüzünden
     # içerik çok yukarıdan başlarsa fiş kesilince üst yazılar kayboluyor.
     y = 96
+
+    # En üst satır: istasyon (sol) + tarih (sağ) — package number (T04-B03) puntosunda.
+    station_name = data.get("station_name") or ""
+    plan_date = data.get("plan_date") or ""
+    if station_name or plan_date:
+        if station_name:
+            parts.append(f"^CF0,30\n^FO{MARGIN_X},{y}^FD{_zpl_escape(station_name)}^FS")
+        if plan_date:
+            parts.append(_right_aligned_text(
+                LABEL_WIDTH_DOTS - MARGIN_X, y, plan_date,
+                font_height=30, est_char_w=15,
+            ))
+        y += SUBHEADER_LINE
 
     # RUT (Rut Sırası) — en üstte büyük, şoför/yükleyici dağıtım sırasını uzaktan görsün.
     route_order = data.get("route_order") or 0

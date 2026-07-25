@@ -20,6 +20,7 @@ from app.models import (
     Territory, Dealer, Product, LoadCounter, TerritoryInfo
 )
 from app.services.zpl_generator import generate_loadsheet_zpl
+from app.services.zebra_cloud import send_zpl, ZebraCloudError
 
 router = APIRouter()
 
@@ -791,3 +792,53 @@ async def get_loadsheet_zpl(
             "X-Loadsheet-Id": str(loadsheet_id),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Zebra bulut yazdırma (Online Print — SendFileToPrinter)
+# ---------------------------------------------------------------------------
+
+@router.post("/{loadsheet_id}/cloud-print")
+async def cloud_print_loadsheet(
+    loadsheet_id: UUID,
+    serial: Optional[str] = Query(None, description="Yazıcı seri no (yoksa .env varsayılanı)"),
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Fişi Zebra Data Services üzerinden doğrudan yazıcıya bas ("Online Print").
+
+    ZPL, Bluetooth yolundaki ile **birebir aynı** `generate_loadsheet_zpl` ile
+    üretilir; tek fark taşıma katmanı — app/BT yerine bulut. Yazıcı seri no
+    verilmezse `.env`'deki varsayılan kullanılır (lokal test için).
+    """
+    loadsheet = session.get(Loadsheet, loadsheet_id)
+    if not loadsheet:
+        raise HTTPException(404, "Fiş bulunamadı")
+    depot_id = current_user.get("depot_id")
+    verify_depot_access(loadsheet, depot_id, "Fiş")
+
+    try:
+        zpl = generate_loadsheet_zpl(session, loadsheet_id, depot_id)
+    except KeyError:
+        raise HTTPException(404, "Fiş bulunamadı")
+
+    try:
+        result = send_zpl(zpl, serial=serial, filename=f"fis-{loadsheet.package_number or loadsheet_id}.zpl")
+    except ZebraCloudError as exc:
+        raise HTTPException(502, str(exc))
+
+    # printed_at — BT yolundaki ile aynı davranış (sadece ilk basımda set edilir).
+    if loadsheet.printed_at is None:
+        loadsheet.printed_at = datetime.now()
+        session.add(loadsheet)
+        session.commit()
+
+    return {
+        "status": "sent",
+        "loadsheet_id": str(loadsheet_id),
+        "printer_serial": result.serial,
+        "zebra_status": result.status_code,
+        "zebra_guid": result.guid,
+        "zebra_response": result.body[:400],
+    }

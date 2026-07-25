@@ -14,6 +14,8 @@ export interface PrintLabelLine {
 
 export interface PrintLabelData {
   loadsheet_no: number;
+  station_name?: string;
+  plan_date?: string;
   route_order: number;
   package_number: string;
   dealer_code: string;
@@ -47,6 +49,12 @@ const PrintLabel = forwardRef<HTMLDivElement, PrintLabelProps>(({ data }, ref) =
         lineHeight: 1.25,
       }}
     >
+      {(data.station_name || data.plan_date) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>
+          <span>{data.station_name || ''}</span>
+          <span>{data.plan_date || ''}</span>
+        </div>
+      )}
       {data.route_order ? (
         <div style={{ textAlign: 'center', fontSize: '30px', fontWeight: 800, marginBottom: '2px' }}>
           RUT {data.route_order}

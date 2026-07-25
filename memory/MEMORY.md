@@ -4,4 +4,5 @@
 > Ayrıntılı notlar bu klasörde ayrı `.md` dosyaları olarak tutulur.
 > (Sabit proje bilgisi — yapı, portlar, deploy — kök `CLAUDE.md`'dedir.)
 
-- _(henüz kayıt yok — ilk kalıcı karar/gerçek çıktığında buraya bir satır eklenecek)_
+- [Yazdırma mimarisi](yazdirma-mimarisi.md) — app'siz Wi-Fi tek-tık için Zebra ZD421 + Cloud Connect; TE210 neden elendi; AkayPrintBT Zebra MFi kilidi
+- [Zebra bulut yazdırma](zebra-bulut-yazdirma.md) — Konya ZD421 buluta kayıtlı (seri `D6J245109380`, tenant `oyuce@fnf1.com.tr`); ZSU tuzakları + backend entegrasyon adımları

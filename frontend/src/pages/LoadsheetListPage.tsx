@@ -73,6 +73,7 @@ export default function LoadsheetListPage() {
   const [dealerGroups, setDealerGroups] = useState<DealerGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [cycleId, setCycleId] = useState<string | null>(null);
+  const [cyclePlanDate, setCyclePlanDate] = useState<string>('');  // ISO "YYYY-MM-DD"
   const [expandedDealerCode, setExpandedDealerCode] = useState<string | null>(null);
 
   // SKU filtresi state'leri
@@ -89,6 +90,8 @@ export default function LoadsheetListPage() {
   const [printData, setPrintData] = useState<PrintLabelData | null>(null);
   const printLabelRef = useRef<HTMLDivElement>(null);
   const [printToast, setPrintToast] = useState<string | null>(null);
+  // Zebra bulut yazdırma (Online Print) — hangi fiş gönderiliyor
+  const [cloudPrintingLoadsheetId, setCloudPrintingLoadsheetId] = useState<string | null>(null);
   // iOS senkron yazdırma için token önbelleği (kart açılışında/dokunuşta doldurulur)
   const printTokenCacheRef = useRef<Map<string, { token: string; ts: number }>>(new Map());
 
@@ -313,6 +316,7 @@ export default function LoadsheetListPage() {
       const activeData = await apiService.getActivecycle();
       if (activeData.has_active_cycle && activeData.cycle) {
         setCycleId(activeData.cycle.id);
+        setCyclePlanDate(activeData.cycle.plan_date || '');
         // Batch listesi (Excel importları)
         const imp = await apiService.getCycleImports(activeData.cycle.id);
         setImports(imp);
@@ -653,8 +657,16 @@ export default function LoadsheetListPage() {
     const orderIdx = sameDealer.findIndex(ls => ls.id === loadsheet.id);
     const loadsheetNo = orderIdx >= 0 ? orderIdx + 1 : 1;
 
+    // ISO "YYYY-MM-DD" → "DD.MM.YYYY"
+    const planDateTr = cyclePlanDate
+      ? cyclePlanDate.split('-').reverse().join('.')
+      : '';
+    const stationName = stations.find(s => s.id === selectedStationId)?.name || '';
+
     const data: PrintLabelData = {
       loadsheet_no: loadsheetNo,
+      station_name: stationName,
+      plan_date: planDateTr,
       route_order: loadsheet.route_order,
       package_number: loadsheet.package_number,
       dealer_code: loadsheet.dealer_code,
@@ -741,6 +753,22 @@ export default function LoadsheetListPage() {
       handleZebraPrintIOS(loadsheet);
     } else {
       handlePrintLoadsheet(loadsheet);
+    }
+  };
+
+  // Zebra bulut yazdırma: ZPL backend'de üretilip Zebra Data Services'e gönderilir,
+  // yazıcı işi buluttan çeker. App/Bluetooth gerekmez — cihaz bağımsız çalışır.
+  const handleCloudPrint = async (loadsheet: Loadsheet) => {
+    setCloudPrintingLoadsheetId(loadsheet.id);
+    try {
+      const result = await apiService.cloudPrintLoadsheet(loadsheet.id);
+      setPrintToast(`Yazıcıya gönderildi (${result.printer_serial})`);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || 'bilinmeyen hata';
+      console.error('Online print hatası:', e);
+      setWarningMessage('Online yazdırma başarısız: ' + detail);
+    } finally {
+      setCloudPrintingLoadsheetId(null);
     }
   };
 
@@ -1207,6 +1235,18 @@ const sortedLoadsheets = [...group.loadsheets]
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
                                           <button
+                                            onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
+                                            disabled={cloudPrintingLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              cloudPrintingLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-sky-600 hover:bg-sky-700'
+                                            }`}
+                                            title="Zebra bulut yazıcısına gönder (app gerekmez)"
+                                          >
+                                            {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
+                                          </button>
+                                          <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
                                             disabled={completingLoadsheetId === loadsheet.id}
                                             className={`text-white px-12 py-3 rounded-md text-base font-bold ${
@@ -1233,6 +1273,18 @@ const sortedLoadsheets = [...group.loadsheets]
                                             title="Yükleme fişini yazdır"
                                           >
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
+                                          </button>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
+                                            disabled={cloudPrintingLoadsheetId === loadsheet.id}
+                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                              cloudPrintingLoadsheetId === loadsheet.id
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-sky-600 hover:bg-sky-700'
+                                            }`}
+                                            title="Zebra bulut yazıcısına gönder (app gerekmez)"
+                                          >
+                                            {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
                                           </button>
                                           {isAdmin && (
                                             <button

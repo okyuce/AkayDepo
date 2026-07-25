@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     
     # CORS - Accept either string or list
     CORS_ORIGINS: Union[str, List[str]] = Field(default="http://localhost:8000,http://localhost:8100")
+
+    # Zebra Data Services (bulut yazdırma — SendFileToPrinter)
+    # Yazıcı Weblink ile buluta bağlı; backend ZPL'i Zebra'ya POST eder, Zebra yazıcıya iter.
+    ZEBRA_API_URL: str = "https://api.zebra.com/v2/devices/printers/send"
+    ZEBRA_API_KEY: str = ""          # developer.zebra.com app Consumer Key
+    ZEBRA_TENANT: str = ""           # yazıcının kayıtlı olduğu tenant
+    ZEBRA_PRINTER_SERIAL: str = ""   # lokal test için varsayılan yazıcı seri no
+    ZEBRA_TIMEOUT_SECONDS: float = 20.0
     
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod

@@ -179,6 +179,22 @@ class ApiService {
     };
   }
 
+  /** Zebra bulut yazdırma (Online Print) — ZPL backend'den Zebra Data Services'e gider. */
+  async cloudPrintLoadsheet(loadsheetId: string, serial?: string) {
+    const response = await this.client.post(
+      `/v1/loadsheets/${loadsheetId}/cloud-print`,
+      null,
+      serial ? { params: { serial } } : undefined,
+    );
+    return response.data as {
+      status: string;
+      loadsheet_id: string;
+      printer_serial: string;
+      zebra_status: number;
+      zebra_response: string;
+    };
+  }
+
   /** API base URL — Zebra fetch URL'i kurmak için. */
   get baseURL(): string {
     return API_BASE_URL;
