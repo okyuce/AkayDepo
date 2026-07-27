@@ -57,6 +57,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
+def _online_print_enabled(depot_code: Optional[str]) -> bool:
+    """Bu deponun Online Print (Zebra bulut) butonunu görüp göremeyeceği.
+
+    `ZEBRA_ENABLED_DEPOT_CODES` (virgülle ayrılmış, ör. "KON") içindeyse True.
+    """
+    from app.core.config import settings
+    if not depot_code:
+        return False
+    enabled = {
+        c.strip().upper()
+        for c in (settings.ZEBRA_ENABLED_DEPOT_CODES or "").split(",")
+        if c.strip()
+    }
+    return depot_code.upper() in enabled
+
+
 def verify_token(token: str) -> dict:
     """JWT token'ı doğrula"""
     try:
@@ -111,6 +127,7 @@ async def get_current_user(
         "depot_code": depot_code,
         "depot_name": depot_name,
         "depot_city": depot_city,
+        "online_print_enabled": _online_print_enabled(depot_code),
     }
 
 

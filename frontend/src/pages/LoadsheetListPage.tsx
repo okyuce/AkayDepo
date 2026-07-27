@@ -806,6 +806,8 @@ export default function LoadsheetListPage() {
   };
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  // Online Print (Zebra bulut) butonu yalnız yazıcısı olan depoda görünür.
+  const onlinePrintEnabled = !!user?.online_print_enabled;
 
   const getCardColorClass = (cardColor: 'gray' | 'green' | 'orange' | 'red') => {
     switch (cardColor) {
@@ -1234,18 +1236,20 @@ const sortedLoadsheets = [...group.loadsheets]
                                           >
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
-                                            disabled={cloudPrintingLoadsheetId === loadsheet.id}
-                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              cloudPrintingLoadsheetId === loadsheet.id
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-sky-600 hover:bg-sky-700'
-                                            }`}
-                                            title="Zebra bulut yazıcısına gönder (app gerekmez)"
-                                          >
-                                            {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
-                                          </button>
+                                          {onlinePrintEnabled && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
+                                              disabled={cloudPrintingLoadsheetId === loadsheet.id}
+                                              className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                                cloudPrintingLoadsheetId === loadsheet.id
+                                                  ? 'bg-gray-400 cursor-not-allowed'
+                                                  : 'bg-sky-600 hover:bg-sky-700'
+                                              }`}
+                                              title="Zebra bulut yazıcısına gönder (app gerekmez)"
+                                            >
+                                              {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
+                                            </button>
+                                          )}
                                           <button
                                             onClick={() => handleCompleteLoadsheet(loadsheet.id)}
                                             disabled={completingLoadsheetId === loadsheet.id}
@@ -1274,18 +1278,20 @@ const sortedLoadsheets = [...group.loadsheets]
                                           >
                                             {printingLoadsheetId === loadsheet.id ? 'Hazırlanıyor…' : '🖨️ Yazdır'}
                                           </button>
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
-                                            disabled={cloudPrintingLoadsheetId === loadsheet.id}
-                                            className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
-                                              cloudPrintingLoadsheetId === loadsheet.id
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-sky-600 hover:bg-sky-700'
-                                            }`}
-                                            title="Zebra bulut yazıcısına gönder (app gerekmez)"
-                                          >
-                                            {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
-                                          </button>
+                                          {onlinePrintEnabled && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleCloudPrint(loadsheet); }}
+                                              disabled={cloudPrintingLoadsheetId === loadsheet.id}
+                                              className={`text-white px-3 py-3 rounded-md text-sm font-bold ${
+                                                cloudPrintingLoadsheetId === loadsheet.id
+                                                  ? 'bg-gray-400 cursor-not-allowed'
+                                                  : 'bg-sky-600 hover:bg-sky-700'
+                                              }`}
+                                              title="Zebra bulut yazıcısına gönder (app gerekmez)"
+                                            >
+                                              {cloudPrintingLoadsheetId === loadsheet.id ? 'Gönderiliyor…' : '🌐 Online Print'}
+                                            </button>
+                                          )}
                                           {isAdmin && (
                                             <button
                                               onClick={(e) => { e.stopPropagation(); handleCancelLoadsheet(loadsheet.id); }}

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     ZEBRA_TENANT: str = ""           # yazıcının kayıtlı olduğu tenant
     ZEBRA_PRINTER_SERIAL: str = ""   # lokal test için varsayılan yazıcı seri no
     ZEBRA_TIMEOUT_SECONDS: float = 20.0
+    # Online Print butonunun görüneceği depo kodları (virgülle) — ör. "KON".
+    # Boşsa hiçbir depoda görünmez. Yeni bölgeye yazıcı kurulunca kodu buraya ekle.
+    ZEBRA_ENABLED_DEPOT_CODES: str = ""
     
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod

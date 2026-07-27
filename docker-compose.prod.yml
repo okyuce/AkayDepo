@@ -53,6 +53,11 @@ services:
       ENVIRONMENT: production
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      # Zebra bulut yazdırma (Online Print) — değerler .env.prod'dan gelir
+      ZEBRA_API_KEY: ${ZEBRA_API_KEY:-}
+      ZEBRA_TENANT: ${ZEBRA_TENANT:-}
+      ZEBRA_PRINTER_SERIAL: ${ZEBRA_PRINTER_SERIAL:-}
+      ZEBRA_ENABLED_DEPOT_CODES: ${ZEBRA_ENABLED_DEPOT_CODES:-}
     depends_on:
       db:
         condition: service_healthy

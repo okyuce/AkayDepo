@@ -812,6 +812,11 @@ async def cloud_print_loadsheet(
     üretilir; tek fark taşıma katmanı — app/BT yerine bulut. Yazıcı seri no
     verilmezse `.env`'deki varsayılan kullanılır (lokal test için).
     """
+    # Online Print yalnızca yazıcısı olan (ZEBRA_ENABLED_DEPOT_CODES) depolara açık.
+    # Butonu gizlemek yeterli değil — doğrudan çağrıya karşı burada da doğrula.
+    if not current_user.get("online_print_enabled"):
+        raise HTTPException(403, "Bu depo için Online Print etkin değil")
+
     loadsheet = session.get(Loadsheet, loadsheet_id)
     if not loadsheet:
         raise HTTPException(404, "Fiş bulunamadı")

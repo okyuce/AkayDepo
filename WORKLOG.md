@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-27 — Online Print sadece Konya'da görünür (depo bazlı kapı) + deploy
+- **Talep:** Online Print butonu 13 deponun hepsinde görünüyordu; tek yazıcı Konya'da → başka depo basarsa Konya'dan çıkardı. Kullanıcı: buton yalnız Konya'da görünsün, yeni bölgeye yazıcı geldikçe açılsın.
+- **Çözüm (config-tabanlı, kod değişmeden bölge açma):** `ZEBRA_ENABLED_DEPOT_CODES` (virgüllü depo kodları, ör. "KON") ayarı → `/me` payload'una `online_print_enabled` bayrağı (büyük/küçük harf duyarsız) → frontend butonu yalnız bayrak true iken gösterir. **Yeni bölge = sadece `.env.prod`'a kod ekle + api restart** (web derlemesi/kod yok). Ek olarak `cloud-print` endpoint'ine **403 koruması** (buton gizli olsa da başka depo doğrudan çağıramaz — derinlemesine savunma). Dosyalar: `core/config.py`, `api/auth.py`, `api/loadsheets.py`, `stores/authStore.ts`, `LoadsheetListPage.tsx`, `docker-compose.prod.yml` (api'ye ZEBRA_* env geçirildi).
+- **Doğrulama:** Lokal canlı /me — KON→True, KAR→False. Kullanıcı UI'da teyit etti: Konya'da buton var, Seydişehir'de yok. `tsc` temiz, ZPL/loadsheet testleri 34 passed (test_auth 2 hata ÖNCEDEN var — conftest admin seed etmiyor, ilgisiz). DB şeması değişmedi → migration yok.
+- **Deploy:** Onaylandı, DB'ye dokunmadan (`db/redis` build edilmez). Sunucu `.env.prod`'a eklenecek: `ZEBRA_API_KEY`, `ZEBRA_TENANT=` (boş!), `ZEBRA_PRINTER_SERIAL=D6J245109380`, `ZEBRA_ENABLED_DEPOT_CODES=KON`.
+- **Sıradaki adım:** Deploy sonrası prod'da Konya kullanıcısıyla buton + tek çıktı testi.
+
+## 2026-07-25 — "Beklenmedik ikinci fiş" teşhisi: Zebra bulut kuyruğu (kod hatası DEĞİL)
+- **Semptom:** Kullanıcı yalnız ALKAN PEHLİVAN'a (T13-B01) Online Print bastı; yazıcıdan ayrıca MİNİ BAKKAL-MEHMET ÇEÇEN (T27-B02) da çıktı. "RUT 17 ikisinde de olduğu için mi?" → HAYIR, tesadüf (veride iki bayinin de route_order=17).
+- **Kök neden:** T27-B02 benim header doğrulama **test baskım** (bugün `send_zpl` ile, guid 1297254333). Kanıt: basılan fiş header'lı (header bugün eklendi) + toplamlar birebir (11 satır, 26/25) + **DB'de T27-B02.printed_at=None** (test scripti düşük seviye `send_zpl()` çağırdı, endpoint'i atladı → uygulamadan basılmadı).
+- **Mekanizma:** Zebra Data Services yazıcı çevrimdışıyken işi **bulut kuyruğunda tutar**, yazıcı bağlanınca gönderir. Test işim beklemiş, yazıcı bugün çevrimiçi olunca ALKAN PEHLİVAN'ın ardından düştü.
+- **KALICI TUZAK:** Zebra bulut kuyruğundaki iş **iptal edilemez** (developer.zebra.com/content/how-clear-queued-labels-stored-zebra-weblink-servers) — yazıcı bağlanınca basılır. → **Canlı yazıcıya test baskısı gönderme**; ZPL'i basmadan doğrula. Endpoint doğru: tık başına 1 fiş.
+- **Sıradaki adım:** Kod değişikliği yok. Kalan test işleri kuyruktan düşerse kullanıcı atacak.
+
 ## 2026-07-25 — Fiş başlığına istasyon (sol üst) + tarih (sağ üst) eklendi
 - **Talep:** Yazdırılan yükleme fişinin en üstüne sol köşeye istasyon adı, sağ köşeye tarih — ikisi de package number (T04-B03) puntosunda.
 - **Yapıldı:** Her iki yazdırma yolu. **ZPL** (`backend/app/services/zpl_generator.py`): `build_label_data` artık `Station.name` ve plan tarihini (`assignment.plan_date`, yoksa `cycle.plan_date`, `DD.MM.YYYY`) döndürüyor; `build_zpl` en üstte (y=96, RUT'tan önce) font 30 ile sol=istasyon `^FO18`, sağ=tarih (right-aligned) basıyor. **PNG** (`frontend/src/components/PrintLabel.tsx`): RUT'un üstüne 16px flex space-between header (`station_name` sol / `plan_date` sağ). `LoadsheetListPage.tsx`: `cyclePlanDate` state aktif döngüden dolduruluyor, ISO→`DD.MM.YYYY`, istasyon adı `stations`'tan; data objesine eklendi.

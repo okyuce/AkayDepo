@@ -15,6 +15,7 @@ interface User {
   depot_code?: string | null;
   depot_name?: string | null;
   depot_city?: string | null;
+  online_print_enabled?: boolean;  // Zebra bulut yazdırma bu depoda etkin mi
 }
 
 interface AuthState {
