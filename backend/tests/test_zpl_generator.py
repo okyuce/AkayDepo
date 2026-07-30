@@ -56,8 +56,8 @@ def _minimal_label_data(**overrides):
         "package_number": "T07-B01",
         "dealer_code": "BAYI001",
         "dealer_name": "TEST BAYISI",
-        "territory_code": "T07",
-        "territory_name": "MERKEZ",
+        "territory_code": "TERR030704-Mevlana",
+        "territory_name": "Mevlana",
         "lines": [
             {"product_code": "P1", "product_name": "Marlboro Red", "qty_carton": 2, "qty_pack": 3},
             {"product_code": "P2", "product_name": "Parliament Night Blue", "qty_carton": 1, "qty_pack": 0},
@@ -103,7 +103,15 @@ def test_build_zpl_includes_package_dealer_territory():
     assert "T07-B01" in zpl
     assert "TEST BAYISI" in zpl
     assert "BAYI001" in zpl
-    assert "T07 - MERKEZ" in zpl
+    # Territory sadece code olarak basılır (isim kodun içinde zaten var).
+    assert "TERR030704-Mevlana" in zpl
+    # İsim TEKRAR edilmemeli.
+    assert "Mevlana - Mevlana" not in zpl
+
+
+def test_build_zpl_includes_company_name():
+    # Firma adı (AKAY) sağ üstte her fişte basılır.
+    assert "AKAY" in build_zpl(_minimal_label_data())
 
 
 def test_build_zpl_includes_all_lines_and_totals():

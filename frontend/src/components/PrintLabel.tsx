@@ -32,9 +32,9 @@ interface PrintLabelProps {
 }
 
 const PrintLabel = forwardRef<HTMLDivElement, PrintLabelProps>(({ data }, ref) => {
-  const territory = data.territory_code
-    ? `${data.territory_code}${data.territory_name ? ' - ' + data.territory_name : ''}`
-    : '';
+  // code alanı bölge adını zaten içeriyor (ör. "TERR030704-Mevlana") → ismi
+  // tekrar ekleme; sadece kodu göster. Kod yoksa isme düş.
+  const territory = data.territory_code || data.territory_name || '';
 
   return (
     <div
@@ -49,6 +49,11 @@ const PrintLabel = forwardRef<HTMLDivElement, PrintLabelProps>(({ data }, ref) =
         lineHeight: 1.25,
       }}
     >
+      {/* En üst: territory (sol) + firma adı AKAY (sağ) — öne çıkan */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', marginBottom: '2px' }}>
+        <span style={{ fontSize: '18px', fontWeight: 800 }}>{territory}</span>
+        <span style={{ fontSize: '20px', fontWeight: 800, whiteSpace: 'nowrap' }}>AKAY</span>
+      </div>
       {(data.station_name || data.plan_date) && (
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>
           <span>{data.station_name || ''}</span>
@@ -70,9 +75,7 @@ const PrintLabel = forwardRef<HTMLDivElement, PrintLabelProps>(({ data }, ref) =
       <div style={{ borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '8px 0', marginBottom: '8px' }}>
         <div style={{ fontSize: '22px', fontWeight: 800 }}>{data.dealer_name}</div>
         <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '2px' }}>{data.dealer_code}</div>
-        {territory && (
-          <div style={{ fontSize: '14px', fontWeight: 500, marginTop: '4px' }}>{territory}</div>
-        )}
+        {/* territory artık en üstte (AKAY'ın karşısında) */}
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '16px' }}>

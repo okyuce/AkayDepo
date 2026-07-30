@@ -35,6 +35,9 @@ COL_NAME_W = CONTENT_WIDTH - 2 * COL_QTY_W
 COL_KRT_X = MARGIN_X + COL_NAME_W
 COL_PKT_X = COL_KRT_X + COL_QTY_W
 
+# Fişin sağ üstüne basılan firma/marka adı. (Çok-tenant üründe ileride tenant'tan gelir.)
+COMPANY_NAME = "AKAY"
+
 
 def _get_territory_display_name(session: Session, territory: Optional[Territory], depot_id: Optional[str]) -> str:
     """TerritoryInfo master'dan doğru isim — yoksa territory.name."""
@@ -197,10 +200,12 @@ def build_zpl(data: Dict[str, Any]) -> str:
       ^XA ^CI28 ^PW576
       FIŞ-N (center, 40)
       package_number (center, 30)
+      territory (sol, 30) + AKAY (sağ, 40)
+      istasyon (sol, 30) + tarih (sağ, 30)
+      RUT (center, 56) / FIŞ-N (center, 40) / package (center, 30)
       ---- ayraç ----
       dealer_name (40)
       dealer_code (26)
-      territory_code - territory_name (24) [opsiyonel]
       ---- ayraç ----
       ÜRÜN | KRT | PKT (header 24)
       ürün satırları (26)
@@ -214,7 +219,23 @@ def build_zpl(data: Dict[str, Any]) -> str:
     # içerik çok yukarıdan başlarsa fiş kesilince üst yazılar kayboluyor.
     y = 96
 
-    # En üst satır: istasyon (sol) + tarih (sağ) — package number (T04-B03) puntosunda.
+    # 1. satır (en üst): territory (sol) + firma adı AKAY (sağ) — öne çıkan.
+    # Territory uzun olduğundan 72mm'e AKAY ile yan yana sığması için font 30;
+    # AKAY FIŞ puntosunda (40), sağa yaslı (uzun territory'de çakışmasın).
+    terr_code = data.get("territory_code") or ""
+    terr_name = data.get("territory_name") or ""
+    # code alanı bölge adını zaten içeriyor (ör. "TERR030704-Mevlana") → ismi
+    # tekrar ekleme; sadece kodu bas. Kod yoksa isme düş.
+    territory_label = terr_code or terr_name
+    if territory_label:
+        parts.append(f"^CF0,30\n^FO{MARGIN_X},{y}^FD{_zpl_escape(territory_label)}^FS")
+    parts.append(_right_aligned_text(
+        LABEL_WIDTH_DOTS - MARGIN_X, y, COMPANY_NAME,
+        font_height=40, est_char_w=24,
+    ))
+    y += 44
+
+    # 2. satır: istasyon (sol) + tarih (sağ) — package number (T04-B03) puntosunda.
     station_name = data.get("station_name") or ""
     plan_date = data.get("plan_date") or ""
     if station_name or plan_date:
@@ -268,17 +289,7 @@ def build_zpl(data: Dict[str, Any]) -> str:
         parts.append(f"^CF0,26\n^FO{MARGIN_X},{y}^FD{_zpl_escape(dealer_code)}^FS")
         y += 30
 
-    # Territory.
-    terr_code = data.get("territory_code") or ""
-    terr_name = data.get("territory_name") or ""
-    territory_label = ""
-    if terr_code and terr_name:
-        territory_label = f"{terr_code} - {terr_name}"
-    elif terr_code or terr_name:
-        territory_label = terr_code or terr_name
-    if territory_label:
-        parts.append(f"^CF0,24\n^FO{MARGIN_X},{y}^FD{_zpl_escape(territory_label)}^FS")
-        y += 28
+    # (Territory artık en üstte — sol üstte AKAY'ın karşısında basılıyor.)
 
     # Alt ayraç.
     y += 6
