@@ -635,9 +635,15 @@ export default function LoadsheetListPage() {
       if (selectedStationId) {
         loadLoadsheets(selectedStationId).catch(() => {});
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fiş tamamlanamadı:', err);
-      setWarningMessage('Hata: Fiş tamamlanamadı');
+      // Yanıt hiç gelmediyse ağ sorunu; api katmanı zaten 3 kez deneyip
+      // fişin sunucudaki durumunu doğruladı — buraya düştüyse fiş tamamlanmadı.
+      setWarningMessage(
+        err?.response
+          ? 'Fiş tamamlanamadı.\nLütfen tekrar deneyin.'
+          : 'Bağlantı sorunu: fiş tamamlanamadı.\nİnternet bağlantısını kontrol edip tekrar deneyin.'
+      );
     } finally {
       setCompletingLoadsheetId(null);
     }

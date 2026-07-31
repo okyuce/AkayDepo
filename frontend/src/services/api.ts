@@ -6,12 +6,30 @@ import axios, { AxiosInstance } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
+/**
+ * Varsayılan zaman aşımı. Timeout olmadan, tablet ağı koptuğunda istek
+ * dakikalarca "yolda" kalıyor ve UI (ör. "Tamamlanıyor..." butonu) kilitleniyordu.
+ */
+const DEFAULT_TIMEOUT_MS = 30000;
+/** Excel import gibi uzun işlemler — nginx proxy_read_timeout (300s) ile uyumlu. */
+const LONG_TIMEOUT_MS = 300000;
+/**
+ * Fiş tamamlama: sunucu normalde ~200ms yanıtlıyor. Kısa tutuluyor çünkü
+ * endpoint idempotent — timeout'ta tekrar denemek ve durumu doğrulamak güvenli.
+ */
+const COMPLETE_TIMEOUT_MS = 12000;
+/** Fişin sunucudaki gerçek durumunu sorarken kullanılan süre. */
+const STATUS_CHECK_TIMEOUT_MS = 6000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 class ApiService {
   private client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      timeout: DEFAULT_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -96,6 +114,7 @@ class ApiService {
     
     const response = await this.client.post('/v1/cycles/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: LONG_TIMEOUT_MS,  // binlerce satırlık Excel işlenmesi uzun sürebilir
     });
     return response.data;
   }
@@ -119,6 +138,8 @@ class ApiService {
   async createPlan(cycleId: string, numStations: number) {
     const response = await this.client.post(`/v1/cycles/${cycleId}/plan`, {
       worker_count: numStations,
+    }, {
+      timeout: LONG_TIMEOUT_MS,  // yük dengeleme tüm bayiler üzerinde çalışır
     });
     return response.data;
   }
@@ -154,9 +175,57 @@ class ApiService {
     return response.data;
   }
 
+  /**
+   * Fişi tamamla — tablet ağı koptuğunda isteğin yolda kaybolmasına dayanıklı.
+   *
+   * Backend idempotent (`already_completed: true` döner) olduğu için tekrar
+   * denemek güvenlidir. Yanıt alınamazsa fişin gerçek durumu sunucuya sorulur:
+   * `loaded` ise istek aslında işlenmiş demektir, başarı sayılır.
+   */
   async completeLoadsheet(loadsheetId: string) {
-    const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/complete`);
-    return response.data;
+    const MAX_ATTEMPTS = 2;
+    let lastError: unknown = new Error('Fiş tamamlanamadı');
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await this.client.post(`/v1/loadsheets/${loadsheetId}/complete`, null, {
+          timeout: COMPLETE_TIMEOUT_MS,
+        });
+        return response.data;
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetriableError(error)) throw error;
+
+        // İstek sunucuya ulaşıp sadece yanıtı kaybolmuş olabilir — durumu doğrula
+        if (await this.isLoadsheetLoaded(loadsheetId)) {
+          return { loadsheet_id: loadsheetId, status: 'loaded', already_completed: true };
+        }
+        if (attempt < MAX_ATTEMPTS) await sleep(attempt * 1000);
+      }
+    }
+
+    throw lastError;
+  }
+
+  /** Yanıt alınamadıysa (timeout/ağ kopması) veya sunucu geçici hata verdiyse tekrar denenebilir. */
+  private isRetriableError(error: any): boolean {
+    if (axios.isCancel(error)) return false;
+    // Sunucudan yanıt geldiyse sadece geçici sunucu hatalarında tekrar dene;
+    // yanıt hiç yoksa (timeout / ağ kopması / bağlantı reddi) tekrar denenebilir.
+    if (error?.response) return [502, 503, 504].includes(error.response.status);
+    return true;
+  }
+
+  /** Fiş sunucuda gerçekten tamamlanmış mı? (yanıtı kaybolan istekleri doğrulamak için) */
+  private async isLoadsheetLoaded(loadsheetId: string): Promise<boolean> {
+    try {
+      const response = await this.client.get(`/v1/loadsheets/${loadsheetId}`, {
+        timeout: STATUS_CHECK_TIMEOUT_MS,
+      });
+      return response.data?.status === 'loaded';
+    } catch {
+      return false;
+    }
   }
 
   async cancelLoadsheet(loadsheetId: string) {

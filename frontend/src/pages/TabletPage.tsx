@@ -97,9 +97,13 @@ export default function TabletPage() {
       setSelectedLoadsheet(null);
       setLoadsheetDetail(null);
       await loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Fiş tamamlama hatası:', error);
-      alert('Fiş tamamlama başarısız!');
+      alert(
+        error?.response
+          ? 'Fiş tamamlama başarısız! Lütfen tekrar deneyin.'
+          : 'Bağlantı sorunu: fiş tamamlanamadı. İnternet bağlantısını kontrol edip tekrar deneyin.'
+      );
     } finally {
       setIsLoading(false);
     }
