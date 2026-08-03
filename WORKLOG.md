@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-08-03 — Konya'da "Planlama oluşturma başarısız" (502): teşhis + N+1 düzeltmesi (DEPLOY ONAYI BEKLİYOR)
+## 2026-08-03 — Konya'da "Planlama oluşturma başarısız" (502): teşhis + N+1 düzeltmesi (commit + push + prod deploy ✅)
 - **Şikâyet:** Konya Excel import'u başarılı (döngü `f58e0dbb-fac6-4438-a1b7-a2cfbff6e940`, 564 bayi) ama "Planlama Oluştur" → `502` + "Planlama oluşturma başarısız". Kullanıcının ilk sorusu "Excel'de mi hata var?" → **hayır**.
 - **Teşhis (canlı, kanıtlı):** Hata 500 değil **502** → uygulama hatası değil, worker ölümü. `planning.py:67` her uygulama hatasını 500 + Türkçe metne çeviriyor, o gelmemiş. Prod api loglarında `[CRITICAL] WORKER TIMEOUT` yağmuru; nginx'teki `POST .../f58e0dbb.../plan 502` saatleri (17:40:47, 17:41:09, 17:42:13, 17:43:27) WORKER TIMEOUT saatleriyle **birebir** eşleşiyor. `POST /v1/cycles/import` de aynı sebeple 502 veriyordu (kullanıcı defalarca denemiş).
 - **Kök neden:** `docker-compose.prod.yml` gunicorn `--timeout 30` + planlama kodundaki N+1. Manuel modda (`KON: auto_planning_enabled=f`) `station_planner.py:173` **her territory için** `_calculate_territory_loads()`'u baştan çağırıyor; o da order başına 2 sorgu atıyor. Canlı ölçüm: tek çağrı **2,66 sn** × 15 territory ≈ **40 sn** > 30 sn → fiş üretimi başlamadan worker SIGKILL. nginx `proxy_read_timeout 300s` devreye bile girmiyor.
@@ -13,7 +13,10 @@
 - **Düzeltme:** (1) `_calculate_territory_loads` → tek SQL aggregate (`outerjoin` + `coalesce`, satırsız order'ın territory'si 0 ile korunur) + cycle bazında cache; (2) `_calculate_current_station_loads` iç içe döngüler yerine aynı cache'ten okuyor; (3) `loadsheet_generator._get_dealer_total_cartons` (bayi başına sorgu) → `_preload_dealer_cartons` tek aggregate; (4) gunicorn `--timeout 30→180`, `--graceful-timeout 15→30` (import 502'lerini de kapatır).
 - **Doğrulama (canlı DB, salt okuma):** territory yükleri eski Python vs yeni SQL → **123x hızlı (2,623→0,021 sn), 0 fark**, toplam karton 21.077,5 ↔ 21.077,5. Bayi kartonları → **72x (2,861→0,040 sn), 564/564 bayi aynı, 0 fark**, AnaStok eşiğini aşan 9 bayi ↔ 9. `py_compile` temiz.
 - **Karar:** Timeout artışı tek başına yeterli değil (semptomu geciktirir); asıl çözüm N+1'in kaldırılması. İkisi birlikte gidiyor.
-- **Sıradaki adım:** Kullanıcı onayı → commit + push + **4 app container build** + `up -d` → Konya'da "Planlama Oluştur" tekrar denenecek (`assigns`/`sheets` dolmalı, 564 fiş). Not: `--timeout` değişikliği compose'da olduğu için `up -d` şart, sadece build yetmez.
+- **Commit/Push:** `4c1c0f7`, pre-commit hook v2.0.74 → **v2.0.75**.
+- **Deploy (TAMAM ✅):** `git pull` (09c4e1b→4c1c0f7) + **4 app container da build** (`api web dashboard superadmin`) + `up -d`. `db`/`redis` yeniden yaratılmadı (2 aydır Up, veri güvende). Doğrulandı: api `Up (healthy)` + `VERSION = "2.0.75"`, container içindeki `/proc/1/cmdline` → `--timeout 180 --graceful-timeout 30` aktif, yeni kod (`_preload_dealer_cartons`, `_territory_loads_cache`) image'da mevcut, https://depo.akaitech.com.tr 200 / 0,18 sn, `/v1/auth/depots/public` 200 / 0,10 sn, deploy sonrası **WORKER TIMEOUT sayısı 0**.
+- **Sıradaki adım:** Konya'da ekrandan "Planlama Oluştur" denenecek — plan oluşturmayı bilerek tetiklemedim (564 fiş + istasyon dağıtımı üretir, istasyon sayısı operasyon kararı). Beklenen: `station_assignments` ve `loadsheets` dolar. Takip sorgusu: `SELECT count(*) FROM station_assignments WHERE cycle_id='f58e0dbb-…'`.
+- **Kalan teknik borç (bu düzeltmenin kapsamı dışında):** `_get_dealer_count_for_territory` hâlâ territory başına order çekiyor (15 sorgu — şimdilik zararsız); tüm endpoint'ler `async def` ama senkron DB kullanıyor → ağır istek worker event loop'unu bloke ediyor (8 worker = 8 eşzamanlı istek tavanı, 2026-07-31 kaydındaki notla aynı); `loadsheet_lines.loadsheet_id` index'i yok.
 
 ## 2026-07-31 — "Tamamlanıyor..." butonu takılı kalıyor: teşhis + dayanıklılık düzeltmesi (commit + push + prod deploy ✅)
 - **Şikâyet:** Van/Hacıbekir tabletinde `T06-B03` fişinde Tamamla butonu "Tamamlanıyor..."da kalmış (fotoğraf 13:02:56).
