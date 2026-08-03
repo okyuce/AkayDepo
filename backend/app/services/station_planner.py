@@ -14,6 +14,7 @@ class StationPlanner:
     def __init__(self, session: Session):
         self.session = session
         self._depot_id = None
+        self._territory_loads_cache: Dict[UUID, Dict[str, float]] = {}
 
     def _get_parked_territory_codes(self) -> set:
         """Depoya ait Park istasyon(lar)ına map edilmiş territory code'larını döndür.
@@ -306,38 +307,39 @@ class StationPlanner:
     
     def _calculate_territory_loads(self, cycle_id: UUID) -> Dict[str, float]:
         """
-        Döngüdeki her territory için toplam karton hesapla
-        
+        Döngüdeki her territory için toplam karton hesapla (paket dahil: 1 karton = 10 paket)
+
+        Tek SQL aggregate + cycle bazında cache. Eskiden order başına iki sorgu
+        atıyordu; manuel modda territory başına yeniden çağrıldığı için 564 bayilik
+        döngüde ~40 sn sürüyor ve gunicorn worker timeout'una (502) yol açıyordu.
+
         Returns:
             {territory_code: total_carton}
         """
-        # Döngünün tüm order'larını al
-        stmt = select(Order).where(Order.cycle_id == cycle_id)
-        orders = self.session.exec(stmt).all()
-        
-        territory_loads = {}
-        
-        for order in orders:
-            # Territory code'u al
-            territory = self.session.get(Territory, order.territory_id)
-            if not territory:
-                continue
-            
-            # Order lines'ı al
-            stmt = select(OrderLine).where(OrderLine.order_id == order.id)
-            lines = self.session.exec(stmt).all()
-            
-            # Toplam karton hesapla (paket dahil: 1 karton = 10 paket)
-            total_carton = 0
-            for line in lines:
-                total_carton += line.qty_carton + (line.qty_pack / 10)
-            
-            # Territory toplama ekle
-            if territory.code not in territory_loads:
-                territory_loads[territory.code] = 0
-            territory_loads[territory.code] += total_carton
-        
-        return territory_loads
+        cached = self._territory_loads_cache.get(cycle_id)
+        if cached is not None:
+            return dict(cached)
+
+        from sqlalchemy import func
+
+        # outerjoin: satırı olmayan order'ın territory'si de 0 ile listede kalsın
+        stmt = (
+            select(
+                Territory.code,
+                func.coalesce(
+                    func.sum(OrderLine.qty_carton + OrderLine.qty_pack / 10.0), 0
+                ),
+            )
+            .select_from(Order)
+            .join(Territory, Territory.id == Order.territory_id)
+            .outerjoin(OrderLine, OrderLine.order_id == Order.id)
+            .where(Order.cycle_id == cycle_id)
+            .group_by(Territory.code)
+        )
+
+        territory_loads = {code: float(total or 0) for code, total in self.session.exec(stmt).all()}
+        self._territory_loads_cache[cycle_id] = territory_loads
+        return dict(territory_loads)
     
     def _greedy_distribution(
         self, 
@@ -498,7 +500,11 @@ class StationPlanner:
         from app.models import Station, StationAssignment, Territory, Order, OrderLine
         
         totals = [0.0 for _ in range(station_count)]
-        
+
+        # Territory yükleri tek aggregate'ten gelir (cache'li) — eskiden burada
+        # istasyon × territory × order × satır iç içe sorgu atılıyordu.
+        loads_by_code = self._calculate_territory_loads(cycle_id)
+
         for idx in range(1, station_count + 1):
             station_name = f"İstasyon-{idx}"
             s_stmt = select(Station).where(Station.name == station_name)
@@ -511,32 +517,16 @@ class StationPlanner:
             # Bu istasyonun tüm territory'leri
             sas = self.session.exec(
                 select(StationAssignment).where(
-                    StationAssignment.cycle_id==cycle_id, 
+                    StationAssignment.cycle_id==cycle_id,
                     StationAssignment.station_id==station.id
                 )
             ).all()
-            territory_ids = [sa.territory_id for sa in sas]
-            
-            if not territory_ids:
-                continue
-            
-            # Tüm batch'lerdeki siparişleri topla
-            for tid in territory_ids:
-                orders = self.session.exec(
-                    select(Order).where(
-                        Order.cycle_id==cycle_id, 
-                        Order.territory_id==tid
-                    )
-                ).all()
-                
-                for order in orders:
-                    lines = self.session.exec(
-                        select(OrderLine).where(OrderLine.order_id==order.id)
-                    ).all()
-                    
-                    for line in lines:
-                        totals[idx-1] += line.qty_carton + (line.qty_pack / 10)
-        
+
+            for sa in sas:
+                territory = self.session.get(Territory, sa.territory_id)
+                if territory:
+                    totals[idx-1] += loads_by_code.get(territory.code, 0.0)
+
         return totals
     
     def _greedy_distribution_with_initial(

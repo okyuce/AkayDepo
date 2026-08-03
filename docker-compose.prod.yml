@@ -70,8 +70,8 @@ services:
       -k uvicorn.workers.UvicornWorker
       -w 8
       -b 0.0.0.0:8001
-      --timeout 30
-      --graceful-timeout 15
+      --timeout 180
+      --graceful-timeout 30
       --max-requests 500
       --max-requests-jitter 50
       --access-logfile -

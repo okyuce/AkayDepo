@@ -34,23 +34,27 @@ class LoadsheetGenerator:
             self._main_stock_station = self.session.exec(stmt).first()
         return self._main_stock_station
 
-    def _get_dealer_total_cartons(self, cycle_id: UUID, dealer_id: UUID) -> float:
-        """Bayinin döngüdeki toplam sipariş miktarını hesapla (karton)"""
-        stmt = select(Order).where(
-            Order.cycle_id == cycle_id,
-            Order.dealer_id == dealer_id
+    def _preload_dealer_cartons(self, cycle_id: UUID) -> Dict[UUID, float]:
+        """Döngüdeki tüm bayilerin toplam karton miktarını TEK sorguda hesapla.
+
+        AnaStok eşiği (300 karton) her bayi için gerekiyordu; bayi başına ayrı
+        sorgu atmak 564 bayilik döngüde fiş üretimini dakikalara çıkarıyordu.
+        """
+        from sqlalchemy import func
+
+        stmt = (
+            select(
+                Order.dealer_id,
+                func.coalesce(
+                    func.sum(OrderLine.qty_carton + OrderLine.qty_pack / 10.0), 0
+                ),
+            )
+            .select_from(Order)
+            .outerjoin(OrderLine, OrderLine.order_id == Order.id)
+            .where(Order.cycle_id == cycle_id)
+            .group_by(Order.dealer_id)
         )
-        orders = self.session.exec(stmt).all()
-
-        total_cartons = 0.0
-        for order in orders:
-            lines = self.session.exec(
-                select(OrderLine).where(OrderLine.order_id == order.id)
-            ).all()
-            for line in lines:
-                total_cartons += line.qty_carton + (line.qty_pack / 10)
-
-        return total_cartons
+        return {dealer_id: float(total or 0) for dealer_id, total in self.session.exec(stmt).all()}
 
     def _get_or_create_main_stock_assignment(
         self, cycle_id: UUID, territory_id: UUID, plan_date
@@ -130,8 +134,8 @@ class LoadsheetGenerator:
 
         loadsheet_count = 0
 
-        # Dealer toplam kartonlarını cache'le (performans için)
-        dealer_cartons_cache = {}
+        # Dealer toplam kartonları — tek sorguda önden yüklenir
+        dealer_cartons_cache = self._preload_dealer_cartons(cycle_id)
 
         # Her assignment için fişler oluştur
         for assignment in assignments:
@@ -146,10 +150,7 @@ class LoadsheetGenerator:
             main_stock_dealer_index = {}  # AnaStok için ayrı index
 
             for dealer_id, batch_number, order in dealer_batches:
-                # Bayi toplam kartonunu hesapla (cache ile)
-                if dealer_id not in dealer_cartons_cache:
-                    dealer_cartons_cache[dealer_id] = self._get_dealer_total_cartons(cycle_id, dealer_id)
-                dealer_total = dealer_cartons_cache[dealer_id]
+                dealer_total = dealer_cartons_cache.get(dealer_id, 0.0)
 
                 # 300+ karton mu? AnaStok'a yönlendir
                 if dealer_total >= MAIN_STOCK_THRESHOLD and main_stock:
