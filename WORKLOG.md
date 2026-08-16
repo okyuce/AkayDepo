@@ -16,8 +16,15 @@
 - **Eski kayıtlar — KARAR: backfill YAPILMAYACAK (ne lokalde ne prod'da).** Düzeltme yalnızca **bundan sonra üretilecek** revizyon fişlerini kapsar; mevcut kayıtlarda alan boş kalır (lokalde 15/15 boş, prod'da da öyle). Eski kayıtlar "Tümü" görünümünde zaten doğru görünüyor, sadece batch filtresinde eskisi gibi kalacak.
   - Backfill betiği yazıldı ve **yazmadan** gerçek DB'de denendi: 15 revizyonun **15'i de** bağlanabiliyor, bağlanamayan 0. Bir kopyada uygulanıp doğrulandı, kopya silindi. Betik `scratchpad/backfill.py` (repoda değil); ileride istenirse `python backfill.py <db> [--yaz]` ile çalıştırılır, `--yaz` olmadan sadece rapor verir.
   - **Kullanıcının şikâyetinin tam kanıtı (D3J004775 / DANIŞ MARKET, 3. Excel filtresi):** bağ boşken `1 Fiş` beyaz rozet / YEŞİL kart / "✓ Tamam" / `FİŞ-1` → **bağ kurulduğunda** `2 Fiş` **TURUNCU** rozet / TURUNCU kart / "⚠ Ek Fiş" / `FİŞ-1(❌İPTAL) + FİŞ-2`. Yani düzeltme doğru yeri hedefliyor; kullanıcının lokal testinde yeşil görünmesinin sebebi o fişin düzeltmeden **önce** üretilmiş olması.
-- **Prod kararı:** Sadece kod deploy edilecek, prod DB'ye dokunulmayacak.
-- **Sıradaki adım:** Kullanıcı lokalde **yeni** bir revizyon Excel'i yükleyip planlama çalıştıracak (yeni fişin parent'ı otomatik dolar) ve batch filtresinde turuncu rozeti görecek → sonra commit + prod deploy (onay alınacak). Lokal api `--reload` ile çalışıyor, yeni kod zaten yüklü (`WatchFiles detected changes ... Reloading` doğrulandı).
+- **Prod kararı:** Sadece kod deploy edildi, prod DB'ye dokunulmadı.
+- **Lokal test:** Kullanıcı yeni revizyon Excel'i ile test etti → **çalışıyor**, onay verdi.
+- **Commit/Push:** `a136186` (fix, kod) + `5ecb939` (docs/WORKLOG/memory). Pre-commit hook v2.0.78 → **v2.0.80** (iki commit, iki bump). `git push origin main` tamam.
+- **DEPLOY (TAMAM ✅ — 16.08 09:16):** `37.148.212.187:2299`, `/opt/akaydepo`. `git pull` (4c1c0f7 → 5ecb939) + **4 app container da build** (`api web dashboard superadmin`) + `up -d`.
+  - `db`/`redis` **yeniden yaratılmadı** — çıktıda "Running/Healthy" olarak sadece dependency kontrolü, ikisi de hâlâ `Up 2 months`. Veri güvende.
+  - Doğrulandı: 4 app container `Up ... (healthy)`; api içinden `VERSION=2.0.80`; **yeni kod image'da** (`loadsheet_generator.py:282 parent_loadsheet_id=parent_loadsheet_id`, `:425` ve `:501` `return previous_loadsheet`); web bundle `index-CRZV9iNb.js` içinde `2.0.80`; https://depo.akaitech.com.tr **200 / 0,17 sn**, `/v1/version` → `2.0.80`, `/v1/auth/depots/public` **200 / 0,14 sn**; deploy sonrası api loglarında traceback/ERROR/CRITICAL/WORKER TIMEOUT **0**.
+  - Prod DB sağlam (salt okuma): **1257 fiş / 1236 bayi / 10 döngü / 21 revizyon / parent_dolu=0** (backfill yapılmadığı için 0 beklenen değer).
+  - Not: prod DB kullanıcısı `akaydepo` (repo `.env.example`'daki `depo` DEĞİL); `docker exec ... printenv POSTGRES_USER` ile alınır.
+- **Sıradaki adım:** Sahada izle — bundan sonra gelen revizyonlarda batch filtresi seçiliyken kart `2 Fiş` turuncu rozetiyle ve iptal edilen fişle birlikte görünmeli. Prod'daki mevcut 21 revizyon kaydı eski davranışta kalır (bilinçli karar).
 
 ## 2026-08-16 — Revizyon turuncusu: YANLIŞ ALARM, sistem sağlıklı — kod DEĞİŞMEDİ ✅
 - **Sonuç:** Şikâyet doğrulanmadı. Revizyon göstergesi çalışıyor, **hiçbir düzeltme yapılmadı, yapılmamalı.** Gelecek oturum bunu "hata" sanıp `groupLoadsheetsByDealer`'a dokunmasın.
