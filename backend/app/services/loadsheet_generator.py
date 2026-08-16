@@ -243,13 +243,20 @@ class LoadsheetGenerator:
         is_revision = order.is_revision
         loadsheet_type = "normal"
         revision_diff = None
-        
+        parent_loadsheet_id = None
+
         if is_revision and order.previous_order_id:
             # Önceki order ile karşılaştır ve diff hesapla
             revision_diff, loadsheet_type = self._calculate_revision_diff(order.id, order.previous_order_id)
-            
+
             # ÖNEMLİ: Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
-            self._cancel_previous_loadsheet(cycle_id, dealer_id, order.previous_order_id, assignment.station_id)
+            previous_loadsheet = self._cancel_previous_loadsheet(cycle_id, dealer_id, order.previous_order_id, assignment.station_id)
+
+            # Ebeveyn bağını sakla: batch filtresi seçildiğinde iptal edilen fiş
+            # bu bağ üzerinden listeye katılıyor (loadsheets.py'deki parent_ids).
+            # Bağ kurulmazsa tek batch görünümünde revizyon hiç belli olmuyor.
+            if previous_loadsheet:
+                parent_loadsheet_id = previous_loadsheet.id
         
         # Idempotency: Aynı dealer + batch için zaten fiş varsa atla
         from app.models import Loadsheet as Ls
@@ -271,7 +278,8 @@ class LoadsheetGenerator:
             loadsheet_type=loadsheet_type,
             revision_diff=revision_diff,
             depot_id=self._depot_id,
-            is_revision=is_revision
+            is_revision=is_revision,
+            parent_loadsheet_id=parent_loadsheet_id
         )
         self.session.add(loadsheet)
         self.session.flush()  # ID için
@@ -364,12 +372,18 @@ class LoadsheetGenerator:
     def _cancel_previous_loadsheet(self, cycle_id: UUID, dealer_id: UUID, previous_order_id: UUID, station_id: UUID):
         """
         Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
-        
+
         Args:
             cycle_id: Döngü ID
             dealer_id: Bayi ID
             previous_order_id: Önceki order ID
             station_id: İstasyon ID
+
+        Returns:
+            Optional[Loadsheet]: İptal edilen (ya da zaten iptal olan) önceki fiş.
+            Yeni revizyon fişi bunu `parent_loadsheet_id` olarak saklar; batch
+            filtresi seçildiğinde ebeveyn fiş listeye o bağ üzerinden katılıyor.
+            Önceki fiş yoksa None.
         """
         from app.models import Loadsheet, StationInventory, StockMovement
         from datetime import datetime
@@ -389,8 +403,8 @@ class LoadsheetGenerator:
         # Önceki batch numarasını order'dan al
         prev_order = self.session.get(Order, previous_order_id)
         if not prev_order:
-            return
-        
+            return None
+
         prev_batch = prev_order.import_batch
         
         # Önceki fişi bul
@@ -403,11 +417,12 @@ class LoadsheetGenerator:
         
         if not previous_loadsheet:
             print(f"UYARI: Önceki fiş bulunamadı - dealer: {dealer_id}, batch: {prev_batch}")
-            return
-        
-        # Eğer fiş zaten iptal ise, tekrar işleme gerek yok
+            return None
+
+        # Eğer fiş zaten iptal ise, tekrar işleme gerek yok.
+        # Yine de ebeveyn olarak döndür: planlama tekrar çalıştırıldığında bağ kurulmalı.
         if previous_loadsheet.status == "cancelled":
-            return
+            return previous_loadsheet
         
         # Eğer fiş tamamlanmışsa (completed_at != null), stoka iade et
         if previous_loadsheet.completed_at is not None:
@@ -482,3 +497,5 @@ class LoadsheetGenerator:
         previous_loadsheet.loaded_at = None
         self.session.add(previous_loadsheet)
         print(f"INFO: Fiş iptal edildi - {previous_loadsheet.id}")
+
+        return previous_loadsheet
