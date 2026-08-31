@@ -6,7 +6,45 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.82"
+VERSION = "2.0.83"
+
+
+# Şema DDL'i için Postgres advisory lock anahtarı (rastgele sabit).
+SCHEMA_LOCK_KEY = 815342907
+
+
+def _schema_lock(engine):
+    """Tabloları/kolonları TEK worker oluştursun; diğerleri kilidi bekler."""
+    from sqlmodel import Session, text
+    from app.core.database import create_db_and_tables
+
+    try:
+        with Session(engine) as session:
+            session.execute(text("SELECT pg_advisory_lock(:k)"), {"k": SCHEMA_LOCK_KEY})
+            session.commit()
+            try:
+                # Yeni tabloları oluştur (mevcut tablolara dokunmaz)
+                create_db_and_tables()
+
+                # create_all MEVCUT tabloya kolon EKLEMEZ; prod deploy'unda
+                # alembic otomatik çalışmıyor. Kolon eksik kalırsa loadsheets'e
+                # giden her sorgu patlar. Idempotent güvence — migration da var.
+                session.execute(text(
+                    "ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS "
+                    "cancelled_by_closing BOOLEAN NOT NULL DEFAULT false"
+                ))
+                session.commit()
+            finally:
+                session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": SCHEMA_LOCK_KEY})
+                session.commit()
+    except Exception as e:
+        # Kilit alınamasa bile uygulama ayağa kalkmalı: tablolar başka bir
+        # worker tarafından zaten oluşturulmuş olabilir.
+        logger.warning(f"Startup şema hazırlığı: {e}")
+        try:
+            create_db_and_tables()
+        except Exception as e2:
+            logger.warning(f"Startup create_all yeniden deneme: {e2}")
 
 
 @asynccontextmanager
@@ -15,21 +53,14 @@ async def lifespan(app: FastAPI):
     from app.core.database import engine, create_db_and_tables
     from sqlmodel import Session, text
 
-    # Yeni tabloları oluştur (mevcut tablolara dokunmaz)
-    create_db_and_tables()
-
-    # create_all MEVCUT tabloya kolon EKLEMEZ; prod deploy'unda alembic
-    # otomatik çalışmadığı için kolon eksik kalırsa loadsheets'e giden her
-    # sorgu patlar. Idempotent güvence — alembic migration'ı da ayrıca var.
-    try:
-        with Session(engine) as session:
-            session.execute(text(
-                "ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS "
-                "cancelled_by_closing BOOLEAN NOT NULL DEFAULT false"
-            ))
-            session.commit()
-    except Exception as e:
-        logger.warning(f"Startup kolon güvencesi hatası: {e}")
+    # Şema işleri TEK worker tarafından yapılır.
+    # Prod'da 8 gunicorn worker'ı lifespan'i aynı anda çalıştırıyor. Yaratılacak
+    # YENİ bir tablo varsa hepsi aynı anda CREATE TABLE deniyor ve Postgres
+    # "duplicate key ... pg_type_typname_nsp_index" veriyor; worker
+    # "Application startup failed. Exiting" deyip ölüyor (31.08.2026 deploy'unda
+    # yaşandı — gunicorn yeniden başlattı ama ~13 sn kapasite düştü).
+    # Advisory lock ile şemayı tek worker kurar, diğerleri bitmesini bekler.
+    _schema_lock(engine)
 
     try:
         with Session(engine) as session:

@@ -40,6 +40,28 @@ tablet dahil tüm uygulamayı düşürür.
    Başlat") silme sırasına ekle — `cycles` DELETE'inden ÖNCE. Unutulursa
    FK ihlaliyle yeni döngü başlatılamaz.
 
+## TUZAK: 8 gunicorn worker'ı create_all'da YARIŞIYOR
+
+Prod'da `api` 8 worker ile çalışıyor ve **her worker lifespan'i ayrı çalıştırıyor.**
+Yaratılacak **yeni bir tablo** varsa hepsi aynı anda `CREATE TABLE` deniyor ve
+Postgres şunu veriyor:
+
+```
+psycopg2.errors.UniqueViolation: duplicate key value violates unique
+constraint "pg_type_typname_nsp_index"
+[ERROR] Application startup failed. Exiting.
+[ERROR] Worker (pid:7) exited with code 3
+```
+
+31.08.2026 deploy'unda gerçekleşti: 5 worker çöktü, gunicorn yeniden başlattı,
+ikinci denemede tablo zaten var olduğu için açıldılar → **~13 saniye kapasite
+düşüşü**, veri kaybı yok. Lokalde `mp.Barrier` ile birebir üretildi:
+eski yol **7/8 worker çöküyor**, advisory lock'lu yeni yol **8/8 sağlam**.
+
+**Çözüm — `main.py:_schema_lock()`:** tüm DDL `pg_advisory_lock` içinde,
+tek worker yapar, diğerleri bekler. Yeni bir şema işi eklerken **oraya** ekle,
+lifespan'e doğrudan DDL yazma.
+
 ## Test etme yöntemi
 
 Migration'sız bir DB kopyası oluştur, `TestClient(app)` ile lifespan'i çalıştır,
