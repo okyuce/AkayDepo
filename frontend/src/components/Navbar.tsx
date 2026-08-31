@@ -135,6 +135,16 @@ export default function Navbar() {
                     Stok Hareketleri
                   </Link>
                 )}
+
+                {/* Admin kullanıcılar için Gün Sonu Sipariş Kontrolü */}
+                {['admin', 'superadmin'].includes(user.role) && (
+                  <Link
+                    to="/siparis-kontrol"
+                    className={linkClasses(location.pathname === '/siparis-kontrol')}
+                  >
+                    Sipariş Kontrol
+                  </Link>
+                )}
               </nav>
             )}
           </div>

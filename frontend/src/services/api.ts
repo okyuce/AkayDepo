@@ -589,6 +589,142 @@ class ApiService {
       offset: number;
     };
   }
+
+  // ---------------------------------------------------------------------
+  // Gün sonu kapanış kontrolü
+  // ---------------------------------------------------------------------
+
+  /** Kapanış Excel'ini doğrula ve döngüyle karşılaştır. Hiçbir şeyi değiştirmez. */
+  async analyzeClosing(file: File, force = false) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('force', String(force));
+
+    const response = await this.client.post('/v1/closing-check/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: LONG_TIMEOUT_MS,
+    });
+    return response.data as ClosingReport;
+  }
+
+  /** Analiz raporundaki iptalleri fişlere yansıt. */
+  async applyClosing(checkId: string) {
+    const response = await this.client.post(`/v1/closing-check/${checkId}/apply`, null, {
+      timeout: LONG_TIMEOUT_MS,
+    });
+    return response.data as ClosingApplyResult;
+  }
+
+  async getClosingHistory(limit = 20) {
+    const response = await this.client.get('/v1/closing-check/history', { params: { limit } });
+    return response.data as ClosingHistoryItem[];
+  }
+}
+
+export interface ClosingLineChange {
+  product_code: string;
+  old_carton: number;
+  old_pack: number;
+  new_carton: number;
+  new_pack: number;
+  diff_carton: number;
+  diff_pack: number;
+}
+
+export interface ClosingCancelItem {
+  dealer_code: string;
+  dealer_id: string;
+  dealer_name: string;
+  territory_no: string;
+  territory_code: string;
+  order_code: string;
+  order_time: string;
+  batch: number;
+  carton: number;
+  pack: number;
+  loadsheet_id: string | null;
+  package_number: string | null;
+  loadsheet_status: string | null;
+  was_loaded: boolean;
+  note?: string;
+  stock_returned?: boolean;
+  reason?: string;
+}
+
+export interface ClosingDiffItem {
+  dealer_code: string;
+  dealer_name: string;
+  territory_no?: string;
+  db_order_code: string;
+  closing_order_code: string;
+  changes: ClosingLineChange[];
+  package_number?: string | null;
+  loadsheet_status?: string | null;
+}
+
+export interface ClosingMissingItem {
+  dealer_code: string;
+  dealer_name: string;
+  territory_code: string;
+  order_code: string;
+  order_time: string;
+  carton: number;
+  pack: number;
+}
+
+export interface ClosingReport {
+  check_id: string;
+  filename: string;
+  status: string;
+  uploaded_at: string;
+  message: string;
+  warnings: string[];
+  cycle: {
+    id: string;
+    cycle_no: number;
+    plan_date: string;
+    order_date: string | null;
+    dealer_count: number;
+    batch_count: number;
+  };
+  summary: {
+    cycle_dealers: number;
+    closing_dealers: number;
+    cancelled: number;
+    already_cancelled: number;
+    missing_orders: number;
+    missed_revisions: number;
+    qty_diffs: number;
+    matched: number;
+  };
+  cancelled: ClosingCancelItem[];
+  already_cancelled: ClosingCancelItem[];
+  missing_orders: ClosingMissingItem[];
+  missed_revisions: ClosingDiffItem[];
+  qty_diffs: ClosingDiffItem[];
+}
+
+export interface ClosingApplyResult {
+  check_id: string;
+  status: string;
+  already_applied: boolean;
+  cancelled_count: number;
+  skipped_count?: number;
+  cancelled?: ClosingCancelItem[];
+  skipped?: ClosingCancelItem[];
+  message: string;
+}
+
+export interface ClosingHistoryItem {
+  id: string;
+  filename: string;
+  status: string;
+  uploaded_at: string;
+  applied_at: string | null;
+  applied_by: string | null;
+  cancelled_count: number;
+  plan_date: string | null;
+  summary: Partial<ClosingReport['summary']>;
 }
 
 export const apiService = new ApiService();

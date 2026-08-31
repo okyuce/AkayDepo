@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.81"
+VERSION = "2.0.82"
 
 
 @asynccontextmanager
@@ -17,6 +17,19 @@ async def lifespan(app: FastAPI):
 
     # Yeni tabloları oluştur (mevcut tablolara dokunmaz)
     create_db_and_tables()
+
+    # create_all MEVCUT tabloya kolon EKLEMEZ; prod deploy'unda alembic
+    # otomatik çalışmadığı için kolon eksik kalırsa loadsheets'e giden her
+    # sorgu patlar. Idempotent güvence — alembic migration'ı da ayrıca var.
+    try:
+        with Session(engine) as session:
+            session.execute(text(
+                "ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS "
+                "cancelled_by_closing BOOLEAN NOT NULL DEFAULT false"
+            ))
+            session.commit()
+    except Exception as e:
+        logger.warning(f"Startup kolon güvencesi hatası: {e}")
 
     try:
         with Session(engine) as session:
@@ -89,13 +102,14 @@ async def health_check():
     return {"status": "healthy"}
 
 # API routers
-from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users, dashboard, depots, superadmin
+from app.api import cycles, planning, loadsheets, counters, websocket, auth, stations, territory_info, assignments, inventory, product_order, users, dashboard, depots, superadmin, closing_check
 
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(dashboard.router, prefix="/v1/dashboard", tags=["dashboard"])
 app.include_router(users.router, prefix="/v1/users", tags=["users"])
 app.include_router(cycles.router, prefix="/v1/cycles", tags=["cycles"])
 app.include_router(planning.router, prefix="/v1/cycles", tags=["planning"])
+app.include_router(closing_check.router, prefix="/v1/closing-check", tags=["closing_check"])
 app.include_router(loadsheets.router, prefix="/v1/loadsheets", tags=["loadsheets"])
 app.include_router(counters.router, prefix="/v1/counters", tags=["counters"])
 app.include_router(stations.router, prefix="/v1/stations", tags=["stations"])

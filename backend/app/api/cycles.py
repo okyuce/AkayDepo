@@ -274,7 +274,12 @@ async def cancel_pending(
                 f"DELETE FROM cycle_imports WHERE cycle_id IN ({cycle_id_list})"
             ))
 
-            # 10. Cycle
+            # 10. ClosingCheck (cycle FK'si var — cycles'tan ONCE silinmeli)
+            session.execute(text(
+                f"DELETE FROM closing_checks WHERE cycle_id IN ({cycle_id_list})"
+            ))
+
+            # 11. Cycle
             session.execute(text(
                 f"DELETE FROM cycles WHERE id IN ({cycle_id_list})"
             ))
@@ -284,10 +289,10 @@ async def cancel_pending(
             session.execute(text("DELETE FROM load_counters WHERE depot_id = :did"), {"did": depot_id_str})
             session.execute(text("DELETE FROM revision_diffs WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 11. Dealer
+        # 12. Dealer
         session.execute(text("DELETE FROM dealers WHERE depot_id = :did"), {"did": depot_id_str})
 
-        # 12. Territory
+        # 13. Territory
         session.execute(text("DELETE FROM territories WHERE depot_id = :did"), {"did": depot_id_str})
 
         session.commit()

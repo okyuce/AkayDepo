@@ -13,6 +13,7 @@ import StockDistributionPage from './pages/StockDistributionPage';
 import ProductOrderPage from './pages/ProductOrderPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import StockMovementsPage from './pages/StockMovementsPage';
+import ClosingCheckPage from './pages/ClosingCheckPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -91,6 +92,14 @@ function App() {
           element={
             <AdminRoute>
               <TerritoryAssignmentPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/siparis-kontrol"
+          element={
+            <AdminRoute>
+              <ClosingCheckPage />
             </AdminRoute>
           }
         />
