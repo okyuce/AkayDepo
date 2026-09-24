@@ -10,8 +10,8 @@ from app.models import (
     Order, OrderLine, Dealer, Territory, Product, Station
 )
 
-# AnaStok için minimum karton limiti
-MAIN_STOCK_THRESHOLD = 300
+# AnaStok için minimum karton limiti (bayi toplamı bu değer ve üstündeyse AnaStok'a gider)
+MAIN_STOCK_THRESHOLD = 200
 
 class LoadsheetGenerator:
     """Fiş üretici"""
@@ -37,11 +37,19 @@ class LoadsheetGenerator:
     def _preload_dealer_cartons(self, cycle_id: UUID) -> Dict[UUID, float]:
         """Döngüdeki tüm bayilerin toplam karton miktarını TEK sorguda hesapla.
 
-        AnaStok eşiği (300 karton) her bayi için gerekiyordu; bayi başına ayrı
-        sorgu atmak 564 bayilik döngüde fiş üretimini dakikalara çıkarıyordu.
+        AnaStok eşiği (MAIN_STOCK_THRESHOLD) her bayi için gerekiyordu; bayi başına
+        ayrı sorgu atmak 564 bayilik döngüde fiş üretimini dakikalara çıkarıyordu.
+
+        Revizyonla geçersizleşen sipariş (başka bir siparişin `previous_order_id`'si)
+        toplama katılmaz: revizyon siparişin tam yeni içeriğidir, eskisi de sayılırsa
+        bayi 2 kat (zincirde N kat) görünür ve eşiğin altındaki bayi AnaStok'a düşer.
         """
         from sqlalchemy import func
 
+        superseded_order_ids = select(Order.previous_order_id).where(
+            Order.cycle_id == cycle_id,
+            Order.previous_order_id.is_not(None),
+        )
         stmt = (
             select(
                 Order.dealer_id,
@@ -51,7 +59,7 @@ class LoadsheetGenerator:
             )
             .select_from(Order)
             .outerjoin(OrderLine, OrderLine.order_id == Order.id)
-            .where(Order.cycle_id == cycle_id)
+            .where(Order.cycle_id == cycle_id, Order.id.not_in(superseded_order_ids))
             .group_by(Order.dealer_id)
         )
         return {dealer_id: float(total or 0) for dealer_id, total in self.session.exec(stmt).all()}
@@ -152,7 +160,7 @@ class LoadsheetGenerator:
             for dealer_id, batch_number, order in dealer_batches:
                 dealer_total = dealer_cartons_cache.get(dealer_id, 0.0)
 
-                # 300+ karton mu? AnaStok'a yönlendir
+                # Eşik (MAIN_STOCK_THRESHOLD) ve üstü karton mu? AnaStok'a yönlendir
                 if dealer_total >= MAIN_STOCK_THRESHOLD and main_stock:
                     # AnaStok assignment'ı al veya oluştur
                     main_stock_assignment = self._get_or_create_main_stock_assignment(
@@ -250,7 +258,7 @@ class LoadsheetGenerator:
             revision_diff, loadsheet_type = self._calculate_revision_diff(order.id, order.previous_order_id)
 
             # ÖNEMLİ: Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
-            previous_loadsheet = self._cancel_previous_loadsheet(cycle_id, dealer_id, order.previous_order_id, assignment.station_id)
+            previous_loadsheet = self._cancel_previous_loadsheet(cycle_id, dealer_id, order.previous_order_id)
 
             # Ebeveyn bağını sakla: batch filtresi seçildiğinde iptal edilen fiş
             # bu bağ üzerinden listeye katılıyor (loadsheets.py'deki parent_ids).
@@ -369,15 +377,18 @@ class LoadsheetGenerator:
         
         return revision_diff_json, loadsheet_type
     
-    def _cancel_previous_loadsheet(self, cycle_id: UUID, dealer_id: UUID, previous_order_id: UUID, station_id: UUID):
+    def _cancel_previous_loadsheet(self, cycle_id: UUID, dealer_id: UUID, previous_order_id: UUID):
         """
         Önceki fişi iptal et ve eğer tamamlanmışsa stoka iade et
+
+        İade, önceki fişin KENDİ istasyonuna yazılır (stok, fiş tamamlanırken o
+        istasyondan düşülmüştü). Yeni revizyon fişi başka istasyona düşebilir —
+        ör. bayi eşiği aşıp AnaStok'a geçerse; iade oraya yazılırsa stok kayar.
 
         Args:
             cycle_id: Döngü ID
             dealer_id: Bayi ID
             previous_order_id: Önceki order ID
-            station_id: İstasyon ID
 
         Returns:
             Optional[Loadsheet]: İptal edilen (ya da zaten iptal olan) önceki fiş.
@@ -427,7 +438,10 @@ class LoadsheetGenerator:
         # Eğer fiş tamamlanmışsa (completed_at != null), stoka iade et
         if previous_loadsheet.completed_at is not None:
             print(f"INFO: İptal edilen fiş tamamlanmıştı, stoka iade ediliyor - {previous_loadsheet.id}")
-            
+
+            # Stok önceki fişin istasyonundan düşülmüştü → iade de oraya
+            station_id = self.session.get(StationAssignment, previous_loadsheet.assignment_id).station_id
+
             # Loadsheet lines'ları al
             stmt = select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == previous_loadsheet.id)
             lines = self.session.exec(stmt).all()

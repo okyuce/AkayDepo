@@ -277,7 +277,7 @@ export default function TerritoryAssignmentPage() {
                       const updated = await apiService.updateStation(mainStockStation.id, { active: !mainStockStation.active });
                       setStations(prev => prev.map(s => s.id === mainStockStation.id ? { ...s, active: updated.active } : s));
                       setToast({
-                        message: updated.active ? 'AnaStok aktif edildi - 300+ karton bayiler AnaStok\'a yönlendirilecek' : 'AnaStok devre dışı - tüm bayiler normal istasyonlara dağıtılacak',
+                        message: updated.active ? 'AnaStok aktif edildi - 200+ karton bayiler AnaStok\'a yönlendirilecek' : 'AnaStok devre dışı - tüm bayiler normal istasyonlara dağıtılacak',
                         type: 'success'
                       });
                       setTimeout(() => setToast(null), 4000);
