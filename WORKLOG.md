@@ -5,6 +5,107 @@
 
 ---
 
+## 2026-09-24 (2) — AnaStok 200: prod'da teşhis DOĞRULANDI + kod yazıldı (9 test yeşil) — commit+push ✅ (`b9ff236`, v2.0.85), prod deploy AKŞAM BEKLİYOR
+- **Kullanıcı kararları (1. kayıttaki sorular):** kapsam **tüm depolar** (global sabit kalır); eşik + 2 hata düzeltmesi + test; önce prod salt-okuma ölçümü ("sırayla yap, önce teşhisi doğrula").
+- **Prod doğrulaması (salt okuma, `default_transaction_read_only=on`):**
+  - Çalışan api container'ındaki 5 ilgili dosya lokal HEAD ile **bayt bayt aynı** (md5), v2.0.83 → kod teşhisi prod için geçerli.
+  - Kural sağlığı: 12 depo / 1.638 fiş → yanlış AnaStok 0, kaçan 0 ✅.
+  - Çift sayım **prod verisinde de var**: 11/11 revizyon fişinde kod toplamı şişik (≈2×; KON D3J146194 iki revizyonlu zincir: 51,1 vs gerçek 14,7 = 3,5×). **VAN D4D179145: gerçek 161,5 → kodun gördüğü 251,5** — eşik 200'de AnaStok'a yanlış düşecek gerçek örnek (VAN'da AnaStok kapalı olduğu için bugün etkisiz).
+  - İade hatası prod'da henüz tetiklenmemiş: 78/78 refund doğru istasyonda (hiçbir revizyon istasyon değiştirmemiş) → gizli hata.
+  - **Prod'da AnaStok AKTİF depolar: AGR, CIH, DOG, KON, SEY.** 1. kayıttaki AKS/KAR bilgisi lokal DB'dendi, prod'da ikisi de kapalı. Diğer 8 depo (AKS, BIT, ERE, HAK, KAR, MUS, NIG, VAN) etkilenmez.
+  - 200'ün prod etkisi (güncel döngüler): AGR +1 (D5F234533, 244 krt), DOG +1 (D55000505, 272), KON +1 (D3J022570, 231); CIH, SEY 0. Prod'da eski döngüler silinmiş (sadece 04.09–24.09 arası 13 döngü; stok hareketleri 11.09'dan beri) → çok günlük ortalama ölçülemedi.
+  - **Operasyonel bulgu:** hiçbir depoda AnaStok'a bağlı tablet kullanıcısı YOK; tablet sadece kendi istasyonunu görüyor (`LoadsheetListPage.tsx:350-351`) → AnaStok fişlerini yalnızca admin görüyor. KON AnaStok'u kullanıyor (24.09'da 26 düşüm). AnaStok stoğu sisteme girilmiyor (KON bakiyesi −834, her döngüde sıfırlanıyor) → 1. kayıttaki "AnaStok'a Stok Dağıtım'dan daha fazla stok" notu **geçersiz**. **AGR ve DOG'da AnaStok hiç kullanılmamış** (11.09'dan beri 0 hareket) → 200 ile ilk kez AnaStok fişi düşecek, bayi o depoların tabletinden kaybolacak.
+- **Kod (lokal, commit YOK):**
+  - `loadsheet_generator.py`: `MAIN_STOCK_THRESHOLD = 200`; `_preload_dealer_cartons` → `Order.id.not_in(<döngüdeki previous_order_id'ler>)` (revizyonla geçersizleşen sipariş toplama girmez); `_cancel_previous_loadsheet` → `station_id` parametresi **kaldırıldı**, iade önceki fişin kendi `assignment.station_id`'sine yazılıyor (`closing_checker._cancel_sheet` ile aynı mantık).
+  - `TerritoryAssignmentPage.tsx:280` bildirim metni "200+".
+  - Yeni `backend/tests/test_main_stock_routing.py` (9 test): sınır (200 / 199 krt+10 pkt / 199 krt+9 pkt / 300), AnaStok kapalı, revizyon çift sayımı, 3 sürümlü zincir, revizyon olmayan siparişlerin toplanması, iadenin önceki fişin istasyonuna gitmesi.
+- **Doğrulama:** Aşamalı TDD — eski kodda 4 kırmızı → sadece eşik 200: çift sayım testleri **kırmızıya döndü** (yalnız eşik değişseydi revizyonlar yanlış yönlenecekti) → çift sayım düzeltmesi → iade düzeltmesi → **9/9 yeşil**. Tüm suite 44 geçti; `test_auth` 1 fail + 1 error **HEAD'de de aynı** (eskiden kalma, test DB'de admin yok). Yeni sorgu lokal Postgres'te (salt okuma) 3 döngüde bağımsız SQL ile 0 fark; **SQLAlchemy'nin ürettiği birebir SQL prod'da 13 döngüde 0 fark**, değişen yalnız revizyonlu 10 bayi, VAN'da 200+ bayi 1→0. `tsc --noEmit` temiz.
+- **Deploy notları:** gün sonunda yapılmalı (batch arası deploy aynı bayiyi iki istasyona bölebilir). Sunucuda tracked dosyalarda lokal değişiklik var (`.env.prod`, `docker-compose.prod.yml`, `nginx/nginx.conf` M + `.bak` dosyaları) — bu commit onlara dokunmuyor, `git pull` çakışmaz.
+- **Kullanıcı onayı (24.09):** commit + push hemen → kod `b9ff236` (v2.0.85) + bu WORKLOG docs commit'i. **Prod deploy AKŞAM, kullanıcı "deploy" deyince** (operasyon bitince; gün içi batch'ler iki istasyona bölünmesin). AGR/DOG: **AnaStok açık kalıyor**; deploy öncesi iki deponun admini bilgilendirilecek (200+ bayi AnaStok'ta, tablette görünmez, admin ekranından takip).
+- **Sıradaki adım:** akşam deploy → DB yedeği (`pg_dump` → `/opt/akaydepo/yedek/`) → `git pull` → `api web dashboard superadmin` build + `up -d` → doğrulama (container içinde `MAIN_STOCK_THRESHOLD = 200`, VERSION, health, WORKER TIMEOUT 0) → ertesi günün ilk planlamasında AnaStok dağılımını kontrol et (AGR/DOG/KON). SSH şifresi hafızada tutulmuyor — kullanıcıdan.
+
+---
+
+## 2026-09-24 — AnaStok eşiği 300 → 200 talebi: ANALİZ bitti, KOD DEĞİŞMEDİ (kullanıcı ONAYI BEKLİYOR)
+- **İstek:** "300 ve üstü karton sipariş otomatik AnaStok'a aktarılır" kuralı **200 ve üstü** olsun.
+- **Kural nerede:** tek yer `loadsheet_generator.py:14` `MAIN_STOCK_THRESHOLD = 300`; karar `:156` `dealer_total >= eşik and main_stock` (depoda AnaStok istasyonu **aktif** olmalı). `dealer_total` = bayinin döngüdeki **tüm** siparişleri (tüm batch'ler), karton + paket/10 (`_preload_dealer_cartons`). Sadece fiş üretiminde (Planlama Oluştur, son batch) uygulanır; fiş (bayi+batch) idempotent → mevcut fişler yer değiştirmez. Eşik **global** (depo bazlı değil). UI metni: `TerritoryAssignmentPage.tsx:280` ("300+ karton bayiler..."). Dashboard / planlayıcı / testlerde eşik yok.
+- **Sağlık: ÇALIŞIYOR ✅** Lokal KON 31.08 döngüsü (583 fiş, 4 batch): AnaStok 4 fiş = beklenen 4, yanlış 0, kaçan 0. Prod 03.08 (önceki ölçüm): AnaStok 9 = 300+ bayi 9.
+- **200'ün etkisi (lokal KON 31.08, tek gün örneklemi):** ≥300: 4 bayi / 3.522 krt (%17,8) → ≥200: **7 bayi / 4.213 krt (%21,2)**. Taşınacak 3 bayi: D3J003990 (T14, 242,6, İst-2), D3J136399 (T05, 225, İst-4), D3J114183 (T23, 224, İst-3). Normal istasyonlar ~220-240 krt hafifliyor. Eşiğin hemen altında 2 bayi (193,0 / 192,9).
+- **İKİ GİZLİ HATA (gerçek `LoadsheetGenerator` + bellek içi SQLite senaryosuyla kanıtlandı):**
+  1. **Revizyonda çift sayım:** `_preload_dealer_cartons` revizyonla geçersizleşen önceki siparişi de topluyor → revizyonlu bayi ~2 kat sayılıyor (lokal: 49,5 vs gerçek 25,0). 300'de 160→170 revizyon (gerçek 170) AnaStok'a gidiyor; **200'de 110→100 bile gidiyor.** Risk grubu (gerçek toplamı eşiğin yarısı ile eşik arası) 300'de ~6 → 200'de ~17 bayi.
+  2. **İade yanlış istasyona:** `_cancel_previous_loadsheet` tamamlanmış önceki fişin iadesini YENİ fişin istasyonuna yazıyor (`closing_checker` doğrusunu yapıyor: fişin kendi istasyonu). Önceki fiş İst-1'de, revizyon AnaStok'ta ise iade AnaStok'a gidiyor → İst-1 stoğu eksik görünüyor, AnaStok'ta hayalet stok (yeni döngüde sıfırlanıp kayboluyor). Meşru eşik geçişinde de (180→220) oluyor, çift sayımdan bağımsız.
+  Lokal geçmişte ikisi de henüz tetiklenmemiş (6 revizyonun hepsi küçük bayi, aynı istasyonda kaldı).
+- **Diğer notlar:** planlayıcı AnaStok'u bilmiyor (plan ekranındaki istasyon kartonları AnaStok bayilerini de içeriyor; 200'de fark büyür). AnaStok paket no'ları aynı territory'deki normal fişlerle çakışıyor (T03-B01 hem İst-2 hem AnaStok; örneklemde 4 → 7; etikette istasyon adı + RUT + bayi adı ayırıyor → kozmetik). AnaStok stoğu Stok Dağıtım ekranından elle veriliyor → AnaStok'a daha fazla stok gerekecek.
+- **Önerilen paket (onay bekliyor):** (a) eşik 200 + yorumlar + UI metni, (b) `_preload_dealer_cartons`'ta revizyonla geçersizleşen siparişleri (`previous_order_id` ile işaretlenen) hariç tut, (c) iadeyi önceki fişin kendi istasyonuna yaz, (d) senaryo testleri `backend/tests/`. Deploy **gün sonunda** (batch arasında deploy aynı bayiyi iki istasyona bölebilir). Açık sorular: kapsam (tüm depolar / tek depo — tek depo ise `planning_config`'e kolon, şema kuralı geçerli), prod salt-okuma ölçümü (SSH şifresi gerekir).
+- **Yan bulgu:** SessionStart hook'u `tail -n 60 WORKLOG.md` basıyor ama kayıtlar en üste ekleniyor → her oturum **en eski** kayıtları görüyor. Düzeltme önerildi (`.claude/settings.local.json`, git dışı), uygulanmadı.
+
+---
+
+## 2026-09-17 (2) — Konya banının KÖK NEDENİ bulundu: WhatsApp link önizlemesi + sayaç şişmesi 🔍
+- **Tetikleyici:** Konya'dakiler AkayDepo linkini (`/distribution`, `/stock-distribution`) **WhatsApp'ta paylaşıyor**. Meta'nın önizleme getiricisi sayfayı **ofisin kendi IP'sinden** çekiyor, UA: `facebookexternalhit/1.1 Facebot Twitterbot/1.0`. Wazuh kuralı **100192** ("Bot veya crawler User-Agent", level 6) tetikleniyor. 2 Eylül'den beri 7 kez (≈2 günde bir); sonuncusu **16.09 18:13:23 `GET /distribution`** — Konya'nın son isteğiyle birebir aynı an.
+- **Alarmların HEPSİ fnf1-srv05'ten (AkayDepo sunucusunun kendisi).** Önceki oturumda "başka sunucudan gelmiş olmalı" diye düşünmüştüm — yanlıştı: agent alarm saklamıyor, alarmlar sadece manager'da. İndexer sorgusu: 1 Eylül'den beri level≥5 toplam 70 alarm, tamamı fnf1-srv05, kural dağılımı 31101×60, 100192×7, 31122×2, 31120×1. 31101/31120/31122 zaten `_NON_ATTACK_RULE_IDS` ile eleniyor → **filtreden geçen tek kural 100192.**
+- **İKİ AYRI KUSUR birleşince ban çıktı (biri olmasa ban YOK):**
+  1. **Yanlış sınıflandırma:** 100192'nin grubu `wazuai,web_rate_detection,web,suspicious_ua,bot_claim`. `_classify_attack` gruplarda **"web"** ipini yakalayıp olayı `web_attack` (taban 25) sayıyor. Oysa 100192 bir *ipucu* kuralı ("IP kontrolü gerek", level 6) ve `_NON_ATTACK_RULE_IDS` listesinde YOK.
+  2. **Sayaç şişmesi (tüm filoyu etkiliyor):** `autonomous_threat_intel.py` → `INTERVAL_SECONDS=600` (10 dk'da bir) ama `LOOKBACK_HOURS=1` (son 60 dk). Sayaçlar birikiyor (`total_events += ...`, `attack_types` Counter merge) → **aynı alarm 6 kata kadar tekrar sayılıyor.** Ölçüldü: DB olay / gerçek indexer sayısı oranı **3.4× – 89×**, iki IP'de tam **6.0×**.
+- **Skor zinciri (DB kaydıyla birebir):** ~5 gerçek alarm → DB'de **12 olay**. `base = 25 × min(12/5, 3.0) = 60` + `frekans log10(12)×10 = 10.8` + `tenant 5` = **75.8 → 75** ≥ 50 → ban. `ban_count=1`, `blocked_until = 17.09 15:25 UTC` (18:25 TSİ). **Gerçek sayımla (5 olay) skor 36 olurdu — ban ÇIKMAZDI.**
+- **⚠️ SIRADAKİLER — iki gerçek depo kullanıcısı eşiğin 2 olay altında:** `78.173.6.203` (skor 42, 6 olay) ve `178.243.153.174` (skor 42, 6 olay — iPad/AkayPrintBT kullanıcısı). "6 olay" = tek bir link önizlemesinin 6 kez sayılması. **Bir WhatsApp paylaşımı daha = ban** (7 olay→48, 8 olay→54). Tabloda toplam 1302 IP, 758'i ban eşiğinde.
+- **Sıradaki adım (soc-ai projesi, AkayDepo değil):** (a) `_NON_ATTACK_RULE_IDS`'e **100192** ekle, (b) ingest'i idempotent yap (işlenen alert `_id`'lerini hatırla) veya `LOOKBACK_HOURS`'u periyoda eşitle, (c) düzeltmeden önce `78.173.6.203` + `178.243.153.174` panelden whitelist'e alınsın.
+- **Erişim notu:** soc-manager `185.246.113.252:2299` (okyuce, AkayDepo'dan FARKLI şifre). Wazuh manager bu makinenin içinde: container `single-node-wazuh.manager-1`, indexer `single-node-wazuh.indexer-1`, DB `soc-ai-postgres` (`soc` / `soc_main`, tablo `threat_intel_ips`).
+
+---
+
+## 2026-09-17 — Konya siteye giremiyordu: SOC-AI merkezi blocklist IP'yi yanlışlıkla engellemiş ✅ ÇÖZÜLDÜ
+- **Şikâyet:** Konya `depo.akaitech.com.tr`'ye giremiyor, `ERR_CONNECTION_RESET`. Sistem aslında çalışıyordu (dışarıdan HTTP 301 → HTTPS 200, sertifika 03.11.2026'ya geçerli).
+- **Kök neden:** Sunucudaki **SOC-AI merkezi blocklist** (`soc_ai_central_v4` ipset'i, `185.246.113.252:19000` backend'inden 5 dk'da bir sync) Konya'nın IP'si **`85.105.205.57`**'yi yanlış pozitif olarak engel listesine almış. ipset iki zincirde birden DROP ediyor: `INPUT` (tüm sunucu) **ve `DOCKER-USER`** (nginx container'ının 80/443'ü) → web erişimi kesiliyor.
+- **Suçlu OLMAYANLAR (elendi):** fail2ban (inactive), nginx `deny`/rate-limit (yok), sertifika (geçerli), ufw (80/443 açık), uygulama container'ları (sağlıklı).
+- **Kimlik doğrulaması:** IP son 72 saatte 1132 istek — başarılı login + `POST /v1/cycles/import` + plan oluşturma, Windows Chrome. Sorguladığı istasyonlar (`İstasyon-1`, `İstasyon-2`, `AnaStok`) DB'de **KON / Konya Deposu**'na bağlı. Son isteği **16.09 18:13**, 17.09'da sıfır istek → şikâyetle birebir uyuştu.
+- **Blok listesindeki diğer 2 "kullanıcı" IP'si gerçek saldırgandı** (`/login.asp`, `/_vti_bin/sites.asmx` taramaları) — doğru engellenmişler. Tek yanlış pozitif Konya'ydı.
+- **Çözüm (kullanıcı uyguladı):** IP, soc-manager panelinden (`fnf1 SOC Manager > AR Whitelist`) "Konya Depo" açıklamasıyla whitelist'e eklendi. 14:29 sync'i 10 whitelist kaydını çekti, ipset'ten 3 IP düştü (80 → 77). **Doğrulandı:** `ipset test` → blokta değil, `/var/ossec/etc/ar-whitelist.txt` satır 23'te. Sunucuda hiçbir elle değişiklik YAPILMADI (kalıcı, doğru katmandan çözüldü).
+- **Sync script mantığı (öğrenildi):** `/usr/local/bin/soc-ai-central-blocklist-sync.sh` satır 198-201 lokal whitelist'i blocklist'ten `comm -23` ile çıkarır → whitelist blocklist'i **ezer**, sync sonrası kalıcıdır.
+- **AÇIK KONU / sıradaki adım:** Konya'nın **neden** engellendiği belli değil — bu sunucunun Wazuh loglarında (`alerts.log`, `active-responses.log`) bu IP'ye dair hiç kayıt yok, karar merkezi backend'de verilmiş. Panelden tetikleyen kural bulunmalı (muhtemel brute-force yanlış pozitifi). **Risk:** Türk Telekom IP'si dinamik — IP değişirse aynı sorun yeni IP'yle tekrarlar. Gerekirse `/24` bloğu whitelist'e alınabilir (ayrıca karar verilecek).
+- **Teşhis refleksi (sonraki oturum için):** Bir depo "siteye giremiyorum" derse ve site dışarıdan açılıyorsa → **önce `sudo ipset list soc_ai_central_v4 | grep <IP>`**. `ERR_CONNECTION_RESET` + site ayakta = IP bazlı engel.
+
+---
+
+## 2026-09-03 — Konya döngüsünde 3. Excel yüklemesinin 6 siparişi CANLIDAN SİLİNDİ (yedekli, doğrulandı) ✅
+- **İstek:** Konya'nın 03.09 döngüsünde `Excel.4535dabb-…` (14:47–14:50, 6 bayi) yüklemesiyle gelen kayıtlar görünmesin. Kullanıcı kararı: **sadece siparişler silinsin, bayi kayıtları kalsın.**
+- **Neden güvenliydi (silme öncesi ölçüldü):** batch 3'ün **0 yükleme fişi** vardı (o yüklemeden sonra planlama hiç çalıştırılmamış), **0 stok hareketi**, 6 siparişin **hiçbiri revizyon değildi** (`is_revision=false`, `previous_order_id=YOK`) ve **hiçbir sipariş `previous_order_id` ile batch 3'e bağlı değildi**. 6 bayinin tümü bu yüklemeyle sisteme ilk kez girmiş (tüm döngülerde 1 sipariş, 0 fiş).
+- **Araya batch 4 girdi — kontroller TEKRARLANDI.** İlk analizden sonra 15:22'de 49 siparişlik yeni yükleme yapılmış (224 sipariş / 218 fiş oldu). Silmeden hemen önce tüm güvenlik sorguları yeniden çalıştırıldı: batch 4 batch 3'ü revize etmemiş (bağlı kayıt 0), 6 bayi batch 4'te yok, batch 3 hâlâ 6 sipariş / 63 satır / 0 fiş.
+- **Yedek:** `/opt/akaydepo/yedek/akaydepo_20260903_154503_batch3_silme_oncesi.sql.gz` (1.1 MB, gzip bütünlüğü + 23 tablo doğrulandı).
+- **Uygulama:** Tek `DO $$` bloğu, **üç guard** ile — (1) batch 3'ün fişi varsa iptal, (2) batch 3'e bağlı revizyon varsa iptal, (3) silinen sayı 6 sipariş / 63 satır değilse iptal. Guard'lardan biri patlasa `RAISE EXCEPTION` işlemi tümüyle geri alacaktı. Sonuç: **63 satır + 6 sipariş + 1 `cycle_imports` kaydı** silindi.
+- **Doğrulama:** döngü siparişi 224→**218**, döngü bayisi 221→**215**, **fiş 218 (değişmedi)**, batch 3 siparişi/satırı **0**, yükleme geçmişi artık `1, 2, 4` (3 numara kayboldu — kozmetik, bir sonraki yükleme batch 5 olur, çakışma yok). 6 bayi kaydı **duruyor**, hepsi 0 sipariş / 0 fiş. **Yetim kayıt 0** (siparişsiz `order_line` 0, siparişsiz fiş 0). API 200, son 3 dk hata 0.
+- **Not:** "yüklenmiş fiş" 198→202 çıktı — silmeyle ilgisi yok, o dakikalarda depo 4 fiş daha tamamlamış (canlı operasyon).
+- **Öğrenilen:** `planning.py` yalnızca **en son batch** için fiş üretiyor (`only_batch=max(import_batch)`). Bir batch yüklenip planlama çalıştırılmadan yenisi gelirse, **aradaki batch'in siparişleri hiç fişe dönüşmüyor** — batch 3'ün fişsiz kalmasının sebebi buydu. Sessiz bir veri kaybı riski; ileride "planlanmamış batch var" uyarısı düşünülebilir.
+
+---
+
+## 2026-09-03 — Muş'ta "planlama hatası" teşhisi: KOD DEĞİL, KONFİGÜRASYON (düzeltmeyi depo yetkilisi yapacak)
+- **Şikâyet:** Excel yüklendikten sonra "Planlama Oluştur" → `Plan oluşturma hatası: Döngüde sipariş bulunamadı`. Kullanıcı yeni deploy'la ilgili olabileceğinden şüphelendi.
+- **Kök neden:** Muş'ta **3 territory'nin 3'ü de Park istasyonuna atanmış** (`TERR042101-Muş Merkez`, `TERR042102-Malazgirt`, `TERR042103-Varto` → hepsi `Park`). Park'a atanan bölgeler tasarım gereği planlama/fiş/stok hesabından tamamen dışlanıyor (`station_planner.py:85-87`); üçü de Park'ta olunca `territory_loads` boş kalıyor ve `:90` bu boş listeyi "sipariş yok" sanıp yanıltıcı mesajı basıyor. **Veri sağlam:** döngüde 13 sipariş / 13 bayi / 334 karton duruyor. Muş'ta İstasyon-1 aktif ama hiçbir bölge ona bağlı değil; İstasyon-2/6/7/8 ve AnaStok pasif.
+- **YENİ DEPLOY İLE İLGİSİ YOK — doğrulandı.** `station_planner.py`'ye dokunulmadı (son değişikliği ağustostaki `4c1c0f7`). 31.08 deploy'undaki üç commit yalnızca kapanış kontrolü dosyaları + `cycles.py` silme sırası + `main.py` router/şema kilidi + frontend'e dokundu. Park filtresi de **depo bazlı** (`_depot_id` hem park istasyonlarını hem `station_territory_map`'i filtreliyor) → depolar birbirine karışmıyor.
+- **Tarama:** Tüm bölgeleri Park'ta olan **tek depo Muş**. Diğer 12 depo sorunsuz plan üretiyor (03.09'da DOG 9 batch, VAN 2, AGR/BIT birer batch — hepsi fiş üretti).
+- **Ekrandaki `4abb3a10-…` döngüsü DB'de yok** — o denemeden sonra "Yeni Döngü Başlat" yapılıp 12:36'da yeniden yüklenmiş; yeni döngüde de aynı durum sürüyordu (13 sipariş, 0 fiş, 0 plan).
+- **KARAR (kullanıcı, 03.09): Düzeltmeyi Muş depo yetkilisi kendisi yapacak** (Territory Atama ekranından 3 bölgeyi İstasyon-1'e taşıyarak). Prod'a dokunulmadı, salt okuma yapıldı.
+- **AÇIK ÖNERİ (onay bekliyor):** `station_planner.py:90` mesajı yanıltıcı. Sebep park'sa *"Tüm bölgeler Park'ta — planlanacak bölge yok"* yazsın; sipariş gerçekten yoksa mevcut mesaj kalsın. Küçük değişiklik, bir dahaki teşhis dakikalar sürer.
+
+---
+
+## 2026-09-01/02 — AkayPrintBT TestFlight süresi doldu → build 3 yayında; 3 Apple kapısı + Info.plist sürüm bug'ı
+- **Şikâyet:** Sahada iPad'de *"AkayPrintBT Betanın Süresi Doldu"*, Bluetooth yazdırma durdu.
+- **Sebep:** TestFlight build'leri yüklendikten **90 gün** sonra doluyor, uzatılamıyor. Build 2 (3 Haz 2026) → **1 Eyl'de doldu**; build 1 (2 Haz) → 31 Ağu'da. Tek çare yeni build yüklemek.
+- **YÜKLEMEYİ ÜÇ APPLE KAPISI BLOKLADI** (hepsi `403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED` veriyordu):
+  1. **Apple Developer Program License Agreement** güncellenmiş — `developer.apple.com/account` → "Review agreement" (yalnızca Account Holder kabul edebilir).
+  2. **Free Apps Agreement** kendini yenilemiş (`Active (New Agreement Available)` → `Active`, 1 Eyl 2026 – 18 May 2027).
+  3. **Digital Services Act beyanı** (App Store Connect → Business, kırmızı kutu) — asıl inatçı olan buydu. AkayPrintBT App Store'da yayınlanmıyor, sadece TestFlight ile Türkiye'deki personele dağıtılıyor → **"I'm not a trader under the DSA / EU'da dağıtım planlamıyorum"** seçildi.
+  - **Teşhis ipucu:** `GET /v1/apps` 403 verirken `GET /v1/builds` 200 veriyorsa engel hesap seviyesindedir; hata gövdesindeki `links.see: "/business"` doğrudan eksik maddeyi gösterir. Anlaşmalar kabul edilince REST API hemen açıldı ama **yükleme servisi ~1 dk geriden geldi** (14:18 başarısız → 14:19 başarılı).
+- **KOD BUG'I BULUNDU VE DÜZELTİLDİ:** `App/Info.plist` elle tutuluyor (`GENERATE_INFOPLIST_FILE: NO`) ve `CFBundleVersion` **sabit `1`** yazılıydı → `project.yml`'deki `CURRENT_PROJECT_VERSION` hiç uygulanmıyor, archive hep build 1 çıkıyordu. Düzeltilmeseydi yükleme "bu build zaten var" diye reddedilecekti. Artık `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)` kullanıyor; archive `1.0.0 (3)` doğrulandı. **Bu düzeltme AkayPrintBT repo'sunda henüz COMMIT EDİLMEDİ.**
+- **Sonuç:** build **1.0.0 (3)** yüklendi (1 Eyl 14:20), işlendi, `akay` iç grubuna düştü. Saha güncelledi: Konya (iPad mini) **2.141 oturum**, Niğde (iPad Air) 10 oturum — BT yazdırma çalışıyor. **Sıradaki süre sonu ~30 KASIM 2026.**
+- **Yeni testçi tuzağı (02.09):** `akayvanpm65@gmail.com` iç gruba eklendi ama `No Builds Available` diyordu. Rol/erişim doğruydu (APP_MANAGER, uygulama görünür), grup build 3'ü içeriyordu, bekleyen ASC daveti yoktu — sorun, **build dağıtıldıktan sonra eklendiği için davetin hiç tetiklenmemesiydi** (API'de `NOT_INVITED`). `POST /v1/betaTesterInvitations` ile davet açıkça gönderildi → durum anında `Invited` oldu.
+- **AÇIK İŞLER:** (1) iOS repo'sunda Info.plist/project.yml düzeltmesi commit bekliyor — o repo'da kullanıcının dokunmadığım başka değişiklikleri de var (app icon'ları, `project.pbxproj`, silinmiş scheme). (2) Apple hesabında **otomatik yenileme için kayıtlı kart yok** uyarısı duruyor — üyelik biterse uygulama komple düşer. (3) `muzaffer.uzer@akaygrup.com.tr` 2 Haz'dan beri `Invited`, hiç kurmamış.
+- **Detaylı runbook:** `memory/testflight-90-gun-suresi.md` (hafızaya yazıldı).
+
+---
+
 ## 2026-08-31 — Sipariş Kontrol PROD'A DEPLOY EDİLDİ (v2.0.83) + startup şema yarışı düzeltildi ✅
 - **Deploy:** `37.148.212.187:2299`, `/opt/akaydepo`. İki tur: `1688f3b` (özellik, v2.0.82) → `916b921` (yarış düzeltmesi, v2.0.83). Her turda **4 app container'ın hepsi build edildi** (`api web dashboard superadmin`).
 - **DB güvenliği:** Deploy öncesi tam yedek alındı — `/opt/akaydepo/yedek/akaydepo_20260831_234306_deploy_oncesi.sql.gz` (2.0 MB, gzip bütünlüğü doğrulandı, 22 tablo). Deploy sonrası **11 tablonun sayımı birebir aynı**: fiş 1580 · fiş satırı 15705 · sipariş 1605 · sipariş satırı 15911 · bayi 1596 · döngü 12 · stok hareketi 14277 · depo 13 · territory 58 · istasyon 62 · kullanıcı 37.
@@ -18,6 +119,8 @@
 - **DİKKAT — runbook düzeltildi:** `up -d api web dashboard superadmin` bu sefer `redis`'i **"Recreated"**, `postgres`'i yeniden başlattı (uptime 4 gün → 33 sn). Hafızadaki "db/redis'e dokunmaz" gözlemi her zaman geçerli değil. **Veri güvende** çünkü postgres named volume'de (`akaydepo_postgres_data`) — ama bundan sonra deploy öncesi yedek şart. Ayrıca db container'ının adı `akaydepo_postgres_prod` (`akaydepo_db_prod` değil).
 - **Lokal test notu:** Kullanıcı 17:20'de lokalde kendi eliyle "Yeni Döngü Başlat" yapıp 26112025'in 4 Excel'ini yükledi (583 sipariş / 577 bayi / 583 fiş), 17:21'de kapanış kontrolünü çalıştırdı → `✅ 577 bayi birebir tutuyor`. `closing_checks` kaydı `analyzed`, iptal 0 — **analiz hiçbir veriye dokunmuyor**, tasarım doğrulandı.
 - **Sıradaki adım:** Sahada ilk gerçek kapanışı bekle. İptal çıkarsa akış: kırmızı tablo → "İptalleri Uygula" → tarayıcı onayı → fiş iptali + tamamlanmışsa stok iadesi (`closing_cancel` hareketi). B/C/D vakaları sadece raporlanıyor; kullanıcı "tek tek seçmek istiyorum" derse satır bazlı onay kutusu eklenecek.
+
+---
 
 ## 2026-08-31 — Gün sonu "Sipariş Kontrol": kapanış Excel'i ile kaçırılan iptalleri bulup fişe yansıtma (LOKAL DOĞRULANDI, commit/deploy BEKLİYOR)
 - **Problem:** Gün içinde gelen parçalı Excel'ler **artımlı** — her dosya yalnızca o pull anına kadarki yeni/değişmiş siparişleri taşıyor (26.11 verisinde dosyaların saat aralıkları ayrık: 08:37-13:13 / 13:18-14:40 / 14:41-15:45 / 15:47-16:59, sipariş kodu çakışması 0). Bayi siparişini **revize** ederse yeni kodla gelir ve sistem yakalar; **iptal** ederse hiçbir dosyada iz kalmaz → fişi yüklemeye devam ediyoruz. Çözüm: akşam gelen, günün tamamını kapsayan "kapanış" Excel'i ayrı bir ekrandan yüklenip döngüyle karşılaştırılıyor.
@@ -39,6 +142,8 @@
   - **HTTP (TestClient, gerçek auth):** tablet 403, deposuz superadmin 403, tokensiz 403, SEY admini Konya dosyasını yükleyemiyor, SEY başkasının kontrolünü apply edemiyor (403), SEY geçmişi boş. `npx tsc --noEmit` + `npm run build` temiz.
 - **Sıradaki adım:** Kullanıcı lokalde denesin; onay verirse commit + push + prod deploy (4 app container da build). Prod'da migration elle çalıştırmak **gerekmiyor** (startup güvencesi var) ama istenirse `alembic upgrade head` de güvenli.
 
+---
+
 ## 2026-08-23 — Zebra bulut yazdırma 429 "Quota Violation": ÜCRETSİZ PLAN GÜNLÜK 100 ÇAĞRI SINIRI DOLDU (teşhis kesin, KARAR BEKLİYOR)
 - **Şikâyet:** Konya sahada "Online Print" → `Zebra bulut hatası (429): {"code":"429","message":"Quota Violation","info":"Quota rate limit has been exhausted."}`
 - **Kök neden — kesin, ölçüldü:** `Send-File-To-Printer-**Free**` planı **API anahtarı başına günde 100 çağrı**. Prod loglarında bugün (23.08, UTC) **tam 102 `cloud-print` çağrısı**: **100 tanesi 200 OK**, 101. ve 102. **502** (bizim `ZebraCloudError` sarmalayıcımız). Saatlik: 10→18, 11→8, 12→27, 13→33, 14→16. Kota 14:34 UTC'de (17:34 TR) tükendi.
@@ -59,6 +164,7 @@
 - **Sahaya söylenecek:** Online Print günde 100 fişten sonra ölüyor; o noktadan sonra **"Yazdır"** butonuyla devam edilecek (BT yolu çalışıyor, bugün zaten 234 fiş oradan basıldı). Kota her gece sıfırlanıyor.
 - **Sıradaki adım:** Konu açık kaldı — Konya her planlama gününde 100'ü aşacağı için tekrarlayacak. Kullanıcı istediğinde PPC planı (~$40/ay, kod değişikliği yok) veya toplu gönderim (kod, ~10x tasarruf) masaya gelsin.
 
+---
 
 ## 2026-08-16 — `parent_loadsheet_id` düzeltmesi: batch filtresinde revizyon artık belli (LOKAL DOĞRULANDI, commit/deploy BEKLİYOR)
 - **Sorun:** Tek batch filtresi seçilince revizyonun sadece bir yarısı görünüyordu; yeni fişin durduğu batch'te kart sıradan bir `FİŞ-1` gibi duruyor, turuncu rozet çıkmıyordu (ölçüm: batch 3'te 0/8 revizyon belli).
@@ -80,64 +186,3 @@
   - Prod DB sağlam (salt okuma): **1257 fiş / 1236 bayi / 10 döngü / 21 revizyon / parent_dolu=0** (backfill yapılmadığı için 0 beklenen değer).
   - Not: prod DB kullanıcısı `akaydepo` (repo `.env.example`'daki `depo` DEĞİL); `docker exec ... printenv POSTGRES_USER` ile alınır.
 - **Sıradaki adım:** Sahada izle — bundan sonra gelen revizyonlarda batch filtresi seçiliyken kart `2 Fiş` turuncu rozetiyle ve iptal edilen fişle birlikte görünmeli. Prod'daki mevcut 21 revizyon kaydı eski davranışta kalır (bilinçli karar).
-
-
-## 2026-08-16 — Revizyon turuncusu: YANLIŞ ALARM, sistem sağlıklı — kod DEĞİŞMEDİ ✅
-- **Sonuç:** Şikâyet doğrulanmadı. Revizyon göstergesi çalışıyor, **hiçbir düzeltme yapılmadı, yapılmamalı.** Gelecek oturum bunu "hata" sanıp `groupLoadsheetsByDealer`'a dokunmasın.
-- **Ayrım — iki ayrı turuncu var, karıştırmayın:**
-  1. **Turuncu "N Fiş" rozeti** (`LoadsheetListPage.tsx:1116`, koşul `group.loadsheets.length > 1`) → **revizyon göstergesi budur.** Bayide birden fazla fiş olunca turuncu yanar. Çalışıyor.
-  2. **Turuncu kart arka planı** (`cardColor === 'orange'`, koşul "bazıları tamamlandı") → revizyon göstergesi değil, "kalan iş var" göstergesi. Yeni fiş tamamlanınca yanar, "⚠ Ek Fiş" etiketiyle.
-  15.08'de sadece (2)'ye bakıp "turuncu gitmiş" sonucuna varmıştım; kullanıcının aradığı işaret (1)'di.
-- **Kullanıcının saha doğrulaması (ekran görüntüsü):** `D3J217000` — turuncu "2 Fiş" rozeti + kartta iptal ve yeni fiş birlikte, kart arka planı beyaz (henüz tamamlanmadı). `D3J004775` — tamamlandıktan sonra kart turuncu + "⚠ Ek Fiş". Kullanıcı: "sistem eskisi gibi sağlıklı çalışıyor, yanlış alarm".
-- **Ölçüm ekran görüntüleriyle birebir uyuştu:** Kullanıcının kendi lokal test verisi (KON, plan_date 2026-08-16, 3 batch, 633 fiş, **15 revizyon**) gerçek `get_station_loadsheets` endpoint'inden çekilip gerçek `groupLoadsheetsByDealer`'dan geçirildi. 15 revizyon grubunun 14'ü gri kart / 1'i turuncu (`D3J004775` — çünkü yeni fişi `loaded`). Görsellerdeki iki bayi de tam bu sonuçlarla eşleşti. **Kartta iptal + yeni fiş birlikte görünüyor: 15/15.**
-- **Kalan (gerçek ama acil değil) teknik borç — batch filtresinde revizyon kayboluyor.** Ölçüldü (15 revizyonlu bayi, gerçek endpoint + gerçek kart render mantığı, `isCancelled`/`FİŞ-N` hesabı dahil):
-  | Filtre | Kartta görünen | Turuncu rozet | Revizyon belli |
-  |---|---|---|---|
-  | Tümü | 15 | 15 | **15/15** |
-  | Batch 1 | 11 | 0 | 11/11 |
-  | Batch 2 | 11 | 0 | **4/11** |
-  | Batch 3 | 8 | 0 | **0/8** |
-  **Doğru kural** (kullanıcının "1. Excel / 2. Excel" modelinden daha genel): tek batch seçilince çiftin sadece bir yarısı görünür. *İptalin durduğu* batch → kırmızı kart + ❌İPTAL (iptal belli, ama "revizyon yüzünden" olduğu belli değil). *Yeninin durduğu* batch → sıradan `FİŞ-1`, beyaz rozet, hiçbir revizyon işareti yok. 3 Excel'de iki revizyon dalgası olduğu için batch 2 karışık çıkıyor (4 bayinin iptali orada, 7 bayinin yenisi orada).
-  **Sebep:** yeni fiş üretilirken `parent_loadsheet_id` doldurulmuyor (`loadsheet_generator.py:263-275`); backend'deki "batch filtresi varsa ebeveyni de listeye kat" kodu (`loadsheets.py:143-149`) bu yüzden ölü. **Düzeltme yapılmadı — kullanıcı istemedi.**
-- **Bu oturumun artefaktları temizlendi:** `data/test-revizyon-batch2.xlsx` ve `akaydepo_revtest` DB kopyası silindi (ikisi de kullanılmamıştı; kullanıcı kendi Excel'leriyle test etti).
-
-
-## 2026-08-16 — Lokal ortam bir daha bozulmasın: `.env.local`'deki sabit IP → mDNS adı
-- **Şikâyet:** "Lokal çalışmıyor." Sayfa açılıyordu ama hiçbir veri gelmiyordu.
-- **Kök neden:** DHCP gece makinenin IP'sini **192.168.1.3 → 192.168.1.36** yaptı; `frontend/.env.local` hâlâ eski adrese bakıyordu (`curl` → `000`, erişim yok). Servisler ayaktaydı, sorun konfigürasyondaydı. Bu **üçüncü** tekrar: `10.129.47.100` → `192.168.1.3` → `192.168.1.36`.
-- **Kalıcı çözüm:** `.env.local`'e artık sabit IP yazılmıyor; Bonjour/mDNS adı kullanılıyor → `VITE_API_URL=http://oguzs-macbook-pro.local:8001`. Bu ad Mac'te `127.0.0.1`'e, ağdaki iPad/tabletten makinenin **güncel** IP'sine çözümlenir; IP değişse de bozulmaz. `backend/.env` CORS listesine `oguzs-macbook-pro.local` (8000/8050/8100) + güncel IP eklendi. İkisi de git'e girmiyor (lokal dosyalar), kod değişmedi.
-- **Doğrulama (gerçek tarayıcı):** `http://localhost:8000` → giriş sayfası açıldı, depo listesi doldu; network kaydında `GET http://oguzs-macbook-pro.local:8001/v1/auth/depots/public` → **200**, konsolda hata yok. CORS başlıkları hem `localhost:8000` hem `oguzs-macbook-pro.local:8000` origin'i için doğru dönüyor. Tablet yolu (`http://192.168.1.36:8000`) → 200.
-- **Bilinen küçük pürüz:** Vite dev sunucusu `http://oguzs-macbook-pro.local:8000` isteğine **403** veriyor (Vite host koruması). Sayfayı isimle açmak için `vite.config.ts`'e `server.allowedHosts` gerekir — tracked dosya olduğu için dokunulmadı. Tablet sayfayı IP ile açıyor, API çağrısı zaten sabit isme gidiyor.
-- **Sıradaki adım:** Değişmedi — turuncu kart testi (aşağıdaki 15.08 kaydı) hâlâ bekliyor.
-
-
-## 2026-08-15 — "Revizyonda turuncu kart gitmiş" şikâyeti: kök neden bulundu (KAPANDI — yanlış alarm, 16.08 kaydına bak; DÜZELTME YAPILMADI)
-- **Şikâyet:** Kullanıcılar "revizyon siparişlerinde yükleme fişi kartı turuncu oluyordu, bu özellik gitmiş" diyor.
-- **Lokal ortam:** Servisler yeniden başlatıldı — api `:8001` (`--reload` ile; önceki süreç 14 gündür `--reload`'suz bayat kodla dönüyormuş), web `:8000`. API v2.0.78. `frontend/.env.local` eski ağ IP'sini (`10.129.47.100`) gösteriyordu, o IP artık makinede yok → `192.168.1.3` yapıldı; `backend/.env` CORS listesine de aynı IP eklendi (ikisi de git'e girmez / lokal).
-- **İlk bulgu — beklenti ile kod uyuşmuyor:** Operasyon listesindeki (`LoadsheetListPage`) turuncu **hiçbir zaman** `is_revision`'a bağlı olmamış. İlk günden beri (f571853, 14.11.2025) anlamı "grupta bazı fişler tamamlandı, bazıları bekliyor" (rozet: `⚠ Ek Fiş`). Yani turuncu, revizyonlarda **dolaylı** olarak çıkıyordu: revizyon gelince bayinin tamamlanmış B1 fişi + yeni B2 fişi aynı grupta olduğu için sayaç 1/2 oluyordu.
-- **KÖK NEDEN:** `loadsheet_generator.py:478-482` (`_cancel_previous_loadsheet`) revizyonda önceki fişi iptal ederken `completed_at` **ve** `loaded_at` alanlarını `None` yapıyor ("hazırlanan hesaplarından düşsün" gerekçesiyle). Frontend'in renk sayacı ise `completed_at !== null || status === 'loaded'` bakıyor → sayaç **1'den 0'a** düşüyor → kart turuncu yerine **gri**. Bu satırlar **40a1611 (08.12.2025)** ile gelmiş; revizyon sistemi 14.11.2025'te çıkmıştı → "3 hafta çalıştı sonra kayboldu" tarifiyle birebir uyuşuyor.
-- **Kanıt (parafraz değil):** `LoadsheetListPage.tsx`'teki gerçek `groupLoadsheetsByDealer` fonksiyonu esbuild ile Node'da çalıştırıldı. Tamamlanmış fişe revizyon → **şu an `gray`, 40a1611 öncesi `orange`**. Kontrol senaryosu (revizyon değil, düz ek fiş: B1 loaded + B2 pending) → hâlâ `orange`, yani turuncunun kendisi bozuk değil, sadece revizyon senaryosu bu daldan düşmüş.
-- **İkinci (gizli) hata:** `parent_loadsheet_id` modelde var ve `loadsheets.py:145`'te okunuyor ama **hiçbir yerde atanmıyor** → batch filtresi seçilince "ebeveyn fişi de listeye kat" kodu ölü; o görünümde grup tek fişe düşüyor.
-- **Not:** Tablet ekranındaki turuncu `REVİZYON` rozeti sağlam — aynı endpoint `is_revision` döndürüyor, `TabletPage.tsx:183` onu okuyor. Bozulan sadece operasyon listesindeki kart rengi.
-- **Önerilen düzeltme (uygulanmadı, onay bekliyor):** `completed_at = None` satırını geri almak YANLIŞ olur (dashboard "hazırlanan" sayıları şişer). Doğrusu rengi revizyondan haberdar etmek: `Loadsheet` arayüzüne `is_revision` eklenip turuncu koşuluna `hasRevision = lsList.some(ls => ls.is_revision || ls.cancelled_by_revision)` katılmalı; rozet de o durumda `⚠ Revizyon` yazmalı.
-- **Test verisi hazır:** `data/test-revizyon-batch2.xlsx` — lokal KON döngüsünün (`b1056c0a…`, plan_date 2026-04-06) batch-1 siparişlerinden üretildi; fişi `loaded` olan 3 bayi (D3J122328 / D3J072286 / D3J151635, hepsi TERR030701-Bosna-Hersek, İstasyon-2), ilk ürünlerine +3 karton. Teslimat tarihi batch-1 ile aynı (2025-11-15) — revizyon tespiti bayi+territory+teslimat tarihi ile yapıldığı için şart. Gerçek `ExcelParser` ile doğrulandı (36 satır / 3 sipariş / 3 bayi).
-- **Kullanıcı kararı (15.08):** Düzeltme **henüz uygulanmadı** — önce kullanıcı mevcut (gri) davranışı kendi görmek istedi. Lokal DB'ye de dokunulmadı (Excel yüklenmedi, KON verisi olduğu gibi duruyor). Kod ve veri değişmemiş durumda; sadece servisler + `.env` IP'leri güncel.
-- **Sıradaki adım:** Kullanıcı UI'da `data/test-revizyon-batch2.xlsx`'i yükleyip "Planlama Oluştur" ile gri davranışı doğrulayacak; onaydan sonra `hasRevision` düzeltmesi uygulanıp aynı senaryo tekrar edilecek.
-
-
-## 2026-08-03 — Konya'da "Planlama oluşturma başarısız" (502): teşhis + N+1 düzeltmesi (commit + push + prod deploy ✅)
-- **Şikâyet:** Konya Excel import'u başarılı (döngü `f58e0dbb-fac6-4438-a1b7-a2cfbff6e940`, 564 bayi) ama "Planlama Oluştur" → `502` + "Planlama oluşturma başarısız". Kullanıcının ilk sorusu "Excel'de mi hata var?" → **hayır**.
-- **Teşhis (canlı, kanıtlı):** Hata 500 değil **502** → uygulama hatası değil, worker ölümü. `planning.py:67` her uygulama hatasını 500 + Türkçe metne çeviriyor, o gelmemiş. Prod api loglarında `[CRITICAL] WORKER TIMEOUT` yağmuru; nginx'teki `POST .../f58e0dbb.../plan 502` saatleri (17:40:47, 17:41:09, 17:42:13, 17:43:27) WORKER TIMEOUT saatleriyle **birebir** eşleşiyor. `POST /v1/cycles/import` de aynı sebeple 502 veriyordu (kullanıcı defalarca denemiş).
-- **Kök neden:** `docker-compose.prod.yml` gunicorn `--timeout 30` + planlama kodundaki N+1. Manuel modda (`KON: auto_planning_enabled=f`) `station_planner.py:173` **her territory için** `_calculate_territory_loads()`'u baştan çağırıyor; o da order başına 2 sorgu atıyor. Canlı ölçüm: tek çağrı **2,66 sn** × 15 territory ≈ **40 sn** > 30 sn → fiş üretimi başlamadan worker SIGKILL. nginx `proxy_read_timeout 300s` devreye bile girmiyor.
-- **Neden sadece Konya:** KON 564 order / 6.962 satır / 15 territory — diğer depoların 3-4 katı (KAR 136, VAN 184, NIG 159). Hepsi aynı gün sorunsuz planlandı (assigns+sheets dolu), KON'da `assigns=0, sheets=0`. Yani ölçek eşiği aşıldı, veri bozuk değil.
-- **Düzeltme:** (1) `_calculate_territory_loads` → tek SQL aggregate (`outerjoin` + `coalesce`, satırsız order'ın territory'si 0 ile korunur) + cycle bazında cache; (2) `_calculate_current_station_loads` iç içe döngüler yerine aynı cache'ten okuyor; (3) `loadsheet_generator._get_dealer_total_cartons` (bayi başına sorgu) → `_preload_dealer_cartons` tek aggregate; (4) gunicorn `--timeout 30→180`, `--graceful-timeout 15→30` (import 502'lerini de kapatır).
-- **Doğrulama (canlı DB, salt okuma):** territory yükleri eski Python vs yeni SQL → **123x hızlı (2,623→0,021 sn), 0 fark**, toplam karton 21.077,5 ↔ 21.077,5. Bayi kartonları → **72x (2,861→0,040 sn), 564/564 bayi aynı, 0 fark**, AnaStok eşiğini aşan 9 bayi ↔ 9. `py_compile` temiz.
-- **Karar:** Timeout artışı tek başına yeterli değil (semptomu geciktirir); asıl çözüm N+1'in kaldırılması. İkisi birlikte gidiyor.
-- **Commit/Push:** `4c1c0f7`, pre-commit hook v2.0.74 → **v2.0.75**.
-- **Deploy (TAMAM ✅):** `git pull` (09c4e1b→4c1c0f7) + **4 app container da build** (`api web dashboard superadmin`) + `up -d`. `db`/`redis` yeniden yaratılmadı (2 aydır Up, veri güvende). Doğrulandı: api `Up (healthy)` + `VERSION = "2.0.75"`, container içindeki `/proc/1/cmdline` → `--timeout 180 --graceful-timeout 30` aktif, yeni kod (`_preload_dealer_cartons`, `_territory_loads_cache`) image'da mevcut, https://depo.akaitech.com.tr 200 / 0,18 sn, `/v1/auth/depots/public` 200 / 0,10 sn, deploy sonrası **WORKER TIMEOUT sayısı 0**.
-- **SONUÇ — sahada çalıştı ✅ (18:05, kullanıcı ekrandan bastı):** `POST .../plan` → **200** (öncesi 17:43:27 → 502), **WORKER TIMEOUT 0**. DB: 564 sipariş → **564 fiş**, 22 atama, 15 territory'nin hepsi karşılandı. Dağılım İstasyon-2: 177 · İstasyon-3: 197 · İstasyon-4: 181 · **AnaStok: 9** — bu 9, deploy öncesi ölçülen "300+ karton eşiğini aşan 9 bayi" ile **birebir** aynı, yani yeni toplu sorgu iş mantığını bozmadı. İstasyon-1 ve -5 boş çünkü ikisi de `active=false` (Konya 3 istasyonla çalışıyor, beklenen). iPad'den `GET .../plan` 200 → tabletler planı görüyor. Plan oluşturmayı bilerek ben tetiklemedim (istasyon sayısı operasyon kararı).
-- **Diğer depolar taraması (kullanıcı sorusu: "aynı sorun başka depoda çıkar mı?") → HAYIR.** (1) Düzeltme depo bazlı değil, ortak kodda — hepsi faydalandı. (2) Hacim: KON 564 sipariş, ikinci sıradaki NIG 227, sonra VAN 184 / KAR 136 / gerisi ≤107 → Konya ikincinin **2,5 katı**, kimse eşiğe yakın değil. Sistem geneli küçük: 12 döngü, 1.595 fiş, 17.130 fiş satırı. (3) **Kritik ayrım:** patlayan hata *kuadratikti* (territory × sipariş); kalan ağır endpoint'ler **lineer** ölçekleniyor, yani ani uçurum yok.
-- **Canlı endpoint ölçümleri (GET, salt okuma, superadmin ile):** fiş listeleme `~7 ms/fiş` lineer → VAN 74 fiş 0,43 sn · NIG 137 fiş 0,86 sn · **KON 197 fiş 1,38 sn** (en yavaş istasyon). Dashboard depo özeti: KAR 0,48 · VAN 0,69 · NIG 0,68 · **KON 2,00 sn**. Düzeltilen uçlar artık ucuz: `GET /cycles/{id}/plan` **0,15 sn**, `/status` 0,15 sn. En yavaş uç (2 sn) ile yeni timeout (180 sn) arasında **~90x pay** var.
-- **Kalan teknik borç (bu düzeltmenin kapsamı dışında):** `_get_dealer_count_for_territory` hâlâ territory başına order çekiyor (15 sorgu — şimdilik zararsız); tüm endpoint'ler `async def` ama senkron DB kullanıyor → ağır istek worker event loop'unu bloke ediyor (8 worker = 8 eşzamanlı istek tavanı, 2026-07-31 kaydındaki notla aynı); `loadsheet_lines.loadsheet_id` index'i yok. **Asıl tavan bu üçünden biri değil:** 8 worker + senkron DB → Konya'da 1,4 sn'lik tablet isteği bir worker'ı tamamen bloke ediyor; 8'i aşan eşzamanlı ağır istek kuyruğa giriyor. Tablet sayısı veya depo sayısı artınca ilk bu hissedilir (timeout olarak değil, yavaşlama olarak).
-- **Ölçemediğim tek şey (dürüstlük notu):** planlamanın uçtan uca gerçek süresi. `loadsheets` tablosunda `created_at` yok (`printed_at` var), tekrar tetiklemek de üretim verisi yazacağı için denemedim. Bilinen: okuma kısmı ~40 sn → 0,06 sn indi ve istek 200 döndü. Fiş üretimi lineer büyüdüğü için 180 sn tavanı ancak binlerce fişte gündeme gelir; 2. distribütör devreye girerse gerçek süre ölçülmeli (öneri: `loadsheets.created_at` eklemek).
-
