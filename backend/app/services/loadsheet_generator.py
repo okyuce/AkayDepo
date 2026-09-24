@@ -43,6 +43,11 @@ class LoadsheetGenerator:
         Revizyonla geçersizleşen sipariş (başka bir siparişin `previous_order_id`'si)
         toplama katılmaz: revizyon siparişin tam yeni içeriğidir, eskisi de sayılırsa
         bayi 2 kat (zincirde N kat) görünür ve eşiğin altındaki bayi AnaStok'a düşer.
+
+        Toplam SQL'de tamsayı PAKET olarak alınır, kartona tek bölmeyle çevrilir.
+        Satır satır `paket / 10.0` toplamak float hatası biriktiriyordu: tam 200
+        kartonluk bayi (ör. 199 krt + 10 satırda 1'er paket) Postgres'te
+        199,99999999999994 çıkıp eşiğin altında kalıyordu.
         """
         from sqlalchemy import func
 
@@ -54,7 +59,7 @@ class LoadsheetGenerator:
             select(
                 Order.dealer_id,
                 func.coalesce(
-                    func.sum(OrderLine.qty_carton + OrderLine.qty_pack / 10.0), 0
+                    func.sum(OrderLine.qty_carton * 10 + OrderLine.qty_pack), 0
                 ),
             )
             .select_from(Order)
@@ -62,7 +67,7 @@ class LoadsheetGenerator:
             .where(Order.cycle_id == cycle_id, Order.id.not_in(superseded_order_ids))
             .group_by(Order.dealer_id)
         )
-        return {dealer_id: float(total or 0) for dealer_id, total in self.session.exec(stmt).all()}
+        return {dealer_id: int(total_packs or 0) / 10 for dealer_id, total_packs in self.session.exec(stmt).all()}
 
     def _get_or_create_main_stock_assignment(
         self, cycle_id: UUID, territory_id: UUID, plan_date

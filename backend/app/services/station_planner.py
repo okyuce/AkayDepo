@@ -313,6 +313,10 @@ class StationPlanner:
         atıyordu; manuel modda territory başına yeniden çağrıldığı için 564 bayilik
         döngüde ~40 sn sürüyor ve gunicorn worker timeout'una (502) yol açıyordu.
 
+        Revizyonla geçersizleşen sipariş (başka bir siparişin `previous_order_id`'si)
+        sayılmaz — loadsheet_generator._preload_dealer_cartons ile aynı kural. Sayılırsa
+        revizyonlu bölgenin yükü şişer (target_total_carton, "çok büyük" uyarısı, dengeleme).
+
         Returns:
             {territory_code: total_carton}
         """
@@ -322,6 +326,10 @@ class StationPlanner:
 
         from sqlalchemy import func
 
+        superseded_order_ids = select(Order.previous_order_id).where(
+            Order.cycle_id == cycle_id,
+            Order.previous_order_id.is_not(None),
+        )
         # outerjoin: satırı olmayan order'ın territory'si de 0 ile listede kalsın
         stmt = (
             select(
@@ -333,7 +341,7 @@ class StationPlanner:
             .select_from(Order)
             .join(Territory, Territory.id == Order.territory_id)
             .outerjoin(OrderLine, OrderLine.order_id == Order.id)
-            .where(Order.cycle_id == cycle_id)
+            .where(Order.cycle_id == cycle_id, Order.id.not_in(superseded_order_ids))
             .group_by(Territory.code)
         )
 

@@ -2,9 +2,9 @@
 AnaStok yönlendirme testleri (loadsheet_generator).
 
 Kural: bayinin döngüdeki toplam siparişi (karton + paket/10) 200 ve üstündeyse
-fişi AnaStok'a gider. Revizyonla geçersizleşen önceki sipariş toplama katılmaz;
-revizyonda iptal edilen tamamlanmış fişin stoğu o fişin kendi istasyonuna iade
-edilir.
+fişi AnaStok'a gider. Revizyonla geçersizleşen önceki sipariş toplama katılmaz
+(planlayıcının bölge yükünde de); revizyonda iptal edilen tamamlanmış fişin
+stoğu o fişin kendi istasyonuna iade edilir.
 """
 from datetime import date, datetime
 from types import SimpleNamespace
@@ -18,6 +18,7 @@ from app.models import (
     Station, StationAssignment, StationInventory, StockMovement, Territory,
 )
 from app.services.loadsheet_generator import LoadsheetGenerator
+from app.services.station_planner import StationPlanner
 
 
 @pytest.fixture
@@ -37,7 +38,11 @@ def world(session: Session):
         territory_id=territory.id, load_rank=1, target_total_carton=0, target_total_pack=0,
     )
     inventory = StationInventory(station_id=station.id, product_id=product.id, quantity_carton=1000, quantity_pack=0)
-    for o in [cycle, territory, station, main_stock, dealer, product, assignment, inventory]:
+    # FK sırasıyla: ilişki tanımı olmadığı için flush sırası garanti değil (Postgres FK'yi denetler)
+    for o in [cycle, territory, station, main_stock, product]:
+        session.add(o)
+    session.flush()
+    for o in [dealer, assignment, inventory]:
         session.add(o)
     session.commit()
     return SimpleNamespace(
@@ -47,8 +52,9 @@ def world(session: Session):
 
 
 def add_order(w, batch: int, carton: int, pack: int = 0, previous: Order = None,
-              delivery: date = date(2026, 9, 25)) -> Order:
-    """Excel import'unun yazdığı sipariş. `previous` verilirse revizyondur (tam yeni içerik)."""
+              delivery: date = date(2026, 9, 25), extra_lines=()) -> Order:
+    """Excel import'unun yazdığı sipariş. `previous` verilirse revizyondur (tam yeni içerik).
+    `extra_lines`: her biri ayrı üründe ek (karton, paket) satırları."""
     order = Order(
         cycle_id=w.cycle.id, external_order_code=f"SIP-{batch}", payment_type="Nakit",
         order_date=datetime(2026, 9, 24, 10, 0), delivery_date=delivery,
@@ -60,6 +66,11 @@ def add_order(w, batch: int, carton: int, pack: int = 0, previous: Order = None,
     w.session.add(order)
     w.session.flush()
     w.session.add(OrderLine(order_id=order.id, product_id=w.product.id, qty_carton=carton, qty_pack=pack))
+    for extra_carton, extra_pack in extra_lines:
+        product = Product(id=uuid4(), code=f"EK-{uuid4().hex[:8]}", name="Ek Ürün")
+        w.session.add(product)
+        w.session.flush()
+        w.session.add(OrderLine(order_id=order.id, product_id=product.id, qty_carton=extra_carton, qty_pack=extra_pack))
     w.session.commit()
     return order
 
@@ -77,18 +88,21 @@ def station_of(w, loadsheet: Loadsheet):
 
 
 def complete(w, loadsheet: Loadsheet):
-    """complete_loadsheet gibi: fiş yüklenir, stok fişin kendi istasyonundan düşer."""
-    inventory = w.session.exec(
-        select(StationInventory).where(
-            StationInventory.station_id == station_of(w, loadsheet),
-            StationInventory.product_id == w.product.id,
-        )
-    ).one()
+    """complete_loadsheet gibi: fiş yüklenir, her satır fişin kendi istasyonunun stoğundan
+    paket eşdeğeriyle (1 karton = 10 paket) düşer."""
+    station_id = station_of(w, loadsheet)
     for line in w.session.exec(select(LoadsheetLine).where(LoadsheetLine.loadsheet_id == loadsheet.id)).all():
-        inventory.quantity_carton -= line.qty_carton
+        inventory = w.session.exec(
+            select(StationInventory).where(
+                StationInventory.station_id == station_id,
+                StationInventory.product_id == line.product_id,
+            )
+        ).one()
+        total_packs = inventory.quantity_carton * 10 + inventory.quantity_pack - (line.qty_carton * 10 + line.qty_pack)
+        inventory.quantity_carton, inventory.quantity_pack = total_packs // 10, total_packs % 10
+        w.session.add(inventory)
     loadsheet.status = "loaded"
     loadsheet.loaded_at = loadsheet.completed_at = datetime.now()
-    w.session.add(inventory)
     w.session.add(loadsheet)
     w.session.commit()
 
@@ -105,6 +119,14 @@ def test_threshold_boundary(world, carton, pack, to_main_stock):
     add_order(world, 1, carton, pack)
     ls = plan_batch(world, 1)
     assert station_of(world, ls) == (world.main_stock.id if to_main_stock else world.station.id)
+
+
+def test_threshold_exact_200_with_pack_lines(world):
+    """199 krt + 10 ayrı satırda 1'er paket = tam 200 → AnaStok. Satır satır `paket / 10.0`
+    toplandığında Postgres 199,99999999999994 veriyordu. (SQLite telafili topladığı için
+    eski kod burada da geçer; asıl güvence tamsayı paket toplamı.)"""
+    add_order(world, 1, 199, extra_lines=[(0, 1)] * 10)
+    assert station_of(world, plan_batch(world, 1)) == world.main_stock.id
 
 
 def test_inactive_main_stock_keeps_dealer_on_station(world):
@@ -172,3 +194,14 @@ def test_revision_refund_goes_to_previous_loadsheet_station(world):
     assert world.session.exec(
         select(StationInventory).where(StationInventory.station_id == world.main_stock.id)
     ).first() is None
+
+
+# ---------- planlayıcı: bölge yükü ----------
+
+def test_territory_load_excludes_superseded_orders(world):
+    """110 → 100 revizyonu: bölge yükü 100 olmalı. Önceki sipariş de sayılırsa 210 çıkıp
+    target_total_carton'u (plan ekranı) ve "çok büyük bölge" uyarısını şişiriyordu."""
+    first = add_order(world, 1, 110)
+    add_order(world, 2, 100, previous=first)
+    loads = StationPlanner(world.session)._calculate_territory_loads(world.cycle.id)
+    assert loads == {world.territory.code: 100.0}
