@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VERSION = "2.0.87"
+VERSION = "2.0.88"
 
 
 # Şema DDL'i için Postgres advisory lock anahtarı (rastgele sabit).
